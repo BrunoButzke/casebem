@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CaseBem · O casamento digital dos noivos</title>
+    <meta
+      name="description"
+      content="Site do casamento, convite virtual, lista de presentes que vira Pix, app de dinâmicas e organização de mesas. Planos a partir de R$ 299,90."
+    />
+    <meta name="theme-color" content="#2F4A40" />
+    <meta property="og:title" content="CaseBem · O casamento digital dos noivos" />
+    <meta
+      property="og:description"
+      content="Informativo, convite, Pix e dinamicas para o grande dia — do Standard ao VIP."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="/images/landing/hero-casal.jpg" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Outfit:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/src/landing/style.css" />
+  </head>
+  <body>
+    <div class="preloader" aria-hidden="true">
+      <div class="preloader__inner">
+        <span class="preloader__mark">Case<em>Bem</em></span>
+      </div>
+      <div class="preloader__bar"><span></span></div>
+    </div>
+
+    <div class="scroll-progress" aria-hidden="true"><span></span></div>
+    <div class="cursor" aria-hidden="true"></div>
+
+    <header class="nav">
+      <a href="#topo" class="logo" aria-label="CaseBem, início">
+        <span class="logo__word">Case<em>Bem</em></span>
+      </a>
+      <nav class="nav__links" aria-label="Seções">
+        <a href="#como-funciona">Como funciona</a>
+        <a href="#app">App</a>
+        <a href="#planos">Planos</a>
+      </nav>
+      <a href="#lista" class="btn btn--sm magnetic">Lista de espera</a>
+    </header>
+
+    <main id="topo">
+      <section class="hero">
+        <div class="hero__bg" data-parallax>
+          <img
+            src="/images/landing/hero-casal.jpg"
+            alt="Casal em ensaio ao ar livre"
+            width="1600"
+            height="900"
+          />
+        </div>
+        <div class="hero__shade"></div>
+        <div class="hero__grid container">
+          <div class="hero__copy">
+            <p class="eyebrow hero__eyebrow">Para noivos que querem menos stress</p>
+            <h1 class="hero__title">
+              <span class="line"><span>Case<em>Bem</em></span></span>
+            </h1>
+            <p class="hero__lead">
+              Site do casamento, convite virtual, presentes que viram Pix e dinâmicas
+              para a festa — tudo em um só lugar.
+            </p>
+            <div class="hero__ctas">
+              <a href="#lista" class="btn magnetic">Entrar na lista</a>
+              <a href="/dani-carine/" class="btn btn--ghost magnetic"
+                >Ver exemplo de casal parceiro</a
+              >
+            </div>
+          </div>
+          <div class="hero__phone phone" aria-hidden="true">
+            <div class="phone__notch"></div>
+            <div class="phone__screen">
+              <img src="/images/landing/ui-site.jpg" alt="" />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="marquee" aria-hidden="true">
+        <div class="marquee__track">
+          <span>Site informativo</span><span>·</span><span>Convite virtual</span
+          ><span>·</span><span>Lista → Pix</span><span>·</span><span>Ranking</span
+          ><span>·</span><span>Galeria</span><span>·</span><span>Jogos</span
+          ><span>·</span><span>Mesas</span><span>·</span><span>Assessor VIP</span
+          ><span>·</span>
+        </div>
+      </div>
+
+      <section class="manifesto" id="manifesto">
+        <div class="container manifesto__grid">
+          <p class="manifesto__text" data-words>
+            O casamento merece mais do que um <mark>link</mark> perdido no WhatsApp.
+          </p>
+          <div class="manifesto__stats">
+            <div class="stat">
+              <span class="stat__num" data-count data-from="0" data-to="3">0</span>
+              <span class="stat__label">planos</span>
+            </div>
+            <div class="stat">
+              <span class="stat__num" data-count data-from="0" data-to="12">0</span>
+              <span class="stat__label">dinâmicas</span>
+            </div>
+            <div class="stat">
+              <span class="stat__num" data-count data-from="0" data-to="100">0</span>
+              <span class="stat__label">% Pix</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="how" id="como-funciona">
+        <div class="how__pin">
+          <div class="container how__layout">
+            <div class="how__copy">
+              <p class="eyebrow">Como funciona</p>
+              <h2 class="how__title">Do briefing à festa</h2>
+              <ul class="how__steps" role="list">
+                <li class="how__step is-active" data-step="0">
+                  <span class="how__n">01</span>
+                  <div>
+                    <strong>Contam a história</strong>
+                    <p>Data, local, dress code e o clima do casal.</p>
+                  </div>
+                </li>
+                <li class="how__step" data-step="1">
+                  <span class="how__n">02</span>
+                  <div>
+                    <strong>Sai o informativo</strong>
+                    <p>Site personalizado + convite virtual para compartilhar.</p>
+                  </div>
+                </li>
+                <li class="how__step" data-step="2">
+                  <span class="how__n">03</span>
+                  <div>
+                    <strong>Presentes viram Pix</strong>
+                    <p>Lista elegante; o valor cai direto para os noivos.</p>
+                  </div>
+                </li>
+                <li class="how__step" data-step="3">
+                  <span class="how__n">04</span>
+                  <div>
+                    <strong>A festa no app</strong>
+                    <p>Desafios, ranking, galeria e jogos para os convidados.</p>
+                  </div>
+                </li>
+              </ul>
+            </div>
+            <div class="how__visual" aria-hidden="true">
+              <figure class="how__frame is-active" data-frame="0">
+                <img src="/images/landing/step-briefing.jpg" alt="" />
+              </figure>
+              <figure class="how__frame" data-frame="1">
+                <img src="/images/landing/step-site.jpg" alt="" />
+              </figure>
+              <figure class="how__frame" data-frame="2">
+                <img src="/images/landing/step-pix.jpg" alt="" />
+              </figure>
+              <figure class="how__frame" data-frame="3">
+                <img src="/images/landing/app-ranking.jpg" alt="" />
+              </figure>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="theme" id="personalize">
+        <div class="container theme__grid">
+          <div class="theme__copy">
+            <p class="eyebrow">Personalize</p>
+            <h2>O informativo no clima de vocês</h2>
+            <p class="theme__lead">
+              Troque a paleta e veja o preview mudar — Standard e Plus usam templates;
+              no VIP o site nasce do zero.
+            </p>
+            <div class="theme__swatches" role="group" aria-label="Tema do informativo">
+              <button
+                type="button"
+                class="theme__dot is-active"
+                style="--c: #2f4a40"
+                data-theme="lagoon"
+                aria-pressed="true"
+                title="Lagoa"
+              >
+                <span class="sr-only">Lagoa</span>
+              </button>
+              <button
+                type="button"
+                class="theme__dot"
+                style="--c: #d4846a"
+                data-theme="salmon"
+                aria-pressed="false"
+                title="Salmão"
+              >
+                <span class="sr-only">Salmão</span>
+              </button>
+              <button
+                type="button"
+                class="theme__dot"
+                style="--c: #5c4a3a"
+                data-theme="espresso"
+                aria-pressed="false"
+                title="Espresso"
+              >
+                <span class="sr-only">Espresso</span>
+              </button>
+              <button
+                type="button"
+                class="theme__dot"
+                style="--c: #3a4a5c"
+                data-theme="dusk"
+                aria-pressed="false"
+                title="Dusk"
+              >
+                <span class="sr-only">Dusk</span>
+              </button>
+            </div>
+          </div>
+          <div class="theme__preview" data-theme="lagoon">
+            <div class="theme__card">
+              <p class="theme__eyebrow">21 · 11 · 2026</p>
+              <p class="theme__names">Ana <em>&amp;</em> Leo</p>
+              <p class="theme__place">Lagoa da Conceição</p>
+              <span class="theme__chip">Como chegar</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="features" id="app">
+        <div class="features__head container">
+          <p class="eyebrow">App de dinâmicas</p>
+          <h2>A festa também é experiência</h2>
+          <p class="features__lead">
+            Desafios com ranking, galeria compartilhada, jogos e arrecadação —
+            no Plus e no VIP.
+          </p>
+        </div>
+        <div class="features__viewport">
+          <div class="features__track">
+            <article class="features__card" >
+              <figure>
+                <img src="/images/landing/app-ranking.jpg" alt="App com ranking de desafios" />
+              </figure>
+              <h3>Desafios + ranking</h3>
+              <p>Missões personalizadas que engajam a mesa inteira.</p>
+            </article>
+            <article class="features__card" >
+              <figure>
+                <img src="/images/landing/app-galeria.jpg" alt="Galeria compartilhada na festa" />
+              </figure>
+              <h3>Galeria ao vivo</h3>
+              <p>Convidados enviam fotos; vocês guardam tudo num só lugar.</p>
+            </article>
+            <article class="features__card" >
+              <figure>
+                <img src="/images/landing/app-jogos.jpg" alt="Jogos para entreter convidados" />
+              </figure>
+              <h3>Jogos de festa</h3>
+              <p>Quebra-gelo e brincadeiras para arrecadar e entreter.</p>
+            </article>
+            <article class="features__card" >
+              <figure>
+                <img src="/images/landing/vip-mesas.jpg" alt="Organização de mesas e convidados" />
+              </figure>
+              <h3>Mesas &amp; convidados</h3>
+              <p>Painel VIP com assessor para distribuir quem senta onde.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="plans" id="planos">
+        <div class="container">
+          <p class="eyebrow">Planos</p>
+          <h2>Escolha o ritmo do casamento</h2>
+          <p class="plans__lead">Valores únicos. Sem mensalidade escondida.</p>
+
+          <div class="plans__grid">
+            <article class="plan reveal">
+              <p class="plan__name">Standard</p>
+              <p class="plan__price">R$&nbsp;299<span>,90</span></p>
+              <ul>
+                <li>Site informativo personalizado</li>
+                <li>Convite virtual</li>
+                <li>Lista de presentes → Pix</li>
+              </ul>
+              <a href="#lista" class="btn btn--ghost magnetic" data-plan="standard"
+                >Quero o Standard</a
+              >
+            </article>
+
+            <article class="plan plan--featured reveal">
+              <p class="plan__badge">Mais escolhido</p>
+              <p class="plan__name">Plus</p>
+              <p class="plan__price">R$&nbsp;499<span>,90</span></p>
+              <ul>
+                <li>Tudo do Standard</li>
+                <li>App de entretenimento e arrecadação</li>
+                <li>Sessões extras no informativo</li>
+                <li>Painel de mesas e convidados</li>
+              </ul>
+              <a href="#lista" class="btn magnetic" data-plan="plus">Quero o Plus</a>
+            </article>
+
+            <article class="plan reveal">
+              <p class="plan__name">VIP</p>
+              <p class="plan__price">R$&nbsp;1.199<span>,90</span></p>
+              <ul>
+                <li>Tudo do Plus</li>
+                <li>Site exclusivo feito do zero</li>
+                <li>Dinâmicas personalizadas</li>
+                <li>Link personalizado</li>
+                <li>Assessor para mesas e presentes</li>
+              </ul>
+              <a href="#lista" class="btn btn--ghost magnetic" data-plan="vip">Quero o VIP</a>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="partner" id="exemplo">
+        <div class="partner__bg" data-parallax>
+          <img
+            src="/images/hero-casal.jpg"
+            alt=""
+            aria-hidden="true"
+            width="1600"
+            height="900"
+          />
+        </div>
+        <div class="partner__shade"></div>
+        <div class="container partner__content">
+          <p class="eyebrow">Casal parceiro</p>
+          <h2>Dani &amp; Carine</h2>
+          <p>
+            Um informativo real, no clima da Lagoa da Conceição — veja o que o CaseBem
+            entrega na prática.
+          </p>
+          <a href="/dani-carine/" class="btn btn--ghost magnetic"
+            >Ver exemplo de casal parceiro</a
+          >
+        </div>
+      </section>
+
+      <section class="waitlist" id="lista">
+        <div class="container waitlist__inner">
+          <p class="eyebrow">Lista de espera</p>
+          <h2 class="waitlist__title">Garanta a vaga<br />do casamento de vocês.</h2>
+          <p class="waitlist__lead">
+            Sem cobrança agora. Avisamos quando a próxima turma abrir.
+          </p>
+
+          <form class="waitlist__form" novalidate>
+            <div class="waitlist__row">
+              <label class="waitlist__field">
+                <span>Nome</span>
+                <input type="text" name="name" autocomplete="name" required placeholder="Como te chamamos" />
+              </label>
+              <label class="waitlist__field">
+                <span>E-mail</span>
+                <input
+                  type="email"
+                  name="email"
+                  autocomplete="email"
+                  required
+                  placeholder="voce@email.com"
+                />
+              </label>
+            </div>
+            <fieldset class="waitlist__plans">
+              <legend>Plano de interesse</legend>
+              <label
+                ><input type="radio" name="plan" value="standard" /> Standard</label
+              >
+              <label
+                ><input type="radio" name="plan" value="plus" checked /> Plus</label
+              >
+              <label><input type="radio" name="plan" value="vip" /> VIP</label>
+            </fieldset>
+            <label class="waitlist__consent">
+              <input type="checkbox" name="consent" required />
+              <span>Quero receber o aviso por e-mail sobre o CaseBem.</span>
+            </label>
+            <p class="waitlist__msg" role="status" aria-live="polite"></p>
+            <button type="submit" class="btn magnetic">Entrar na lista</button>
+          </form>
+
+          <div class="waitlist__success" hidden>
+            <p class="waitlist__success-mark">Case<em>Bem</em></p>
+            <h3>Pronto, você está na lista!</h3>
+            <p>
+              Registramos <strong data-success-email></strong>. Em breve falamos
+              com você.
+            </p>
+            <button type="button" class="btn magnetic waitlist__pay" data-pay-plan>
+              Pagar plano agora
+            </button>
+            <p class="waitlist__pay-msg" data-pay-msg role="status" aria-live="polite"></p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p class="footer__mark">Case<em>Bem</em></p>
+      <p class="footer__note">Produto em construção</p>
+      <a href="/dani-carine/" class="footer__link">Exemplo Dani &amp; Carine</a>
+    </footer>
+
+    <script type="module" src="/src/landing/main.js"></script>
+  </body>
+</html>

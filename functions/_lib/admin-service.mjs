@@ -161,3 +161,30 @@ export async function markIntentPaidByProviderRef(db, providerReference, paidAtI
   const changes = Number(result?.meta?.changes ?? result?.changes ?? 0);
   return { updated: changes > 0 };
 }
+
+/**
+ * Mark paid by external_reference casebem:gift:{intentKey}
+ * (Checkout Pro card/boleto — preference id ≠ payment id)
+ */
+export async function markIntentPaidByExternalRef(db, externalReference, paymentId, paidAtIso) {
+  if (!externalReference || typeof externalReference !== 'string') {
+    return { updated: false };
+  }
+  const match = externalReference.match(/^casebem:gift:([0-9a-f-]{36})$/i);
+  if (!match) return { updated: false };
+  const intentKey = match[1];
+
+  const result = await db
+    .prepare(
+      `UPDATE checkout_intents
+       SET paid_at = COALESCE(paid_at, ?),
+           provider_reference = COALESCE(?, provider_reference),
+           updated_at = ?
+       WHERE intent_key = ?`
+    )
+    .bind(paidAtIso, paymentId ? String(paymentId) : null, paidAtIso, intentKey)
+    .run();
+
+  const changes = Number(result?.meta?.changes ?? result?.changes ?? 0);
+  return { updated: changes > 0, intentKey };
+}

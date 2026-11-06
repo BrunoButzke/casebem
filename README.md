@@ -29,7 +29,7 @@ Abre em `/landing-page-animada/`.
 4. No Cloudflare Pages: Settings → Environment variables → `MP_ACCESS_TOKEN` (produção).
 5. Painel noivos (Free): `ADMIN_PANEL_SECRET` (≥16 chars) → `/dani-carine/admin.html`
 6. Opcional e-mail (Resend free, fora da CF): `RESEND_API_KEY` + `ADMIN_NOTIFY_EMAIL`
-7. Webhook Pix: configure no MP `https://seu-dominio/api/webhooks/mercadopago`
+7. Webhook MP (Pix + cartão/boleto): `https://seu-dominio/api/webhooks/mercadopago`
 8. Migration `0005_admin_and_paid.sql` no D1 após deploy
 9. Migration `0006_rsvp_closed.sql` — RSVP aberto/fechado + lista no painel
 10. Migration `0007_gifts_catalog.sql` — catálogo editável no painel (`/api/gifts/catalog`)
@@ -40,7 +40,7 @@ Abre em `/landing-page-animada/`.
 
 | Fluxo | Onde | Comportamento |
 |-------|------|----------------|
-| Presentes | `/dani-carine/` modal | Gera **Pix** (QR + copia-e-cola), consulta status |
+| Presentes | `/dani-carine/` modal | **Pix** (QR) + **cartão/boleto** (Checkout Pro redirect) |
 | Planos | Landing → lista de espera → **Pagar plano agora** | Checkout Pro (redirect MP) |
 
 APIs (dev via Vite; prod via Cloudflare Pages Functions):

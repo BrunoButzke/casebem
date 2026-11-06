@@ -151,6 +151,119 @@ export async function getPaymentStatus({ accessToken, paymentId }) {
       status: data.status,
       statusDetail: data.status_detail,
       amount: data.transaction_amount,
+      externalReference: data.external_reference || null,
+    },
+  };
+}
+
+/**
+ * Checkout Pro — presentes multi-item (cartão / boleto via redirect).
+ * Free-tier CF: só Functions + fetch ao MP. external_reference estável = intentKey.
+ */
+export async function createGiftPreference({
+  accessToken,
+  intentKey,
+  gifterName,
+  items,
+  totalInCents,
+  paymentMethod, // 'card' | 'boleto'
+  payerEmail,
+  successUrl,
+  failureUrl,
+  pendingUrl,
+}) {
+  if (!accessToken) {
+    return jsonError(500, 'MP_ACCESS_TOKEN não configurado no servidor.');
+  }
+  if (!intentKey || !Array.isArray(items) || items.length === 0) {
+    return jsonError(400, 'intentKey e items obrigatórios.');
+  }
+  if (paymentMethod !== 'card' && paymentMethod !== 'boleto') {
+    return jsonError(400, 'paymentMethod deve ser card ou boleto.');
+  }
+
+  const amount = Number(totalInCents) / 100;
+  if (!Number.isFinite(amount) || amount < 0.99) {
+    return jsonError(400, 'Valor mínimo é R$ 0,99.');
+  }
+
+  const sorted = [...items].sort((a, b) => String(a.giftId).localeCompare(String(b.giftId)));
+  const mpItems = sorted.map((item) => ({
+    id: String(item.giftId).slice(0, 60),
+    title: String(item.name || item.giftId).slice(0, 200),
+    quantity: item.quantity,
+    currency_id: 'BRL',
+    unit_price: Math.round((item.priceInCents || 0) / 100 * 100) / 100,
+  }));
+
+  const isLocal =
+    String(successUrl || '').includes('localhost') ||
+    String(successUrl || '').includes('127.0.0.1');
+
+  // boleto no MP = tipo ticket; cartão = credit/debit
+  const paymentMethods =
+    paymentMethod === 'boleto'
+      ? {
+          excluded_payment_types: [
+            { id: 'credit_card' },
+            { id: 'debit_card' },
+            { id: 'prepaid_card' },
+            { id: 'bank_transfer' },
+          ],
+        }
+      : {
+          excluded_payment_types: [
+            { id: 'ticket' },
+            { id: 'bank_transfer' },
+            { id: 'atm' },
+          ],
+        };
+
+  const body = {
+    items: mpItems,
+    payer: {
+      email: String(payerEmail || 'noreply@casebem.com').trim().toLowerCase(),
+      name: String(gifterName || 'Convidado').slice(0, 60),
+    },
+    back_urls: {
+      success: successUrl,
+      failure: failureUrl,
+      pending: pendingUrl,
+    },
+    ...(isLocal ? {} : { auto_return: 'approved' }),
+    external_reference: `casebem:gift:${intentKey}`,
+    metadata: {
+      source: 'casebem-gifts',
+      intent_key: intentKey,
+      payment_method: paymentMethod,
+    },
+    payment_methods: paymentMethods,
+    statement_descriptor: 'CASEBEM',
+  };
+
+  const res = await fetch(`${MP_API}/checkout/preferences`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      'X-Idempotency-Key': intentKey,
+    },
+    body: JSON.stringify(body),
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    return jsonError(res.status, data?.message || 'Falha ao criar preferência de presente.', data);
+  }
+
+  return {
+    ok: true,
+    status: 200,
+    preference: {
+      id: data.id,
+      initPoint: data.init_point,
+      sandboxInitPoint: data.sandbox_init_point,
     },
   };
 }

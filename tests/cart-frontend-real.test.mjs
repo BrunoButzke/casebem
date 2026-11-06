@@ -50,12 +50,12 @@ function setupDOM() {
               <label for="pix">Pix</label>
             </div>
             <div class="payment-method">
-              <input type="radio" id="card" name="paymentMethod" value="card" disabled />
-              <label for="card">Cartão (em breve)</label>
+              <input type="radio" id="card" name="paymentMethod" value="card" />
+              <label for="card">Cartão de crédito</label>
             </div>
             <div class="payment-method">
-              <input type="radio" id="boleto" name="paymentMethod" value="boleto" disabled />
-              <label for="boleto">Boleto (em breve)</label>
+              <input type="radio" id="boleto" name="paymentMethod" value="boleto" />
+              <label for="boleto">Boleto bancário</label>
             </div>
           </div>
           

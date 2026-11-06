@@ -309,48 +309,72 @@ test('createCheckoutPayment com Pix mas sem MP_ACCESS_TOKEN retorna 503', async 
   assert.match(result.message, /servi[çc]o.*pagamento.*n[ãa]o.*configurado/i);
 });
 
-test('createCheckoutPayment com cartão retorna 503 provider não configurado', async () => {
+test('createCheckoutPayment com cartão retorna redirectUrl Checkout Pro', async () => {
   const request = {
     paymentMethod: 'card',
     gifterName: 'João Silva',
     items: [{ giftId: 'danca', quantity: 1 }],
     intentKey: '550e8400-e29b-41d4-a716-446655440012',
   };
-  
+
   const mockEnv = {
+    MP_ACCESS_TOKEN: 'TEST_TOKEN',
     RSVP_SECRET: Buffer.from('a'.repeat(32)).toString('base64'),
   };
   const mockDB = new MockD1Database();
-  
-  const result = await createCheckoutPayment(request, mockEnv, mockDB, '127.0.0.1');
-  
-  assert.equal(result.ok, false);
-  assert.equal(result.status, 503);
-  assert.equal(result.error, 'PAYMENT_PROVIDER_NOT_CONFIGURED');
-  assert.match(result.message, /cart[ãa]o.*boleto.*n[ãa]o.*dispon[íi]vel/i);
-  assert.ok(Array.isArray(result.availableMethods));
-  assert.ok(result.availableMethods.includes('pix'));
+
+  globalThis.__testCreateGiftPreference = async () => ({
+    ok: true,
+    preference: {
+      id: 'pref_card_1',
+      initPoint: 'https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=card',
+    },
+  });
+
+  try {
+    const result = await createCheckoutPayment(request, mockEnv, mockDB, '127.0.0.1', {
+      origin: 'https://casebem.com',
+    });
+    assert.equal(result.ok, true);
+    assert.equal(result.method, 'card');
+    assert.match(result.redirectUrl, /^https:\/\//);
+  } finally {
+    delete globalThis.__testCreateGiftPreference;
+  }
 });
 
-test('createCheckoutPayment com boleto retorna 503 provider não configurado', async () => {
+test('createCheckoutPayment com boleto retorna redirectUrl Checkout Pro', async () => {
   const request = {
     paymentMethod: 'boleto',
     gifterName: 'Maria Santos',
     items: [{ giftId: 'spa', quantity: 1 }],
     intentKey: '550e8400-e29b-41d4-a716-446655440013',
   };
-  
+
   const mockEnv = {
+    MP_ACCESS_TOKEN: 'TEST_TOKEN',
     RSVP_SECRET: Buffer.from('a'.repeat(32)).toString('base64'),
   };
   const mockDB = new MockD1Database();
-  
-  const result = await createCheckoutPayment(request, mockEnv, mockDB, '127.0.0.1');
-  
-  assert.equal(result.ok, false);
-  assert.equal(result.status, 503);
-  assert.equal(result.error, 'PAYMENT_PROVIDER_NOT_CONFIGURED');
-  assert.match(result.message, /cart[ãa]o.*boleto.*n[ãa]o.*dispon[íi]vel/i);
+
+  globalThis.__testCreateGiftPreference = async () => ({
+    ok: true,
+    preference: {
+      id: 'pref_bol_1',
+      initPoint: 'https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=bol',
+    },
+  });
+
+  try {
+    const result = await createCheckoutPayment(request, mockEnv, mockDB, '127.0.0.1', {
+      origin: 'https://casebem.com',
+    });
+    assert.equal(result.ok, true);
+    assert.equal(result.method, 'boleto');
+    assert.match(result.redirectUrl, /^https:\/\//);
+  } finally {
+    delete globalThis.__testCreateGiftPreference;
+  }
 });
 
 test('createCheckoutPayment recalcula total no servidor', async () => {

@@ -14,9 +14,12 @@ function setupDOM() {
   
   // Setup HTML structure (simulando dani-carine/index.html)
   document.body.innerHTML = `
-    <main id="main">
-      <button id="cart-button" aria-label="Abrir carrinho">🎁 <span id="cart-badge">0</span></button>
-    </main>
+    <header>
+      <nav>
+        <div class="nav__links"></div>
+      </nav>
+    </header>
+    <main id="main"></main>
     
     <aside id="cart-modal" class="cart-modal" hidden>
       <div class="cart-overlay"></div>
@@ -26,24 +29,34 @@ function setupDOM() {
         
         <div id="cart-items"></div>
         
-        <div id="cart-summary" hidden>
-          <div class="cart-total"></div>
+        <div class="cart-checkout" id="cart-checkout">
+          <div class="form-field">
+            <label for="gifter-name">Seu nome <span class="required">*</span></label>
+            <input type="text" id="gifter-name" required minlength="2" maxlength="100" />
+            <span class="form-error" id="gifter-name-error" role="alert" hidden></span>
+          </div>
           
-          <label for="gifter-name">Seu nome completo:</label>
-          <input type="text" id="gifter-name" required />
+          <div class="payment-methods">
+            <div class="payment-method">
+              <input type="radio" id="pix" name="paymentMethod" value="pix" checked />
+              <label for="pix">Pix</label>
+            </div>
+            <div class="payment-method">
+              <input type="radio" id="card" name="paymentMethod" value="card" disabled />
+              <label for="card">Cartão (em breve)</label>
+            </div>
+            <div class="payment-method">
+              <input type="radio" id="boleto" name="paymentMethod" value="boleto" disabled />
+              <label for="boleto">Boleto (em breve)</label>
+            </div>
+          </div>
           
-          <label for="payment-method">Forma de pagamento:</label>
-          <select id="payment-method">
-            <option value="pix">Pix</option>
-            <option value="card">Cartão (em breve)</option>
-            <option value="boleto">Boleto (em breve)</option>
-          </select>
+          <p class="cart-error" id="cart-error" hidden role="alert"></p>
           
-          <button id="cart-checkout" class="btn btn-primary">Finalizar Compra</button>
-          <div id="cart-error" hidden></div>
+          <button type="button" class="btn magnetic" id="cart-checkout-btn">Finalizar compra</button>
         </div>
         
-        <div id="payment-result" hidden></div>
+        <div id="cart-payment-result" hidden></div>
       </div>
     </aside>
   `;
@@ -57,6 +70,13 @@ function setupDOM() {
   window.crypto = {
     randomUUID: () => '550e8400-e29b-41d4-a716-446655440000',
   };
+  
+  // Mock requestAnimationFrame
+  window.requestAnimationFrame = (cb) => setTimeout(cb, 0);
+  window.setTimeout = setTimeout;
+  window.setInterval = setInterval;
+  window.clearTimeout = clearTimeout;
+  window.clearInterval = clearInterval;
   
   global.fetch = async () => ({
     ok: true,
@@ -77,17 +97,14 @@ test('Cart modal focus trap: Tab cycles through modal elements', async () => {
   const { document } = setupDOM();
   
   // Dynamically import cart after DOM is ready
-  const { initCart } = await import('../src/dani-carine/cart.mjs');
+  const { initCart, addToCart, openCartModal } = await import('../src/dani-carine/cart.mjs');
   initCart(global.window);
 
-  // Adicionar item ao carrinho
-  global.window.dispatchEvent(new global.window.CustomEvent('addToCart', {
-    detail: { giftId: 'danca', quantity: 1 },
-  }));
+  // Adicionar item ao carrinho via API pública
+  addToCart('danca', 1);
 
-  // Abrir modal
-  const cartButton = document.getElementById('cart-button');
-  cartButton.click();
+  // Abrir modal via API pública
+  openCartModal();
 
   const modal = document.getElementById('cart-modal');
   assert.equal(modal.hidden, false, 'Modal deve estar visível');
@@ -114,17 +131,14 @@ test('Cart modal focus trap: Tab cycles through modal elements', async () => {
 test('Cart modal: Escape key fecha modal e restaura focus', async () => {
   const { document } = setupDOM();
   
-  const { initCart } = await import('../src/dani-carine/cart.mjs');
+  const { initCart, addToCart, openCartModal } = await import('../src/dani-carine/cart.mjs');
   initCart(global.window);
 
   // Adicionar item
-  global.window.dispatchEvent(new global.window.CustomEvent('addToCart', {
-    detail: { giftId: 'danca', quantity: 1 },
-  }));
+  addToCart('danca', 1);
 
   // Abrir modal
-  const cartButton = document.getElementById('cart-button');
-  cartButton.click();
+  openCartModal();
 
   const modal = document.getElementById('cart-modal');
   assert.equal(modal.hidden, false);
@@ -144,27 +158,23 @@ test('Cart modal: Escape key fecha modal e restaura focus', async () => {
 test('Cart: inert attribute aplicado em <main> quando modal aberto', async () => {
   const { document } = setupDOM();
   
-  const { initCart } = await import('../src/dani-carine/cart.mjs');
+  const { initCart, addToCart, openCartModal, closeCartModal } = await import('../src/dani-carine/cart.mjs');
   initCart(global.window);
 
   const main = document.getElementById('main');
   
   // Adicionar item
-  global.window.dispatchEvent(new global.window.CustomEvent('addToCart', {
-    detail: { giftId: 'danca', quantity: 1 },
-  }));
+  addToCart('danca', 1);
 
   // Abrir modal
-  const cartButton = document.getElementById('cart-button');
-  cartButton.click();
+  openCartModal();
 
   // Verificar inert
   assert.ok(main.hasAttribute('inert'), '<main> deve ter inert quando modal aberto');
   assert.equal(main.getAttribute('aria-hidden'), 'true', '<main> deve ter aria-hidden');
 
   // Fechar modal
-  const closeButton = document.getElementById('cart-close');
-  closeButton.click();
+  closeCartModal();
 
   assert.equal(main.hasAttribute('inert'), false, '<main> não deve ter inert quando modal fechado');
   assert.equal(main.getAttribute('aria-hidden'), 'false');
@@ -175,20 +185,18 @@ test('Cart: inert attribute aplicado em <main> quando modal aberto', async () =>
 test('Cart validation: rejeita nome vazio/curto', async () => {
   const { document } = setupDOM();
   
-  const { initCart } = await import('../src/dani-carine/cart.mjs');
+  const { initCart, addToCart, openCartModal } = await import('../src/dani-carine/cart.mjs');
   initCart(global.window);
 
   // Adicionar item
-  global.window.dispatchEvent(new global.window.CustomEvent('addToCart', {
-    detail: { giftId: 'danca', quantity: 1 },
-  }));
+  addToCart('danca', 1);
 
   // Abrir modal
-  document.getElementById('cart-button').click();
+  openCartModal();
 
   const nameInput = document.getElementById('gifter-name');
-  const checkoutBtn = document.getElementById('cart-checkout');
-  const errorDiv = document.getElementById('cart-error');
+  const checkoutBtn = document.getElementById('cart-checkout-btn');
+  const nameError = document.getElementById('gifter-name-error');
 
   // Tentar checkout com nome vazio
   nameInput.value = '';
@@ -197,16 +205,17 @@ test('Cart validation: rejeita nome vazio/curto', async () => {
   // Aguardar evento assíncrono
   await new Promise(resolve => setTimeout(resolve, 50));
 
-  assert.equal(errorDiv.hidden, false, 'Erro deve ser exibido');
-  assert.match(errorDiv.textContent, /nome/i, 'Erro deve mencionar nome');
+  assert.equal(nameError.hidden, false, 'Erro de nome deve ser exibido');
+  assert.match(nameError.textContent, /nome|caracteres/i, 'Erro deve mencionar nome ou caracteres');
 
   // Tentar com nome muito curto
   nameInput.value = 'A';
+  nameError.hidden = true;  // Reset
   checkoutBtn.click();
 
   await new Promise(resolve => setTimeout(resolve, 50));
 
-  assert.equal(errorDiv.hidden, false);
+  assert.equal(nameError.hidden, false, 'Erro de nome curto deve ser exibido');
 
   cleanupDOM();
 });
@@ -229,16 +238,14 @@ test('Cart XSS: rejeita QR code base64 com script tags', async () => {
     }),
   });
 
-  const { initCart } = await import('../src/dani-carine/cart.mjs');
+  const { initCart, addToCart, openCartModal } = await import('../src/dani-carine/cart.mjs');
   initCart(global.window);
 
   // Adicionar item
-  global.window.dispatchEvent(new global.window.CustomEvent('addToCart', {
-    detail: { giftId: 'danca', quantity: 1 },
-  }));
+  addToCart('danca', 1);
 
   // Abrir modal e fazer checkout
-  document.getElementById('cart-button').click();
+  openCartModal();
   document.getElementById('gifter-name').value = 'João Silva';
   document.getElementById('cart-checkout').click();
 
@@ -278,14 +285,12 @@ test('Cart XSS: valida base64 estritamente', async () => {
       }),
     });
 
-    const { initCart } = await import('../src/dani-carine/cart.mjs');
+    const { initCart, addToCart, openCartModal } = await import('../src/dani-carine/cart.mjs');
     initCart(global.window);
 
-    global.window.dispatchEvent(new global.window.CustomEvent('addToCart', {
-      detail: { giftId: 'danca', quantity: 1 },
-    }));
+    addToCart('danca', 1);
 
-    document.getElementById('cart-button').click();
+    openCartModal();
     document.getElementById('gifter-name').value = 'João Silva';
     document.getElementById('cart-checkout').click();
 
@@ -312,23 +317,23 @@ test('Cart XSS: valida base64 estritamente', async () => {
 test('Cart: badge atualiza corretamente com quantidade', async () => {
   const { document } = setupDOM();
   
-  const { initCart } = await import('../src/dani-carine/cart.mjs');
+  const { initCart, addToCart } = await import('../src/dani-carine/cart.mjs');
   initCart(global.window);
 
-  const badge = document.getElementById('cart-badge');
+  // Badge é criado dinamicamente por setupCartBadge
+  await new Promise(resolve => setTimeout(resolve, 10));
+  
+  const badge = document.querySelector('.cart-badge');
+  assert.ok(badge, 'Badge deve existir');
   assert.equal(badge.textContent, '0', 'Badge inicial deve ser 0');
 
   // Adicionar 2 items
-  global.window.dispatchEvent(new global.window.CustomEvent('addToCart', {
-    detail: { giftId: 'danca', quantity: 2 },
-  }));
+  addToCart('danca', 2);
 
   assert.equal(badge.textContent, '2', 'Badge deve mostrar 2');
 
   // Adicionar mais 1
-  global.window.dispatchEvent(new global.window.CustomEvent('addToCart', {
-    detail: { giftId: 'spa', quantity: 1 },
-  }));
+  addToCart('spa', 1);
 
   assert.equal(badge.textContent, '3', 'Badge deve mostrar 3');
 
@@ -338,16 +343,14 @@ test('Cart: badge atualiza corretamente com quantidade', async () => {
 test('Cart: ajuste de quantidade via botões + e -', async () => {
   const { document } = setupDOM();
   
-  const { initCart } = await import('../src/dani-carine/cart.mjs');
+  const { initCart, addToCart, openCartModal } = await import('../src/dani-carine/cart.mjs');
   initCart(global.window);
 
   // Adicionar item
-  global.window.dispatchEvent(new global.window.CustomEvent('addToCart', {
-    detail: { giftId: 'danca', quantity: 1 },
-  }));
+  addToCart('danca', 1);
 
   // Abrir modal
-  document.getElementById('cart-button').click();
+  openCartModal();
 
   const cartItems = document.getElementById('cart-items');
   const plusButton = cartItems.querySelector('[data-action="increase"]');
@@ -386,14 +389,12 @@ test('Cart: verdadeira mensagem sobre confirmação pendente/manual', async () =
     }),
   });
 
-  const { initCart } = await import('../src/dani-carine/cart.mjs');
+  const { initCart, addToCart, openCartModal } = await import('../src/dani-carine/cart.mjs');
   initCart(global.window);
 
-  global.window.dispatchEvent(new global.window.CustomEvent('addToCart', {
-    detail: { giftId: 'danca', quantity: 1 },
-  }));
+  addToCart('danca', 1);
 
-  document.getElementById('cart-button').click();
+  openCartModal();
   document.getElementById('gifter-name').value = 'João Silva';
   document.getElementById('cart-checkout').click();
 

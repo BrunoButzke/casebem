@@ -6,35 +6,80 @@ import { CartStorage } from './cart-storage.mjs';
 import { GIFTS_CATALOG, getGiftById, formatPrice } from '../../data/gifts-catalog.mjs';
 
 let cart = null;
+let _window = null;
+let _document = null;
+let _sessionStorage = null;
+let _crypto = null;
+let _fetch = null;
+
+/**
+ * Adiciona item ao carrinho (API pública para testes)
+ * @param {string} giftId - ID do presente
+ * @param {number} quantity - Quantidade
+ * @public
+ */
+export function addToCart(giftId, quantity = 1) {
+  if (!cart) return;
+  cart.addItem(giftId, quantity);
+  resetIntentKey();
+  updateCartBadge();
+}
 
 /**
  * Inicializa o carrinho
+ * @param {Window} windowObj - Window object (para testes injetarem deps)
  */
 export function initCart(windowObj) {
-  // Accept window object for testing
-  const win = windowObj || window;
-  const doc = win.document;
-  const storage = win.sessionStorage;
+  // Injetar dependências
+  _window = windowObj || (typeof window !== 'undefined' ? window : null);
+  if (!_window) return;
   
-  cart = new CartStorage(storage);
+  _document = _window.document;
+  _sessionStorage = _window.sessionStorage;
+  _crypto = _window.crypto;
+  _fetch = _window.fetch || (typeof fetch !== 'undefined' ? fetch : null);
+  
+  if (!_document || !_sessionStorage) return;
+  
+  cart = new CartStorage(_sessionStorage);
 
   setupCartBadge();
   setupGiftCards();
-  // setupCartModal(); // Comentado: modal já existe no HTML
+  setupModalEvents();
   updateCartBadge();
+}
+
+/**
+ * Setup eventos do modal (chamado uma vez no init)
+ * @private
+ */
+function setupModalEvents() {
+  if (!_document) return;
+  
+  // Eventos globais
+  _document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      const modal = _document.getElementById('cart-modal');
+      if (modal && !modal.hidden) {
+        closeCartModal();
+      }
+    }
+  });
 }
 
 /**
  * Configura badge do carrinho
  */
 function setupCartBadge() {
-  const existingBadge = document.querySelector('.cart-badge');
+  if (!_document) return;
+  
+  const existingBadge = _document.querySelector('.cart-badge');
   if (existingBadge) return;
 
-  const nav = document.querySelector('.nav__links');
+  const nav = _document.querySelector('.nav__links');
   if (!nav) return;
 
-  const cartLink = document.createElement('button');
+  const cartLink = _document.createElement('button');
   cartLink.type = 'button';
   cartLink.className = 'btn btn--sm magnetic cart-trigger';
   cartLink.setAttribute('aria-label', 'Ver carrinho');
@@ -53,7 +98,9 @@ function setupCartBadge() {
  * Configura cards de presentes para adicionar ao carrinho
  */
 function setupGiftCards() {
-  const giftCards = document.querySelectorAll('.gift-card');
+  if (!_document) return;
+  
+  const giftCards = _document.querySelectorAll('.gift-card');
   
   giftCards.forEach(card => {
     card.addEventListener('click', (e) => {
@@ -76,7 +123,9 @@ function setupGiftCards() {
  * Atualiza badge do carrinho
  */
 function updateCartBadge() {
-  const badge = document.querySelector('.cart-badge');
+  if (!_document) return;
+  
+  const badge = _document.querySelector('.cart-badge');
   if (!badge) return;
 
   const count = cart.getCount();
@@ -88,18 +137,19 @@ function updateCartBadge() {
  * Mostra feedback ao adicionar item
  */
 function showCartFeedback(message) {
-  const existing = document.querySelector('.cart-feedback');
+  const existing = _document.querySelector('.cart-feedback');
   if (existing) existing.remove();
 
-  const feedback = document.createElement('div');
+  const feedback = _document.createElement('div');
   feedback.className = 'cart-feedback';
   feedback.setAttribute('role', 'status');
   feedback.setAttribute('aria-live', 'polite');
   feedback.textContent = message;
   
-  document.body.appendChild(feedback);
+  _document.body.appendChild(feedback);
 
-  requestAnimationFrame(() => {
+  const raf = _window.requestAnimationFrame || ((cb) => setTimeout(cb, 0));
+  raf(() => {
     feedback.classList.add('is-visible');
   });
 
@@ -120,7 +170,7 @@ let currentIntentKey = null;
 function getOrCreateIntentKey() {
   try {
     // Tentar recuperar intent key existente
-    const stored = sessionStorage.getItem('casebem_intent_key');
+    const stored = _sessionStorage.getItem('casebem_intent_key');
     if (stored) {
       currentIntentKey = stored;
       return stored;
@@ -130,10 +180,10 @@ function getOrCreateIntentKey() {
   }
 
   // Gerar novo intent key (UUID v4)
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    currentIntentKey = crypto.randomUUID();
+  if (_crypto && typeof _crypto.randomUUID === 'function') {
+    currentIntentKey = _crypto.randomUUID();
   } else {
-    // Fallback para Node.js tests
+    // Fallback
     currentIntentKey = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
       const r = Math.random() * 16 | 0;
       const v = c === 'x' ? r : (r & 0x3 | 0x8);
@@ -143,7 +193,7 @@ function getOrCreateIntentKey() {
 
   // Salvar no sessionStorage
   try {
-    sessionStorage.setItem('casebem_intent_key', currentIntentKey);
+    _sessionStorage.setItem('casebem_intent_key', currentIntentKey);
   } catch (e) {
     // Storage denied, continuar com memória
   }
@@ -158,7 +208,7 @@ function getOrCreateIntentKey() {
 function resetIntentKey() {
   currentIntentKey = null;
   try {
-    sessionStorage.removeItem('casebem_intent_key');
+    _sessionStorage.removeItem('casebem_intent_key');
   } catch (e) {
     // Storage denied
   }
@@ -183,13 +233,13 @@ function setupFocusTrap(modal) {
 
     if (e.shiftKey) {
       // Shift + Tab
-      if (document.activeElement === firstElement) {
+      if (_document.activeElement === firstElement) {
         e.preventDefault();
         lastElement.focus();
       }
     } else {
       // Tab
-      if (document.activeElement === lastElement) {
+      if (_document.activeElement === lastElement) {
         e.preventDefault();
         firstElement.focus();
       }
@@ -206,24 +256,32 @@ function setupFocusTrap(modal) {
 
 /**
  * Abre modal do carrinho
+ * @public
  */
-function openCartModal() {
-  let modal = document.getElementById('cart-modal');
+export function openCartModal() {
+  let modal = _document.getElementById('cart-modal');
   
   if (!modal) {
     modal = createCartModal();
-    document.body.appendChild(modal);
+    _document.body.appendChild(modal);
+  } else {
+    // Modal já existe (ex: testes), garantir que listeners estão configurados
+    const checkoutBtn = modal.querySelector('#cart-checkout-btn');
+    if (checkoutBtn && !checkoutBtn.hasAttribute('data-listener-attached')) {
+      checkoutBtn.addEventListener('click', handleCheckout);
+      checkoutBtn.setAttribute('data-listener-attached', 'true');
+    }
   }
 
   // Salvar elemento ativo anterior
-  previousActiveElement = document.activeElement;
+  previousActiveElement = _document.activeElement;
 
   renderCartItems();
   modal.hidden = false;
-  document.body.style.overflow = 'hidden';
+  _document.body.style.overflow = 'hidden';
   
   // Tornar background inert (apenas modal interativo)
-  const mainContent = document.querySelector('main');
+  const mainContent = _document.querySelector('main');
   if (mainContent) {
     mainContent.setAttribute('inert', '');
     mainContent.setAttribute('aria-hidden', 'true');
@@ -236,7 +294,8 @@ function openCartModal() {
   const firstButton = modal.querySelector('button:not([disabled])');
   if (firstButton) {
     // Pequeno delay para garantir que o modal está visível
-    requestAnimationFrame(() => {
+    const raf = _window.requestAnimationFrame || ((cb) => setTimeout(cb, 0));
+    raf(() => {
       firstButton.focus();
     });
   }
@@ -244,19 +303,20 @@ function openCartModal() {
 
 /**
  * Fecha modal do carrinho
+ * @public
  */
-function closeCartModal() {
-  const modal = document.getElementById('cart-modal');
+export function closeCartModal() {
+  const modal = _document.getElementById('cart-modal');
   if (!modal) return;
 
   modal.hidden = true;
-  document.body.style.overflow = '';
+  _document.body.style.overflow = '';
 
   // Remover inert do background
-  const mainContent = document.querySelector('main');
+  const mainContent = _document.querySelector('main');
   if (mainContent) {
     mainContent.removeAttribute('inert');
-    mainContent.removeAttribute('aria-hidden');
+    mainContent.setAttribute('aria-hidden', 'false');
   }
 
   // Restaurar focus anterior
@@ -270,7 +330,7 @@ function closeCartModal() {
  * Cria estrutura do modal do carrinho
  */
 function createCartModal() {
-  const modal = document.createElement('div');
+  const modal = _document.createElement('div');
   modal.id = 'cart-modal';
   modal.className = 'gift-modal';
   modal.hidden = true;
@@ -358,11 +418,11 @@ function createCartModal() {
  * @private
  */
 function createCartItemElement(item, gift, subtotal) {
-  const article = document.createElement('article');
+  const article = _document.createElement('article');
   article.className = 'cart-item';
 
   // Imagem
-  const img = document.createElement('img');
+  const img = _document.createElement('img');
   img.src = gift.imageUrl;
   img.alt = gift.name;
   img.width = 80;
@@ -370,24 +430,24 @@ function createCartItemElement(item, gift, subtotal) {
   article.appendChild(img);
 
   // Info
-  const info = document.createElement('div');
+  const info = _document.createElement('div');
   info.className = 'cart-item__info';
   
-  const h4 = document.createElement('h4');
+  const h4 = _document.createElement('h4');
   h4.textContent = gift.name;
   info.appendChild(h4);
   
-  const price = document.createElement('p');
+  const price = _document.createElement('p');
   price.textContent = formatPrice(gift.priceInCents);
   info.appendChild(price);
   
   article.appendChild(info);
 
   // Actions (quantidade)
-  const actions = document.createElement('div');
+  const actions = _document.createElement('div');
   actions.className = 'cart-item__actions';
   
-  const decBtn = document.createElement('button');
+  const decBtn = _document.createElement('button');
   decBtn.type = 'button';
   decBtn.className = 'cart-qty-btn';
   decBtn.dataset.action = 'dec';
@@ -396,13 +456,13 @@ function createCartItemElement(item, gift, subtotal) {
   decBtn.textContent = '−';
   actions.appendChild(decBtn);
   
-  const qty = document.createElement('span');
+  const qty = _document.createElement('span');
   qty.className = 'cart-qty';
   qty.setAttribute('aria-label', 'Quantidade');
   qty.textContent = String(item.quantity);
   actions.appendChild(qty);
   
-  const incBtn = document.createElement('button');
+  const incBtn = _document.createElement('button');
   incBtn.type = 'button';
   incBtn.className = 'cart-qty-btn';
   incBtn.dataset.action = 'inc';
@@ -414,13 +474,13 @@ function createCartItemElement(item, gift, subtotal) {
   article.appendChild(actions);
 
   // Subtotal
-  const subtotalDiv = document.createElement('div');
+  const subtotalDiv = _document.createElement('div');
   subtotalDiv.className = 'cart-item__subtotal';
   subtotalDiv.textContent = formatPrice(subtotal);
   article.appendChild(subtotalDiv);
 
   // Botão remover
-  const removeBtn = document.createElement('button');
+  const removeBtn = _document.createElement('button');
   removeBtn.type = 'button';
   removeBtn.className = 'cart-item__remove';
   removeBtn.dataset.giftId = item.giftId;
@@ -440,22 +500,22 @@ function createCartItemElement(item, gift, subtotal) {
  * Renderiza itens do carrinho (XSS-safe)
  */
 function renderCartItems() {
-  const container = document.getElementById('cart-items');
-  const totalEl = document.getElementById('cart-total-value');
+  const container = _document.getElementById('cart-items');
+  const totalEl = _document.getElementById('cart-total-value');
   if (!container || !totalEl) return;
 
   const items = cart.getItems();
 
   if (items.length === 0) {
     container.innerHTML = '';
-    const emptyMsg = document.createElement('p');
+    const emptyMsg = _document.createElement('p');
     emptyMsg.className = 'cart-empty';
     emptyMsg.textContent = 'Seu carrinho está vazio';
     container.appendChild(emptyMsg);
     
     totalEl.textContent = 'R$ 0,00';
     
-    const checkoutBtn = document.getElementById('cart-checkout-btn');
+    const checkoutBtn = _document.getElementById('cart-checkout-btn');
     if (checkoutBtn) checkoutBtn.disabled = true;
     
     return;
@@ -479,7 +539,7 @@ function renderCartItems() {
 
   totalEl.textContent = formatPrice(total);
 
-  const checkoutBtn = document.getElementById('cart-checkout-btn');
+  const checkoutBtn = _document.getElementById('cart-checkout-btn');
   if (checkoutBtn) checkoutBtn.disabled = false;
 }
 
@@ -531,10 +591,10 @@ function handleRemoveItem(e) {
  * Manipula finalização de compra
  */
 async function handleCheckout() {
-  const nameInput = document.getElementById('gifter-name');
-  const nameError = document.getElementById('gifter-name-error');
-  const cartError = document.getElementById('cart-error');
-  const checkoutBtn = document.getElementById('cart-checkout-btn');
+  const nameInput = _document.getElementById('gifter-name');
+  const nameError = _document.getElementById('gifter-name-error');
+  const cartError = _document.getElementById('cart-error');
+  const checkoutBtn = _document.getElementById('cart-checkout-btn');
   
   if (!nameInput || !checkoutBtn) return;
 
@@ -549,7 +609,7 @@ async function handleCheckout() {
   nameError.hidden = true;
 
   // Obter método de pagamento
-  const paymentMethodInput = document.querySelector('input[name="paymentMethod"]:checked');
+  const paymentMethodInput = _document.querySelector('input[name="paymentMethod"]:checked');
   if (!paymentMethodInput) return;
   
   const paymentMethod = paymentMethodInput.value;
@@ -571,7 +631,7 @@ async function handleCheckout() {
   const intentKey = getOrCreateIntentKey();
 
   try {
-    const response = await fetch('/api/gifts/checkout', {
+    const response = await _fetch('/api/gifts/checkout', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -631,9 +691,9 @@ function isValidBase64(str) {
  * XSS-safe: usa createElement e textContent
  */
 function showPaymentResult(data) {
-  const checkoutEl = document.getElementById('cart-checkout');
-  const resultEl = document.getElementById('cart-payment-result');
-  const itemsEl = document.getElementById('cart-items');
+  const checkoutEl = _document.getElementById('cart-checkout');
+  const resultEl = _document.getElementById('cart-payment-result');
+  const itemsEl = _document.getElementById('cart-items');
   
   if (!checkoutEl || !resultEl || !itemsEl) return;
 
@@ -643,20 +703,20 @@ function showPaymentResult(data) {
   const { payment } = data;
 
   // Criar elementos de forma segura (sem innerHTML)
-  const container = document.createElement('div');
+  const container = _document.createElement('div');
   container.className = 'payment-success';
 
-  const title = document.createElement('h4');
+  const title = _document.createElement('h4');
   title.textContent = 'Pagamento Pix gerado!';
   container.appendChild(title);
 
-  const instruction = document.createElement('p');
+  const instruction = _document.createElement('p');
   instruction.textContent = 'Escaneie o QR Code ou copie o código Pix:';
   container.appendChild(instruction);
 
   // QR Code image (validar base64 antes de usar)
   if (payment.qrCodeBase64 && isValidBase64(payment.qrCodeBase64)) {
-    const qrImg = document.createElement('img');
+    const qrImg = _document.createElement('img');
     qrImg.src = `data:image/png;base64,${payment.qrCodeBase64}`;
     qrImg.alt = 'QR Code Pix';
     qrImg.className = 'gift-modal__qr';
@@ -666,13 +726,13 @@ function showPaymentResult(data) {
   }
 
   // Label do código Pix
-  const label = document.createElement('label');
+  const label = _document.createElement('label');
   label.setAttribute('for', 'pix-code-final');
   label.textContent = 'Código Pix copia e cola:';
   container.appendChild(label);
 
   // Textarea com código Pix (usar .value, não innerHTML)
-  const textarea = document.createElement('textarea');
+  const textarea = _document.createElement('textarea');
   textarea.id = 'pix-code-final';
   textarea.rows = 3;
   textarea.readOnly = true;
@@ -680,7 +740,7 @@ function showPaymentResult(data) {
   container.appendChild(textarea);
 
   // Botão copiar
-  const copyBtn = document.createElement('button');
+  const copyBtn = _document.createElement('button');
   copyBtn.type = 'button';
   copyBtn.className = 'btn btn--ghost';
   copyBtn.id = 'copy-pix-final';
@@ -688,13 +748,13 @@ function showPaymentResult(data) {
   container.appendChild(copyBtn);
 
   // Nota sobre confirmação manual (honesta)
-  const note = document.createElement('p');
+  const note = _document.createElement('p');
   note.className = 'payment-note';
   note.textContent = 'Pedido Pix criado e pendente. Não há confirmação automática neste MVP. Guarde este código até a confirmação manual pelos noivos.';
   container.appendChild(note);
 
   // Botão fechar
-  const closeBtn = document.createElement('button');
+  const closeBtn = _document.createElement('button');
   closeBtn.type = 'button';
   closeBtn.className = 'btn';
   closeBtn.setAttribute('data-close-cart', '');

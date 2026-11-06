@@ -12,8 +12,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_rsvps_idempotency
   WHERE idempotency_key IS NOT NULL;
 
 -- Note: SQLite ALTER TABLE cannot add CHECK constraints to existing tables
--- For new deployments, use 0001_rsvps_v2.sql with constraints built-in
--- For existing data, the application enforces: attending=0 => counts=0
+-- 0001_rsvps.sql includes CHECK constraint: attending=0 => counts=0
+-- For existing data, the application also enforces this at write time
 
 -- Update migration metadata
 INSERT INTO schema_migrations (version, applied_at, description)

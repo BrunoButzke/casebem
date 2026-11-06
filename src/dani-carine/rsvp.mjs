@@ -24,7 +24,7 @@ export function setupRsvp() {
   const TOKEN_KEY = 'rsvp_manage_token';
 
   let manageToken = localStorage.getItem(TOKEN_KEY);
-  let isEditMode = false;
+  let viewMode = 'create'; // 'create' | 'view' | 'edit'
 
   function showStatus(message, type = 'info') {
     statusDiv.hidden = false;
@@ -123,7 +123,10 @@ export function setupRsvp() {
   }
 
   async function fetchRsvp() {
-    if (!manageToken) return;
+    if (!manageToken) {
+      viewMode = 'create';
+      return;
+    }
 
     try {
       const response = await fetch(API_URL, {
@@ -139,17 +142,22 @@ export function setupRsvp() {
           manageToken = null;
           rotateIdempotencyKey(); // New key for fresh attempt
           showError('rsvp-name', 'Token inválido. Faça uma nova confirmação.');
+          viewMode = 'create';
           setViewMode('create');
           return;
         }
-        throw new Error(`HTTP ${response.status}`);
+        // Other errors (503, 500): silent, keep token for retry
+        console.warn(`GET failed: ${response.status}`);
+        return;
       }
 
       const data = await response.json();
       populateForm(data);
+      viewMode = 'view';
       setViewMode('view');
     } catch (error) {
       console.error('Failed to fetch RSVP:', error);
+      // Network errors: keep token, silent
     }
   }
 
@@ -169,7 +177,7 @@ export function setupRsvp() {
   }
 
   function enableEditMode() {
-    isEditMode = true;
+    viewMode = 'edit';
     setViewMode('edit');
     hideStatus();
   }
@@ -185,7 +193,7 @@ export function setupRsvp() {
     clearErrors();
     hideStatus();
 
-    const savedMode = isEditMode; // Capture before async
+    const savedViewMode = viewMode; // Capture before async
     const attending = document.querySelector('input[name="attending"]:checked')?.value === 'true';
 
     const payload = {
@@ -197,7 +205,7 @@ export function setupRsvp() {
       consentGiven: consentCheckbox?.checked === true,
     };
 
-    const method = savedMode ? 'PUT' : 'POST';
+    const method = savedViewMode === 'edit' ? 'PUT' : 'POST';
     const headers = {
       'Content-Type': 'application/json',
     };
@@ -214,7 +222,9 @@ export function setupRsvp() {
     }
 
     setBusyState(true);
-    if (submitBtn) submitBtn.textContent = savedMode ? 'Atualizando...' : 'Enviando...';
+    if (submitBtn) submitBtn.textContent = savedViewMode === 'edit' ? 'Atualizando...' : 'Enviando...';
+
+    let success = false;
 
     try {
       const response = await fetch(API_URL, { method, headers, body: JSON.stringify(payload) });
@@ -225,18 +235,24 @@ export function setupRsvp() {
         throw new Error('Serviço temporariamente indisponível');
       }
 
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+      } catch (jsonError) {
+        throw new Error('Resposta inválida do servidor');
+      }
 
       if (!response.ok) {
         if (response.status === 409) {
           showStatus(
-            'Conflito de idempotência. Esta confirmação pode já ter sido enviada anteriormente. Para criar uma nova confirmação, recarregue a página.',
+            'Se você já confirmou, recupere o site no mesmo dispositivo ou fale com os noivos. Não reenvie outra confirmação com o mesmo nome.',
             'error'
           );
           return;
         }
         if (response.status === 413) {
           showError('rsvp-observations', 'Mensagem muito longa');
+          showStatus('Campo observações muito longo. Reduza o texto.', 'error');
           return;
         }
         if (response.status === 429) {
@@ -244,19 +260,20 @@ export function setupRsvp() {
           return;
         }
         if (response.status === 401) {
-          // Token invalid on PUT
+          // Token invalid - reset to create mode
           localStorage.removeItem(TOKEN_KEY);
           manageToken = null;
           rotateIdempotencyKey();
           showStatus('Token inválido. Faça uma nova confirmação.', 'error');
+          viewMode = 'create';
           setViewMode('create');
-          isEditMode = false;
           return;
         }
         throw new Error(data.error || 'Erro desconhecido');
       }
 
       // Success!
+      success = true;
       if (method === 'POST' && data.manageToken) {
         manageToken = data.manageToken;
         localStorage.setItem(TOKEN_KEY, manageToken);
@@ -264,24 +281,23 @@ export function setupRsvp() {
       }
 
       showStatus(
-        savedMode ? 'Confirmação atualizada com sucesso!' : 'Confirmação enviada com sucesso!',
+        savedViewMode === 'edit' ? 'Confirmação atualizada com sucesso!' : 'Confirmação enviada com sucesso!',
         'success'
       );
 
+      viewMode = 'view';
       setViewMode('view');
-      isEditMode = false;
     } catch (error) {
       console.error('Failed to submit RSVP:', error);
-      showStatus(error.message || 'Erro ao enviar confirmação. Tente novamente.', 'error');
-      // On error, restore editable state
-      if (savedMode) {
-        setViewMode('edit');
-      } else {
-        setViewMode('create');
-      }
+      showStatus(error.message || 'Erro de conexão. Verifique sua internet e tente novamente.', 'error');
     } finally {
-      // Restore button text based on saved mode
-      if (submitBtn) submitBtn.textContent = savedMode ? 'Atualizar Confirmação' : 'Confirmar Presença';
+      setBusyState(false);
+      // Restore button text
+      if (submitBtn) submitBtn.textContent = savedViewMode === 'edit' ? 'Atualizar Confirmação' : 'Confirmar Presença';
+      // Restore view mode if not success (unless viewMode was explicitly changed, e.g. 401 -> 'create')
+      if (!success && viewMode === savedViewMode) {
+        setViewMode(savedViewMode);
+      }
     }
   }
 

@@ -55,7 +55,7 @@ export async function createRsvp(db, data, idempotencyKey, secret, bearerToken =
     const existing = await db
       .prepare(
         `SELECT id, guest_name, attending, adults_count, children_count,
-                observations, manage_token_hash, manage_token_encrypted,
+                observations, manage_token_hash,
                 idempotency_fingerprint, created_at, updated_at
          FROM rsvps
          WHERE wedding_key = ? AND idempotency_key = ?`
@@ -105,8 +105,6 @@ export async function createRsvp(db, data, idempotencyKey, secret, bearerToken =
   const id = generateUuid();
   const manageToken = await generateToken();
   const tokenHash = await hashToken(manageToken);
-  // Token encryption not needed: replay requires bearer, no recovery path
-  const tokenEncrypted = null;
   const timestamp = now();
 
   let result;
@@ -116,17 +114,16 @@ export async function createRsvp(db, data, idempotencyKey, secret, bearerToken =
         `INSERT INTO rsvps (
           id, wedding_key, guest_name, attending,
           adults_count, children_count, observations,
-          consent_given, manage_token_hash, manage_token_encrypted,
-          idempotency_key, idempotency_fingerprint, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          consent_given, manage_token_hash, created_at, updated_at,
+          idempotency_key, idempotency_fingerprint
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).bind(
         id, WEDDING_KEY, normalizedData.guestName,
         normalizedData.attending ? 1 : 0,
         normalizedData.adultsCount, normalizedData.childrenCount,
         normalizedData.observations, 1,
-        tokenHash, tokenEncrypted,
-        idempotencyKey || null, fingerprint,
-        timestamp, timestamp
+        tokenHash, timestamp, timestamp,
+        idempotencyKey || null, fingerprint
       ),
     ]);
   } catch (batchError) {

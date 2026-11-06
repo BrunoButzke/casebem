@@ -53,7 +53,7 @@ class MockD1 {
         const bindings = this.bindings;
 
         if (sql.includes('INSERT INTO rsvps')) {
-          const [id, weddingKey, guestName, attending, adultsCount, childrenCount, observations, consentGiven, tokenHash, tokenEncrypted, idemKey, idemFingerprint, createdAt, updatedAt] = bindings;
+          const [id, weddingKey, guestName, attending, adultsCount, childrenCount, observations, consentGiven, tokenHash, createdAt, updatedAt, idemKey, idemFingerprint] = bindings;
           mock.data.rsvps.push({
             id,
             wedding_key: weddingKey,
@@ -64,11 +64,10 @@ class MockD1 {
             observations,
             consent_given: consentGiven,
             manage_token_hash: tokenHash,
-            manage_token_encrypted: tokenEncrypted,
-            idempotency_key: idemKey,
-            idempotency_fingerprint: idemFingerprint,
             created_at: createdAt,
             updated_at: updatedAt,
+            idempotency_key: idemKey,
+            idempotency_fingerprint: idemFingerprint
           });
           return { success: true };
         }

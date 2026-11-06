@@ -58,21 +58,29 @@ describe('Frontend RSVP - Real DOM Tests', () => {
   it('POST 201 success: token stored, fields locked, edit button visible', async () => {
     const { document, fetchCalls, mockFetch } = await setupWindow();
     
-    global.fetch = mockFetch([{
-      status: 201,
-      body: {
-        id: 'id1',
-        manageToken: 'token-success',
-        guestName: 'Test User',
-        attending: true,
-        adultsCount: 2,
-        childrenCount: 0,
-        observations: null,
-        consentGiven: true,
-        createdAt: '2026-11-06T00:00:00Z',
-        updatedAt: '2026-11-06T00:00:00Z'
+    global.fetch = mockFetch([
+      {
+        // First call is GET from fetchRsvp() - return 401 (no token)
+        status: 401,
+        body: { error: 'No token' }
+      },
+      {
+        // Second call is POST from form submit
+        status: 201,
+        body: {
+          id: 'id1',
+          manageToken: 'token-success',
+          guestName: 'Test User',
+          attending: true,
+          adultsCount: 2,
+          childrenCount: 0,
+          observations: null,
+          consentGiven: true,
+          createdAt: '2026-11-06T00:00:00Z',
+          updatedAt: '2026-11-06T00:00:00Z'
+        }
       }
-    }]);
+    ]);
 
     const { setupRsvp } = await import('../src/dani-carine/rsvp.mjs?' + Math.random());
     setupRsvp();
@@ -91,8 +99,9 @@ describe('Frontend RSVP - Real DOM Tests', () => {
     attendingTrue.checked = true;
 
     form.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
-    await Promise.resolve(); // Queue microtask
-    await Promise.resolve(); // Allow async handlers
+    
+    // Wait for all async operations (fetch + json + setViewMode)
+    await new Promise(resolve => setTimeout(resolve, 100));
 
     assert.equal(fetchCalls.length, 1);
     assert.equal(fetchCalls[0].options.method, 'POST');
@@ -117,21 +126,39 @@ describe('Frontend RSVP - Real DOM Tests', () => {
     const { document, fetchCalls, mockFetch } = await setupWindow();
     localStorage.setItem('rsvp_manage_token', 'existing-token');
     
-    global.fetch = mockFetch([{
-      status: 201,
-      body: {
-        id: 'id2',
-        manageToken: 'existing-token',
-        guestName: 'Retry User',
-        attending: false,
-        adultsCount: 0,
-        childrenCount: 0,
-        observations: null,
-        consentGiven: true,
-        createdAt: '2026-11-06T00:00:00Z',
-        updatedAt: '2026-11-06T00:00:00Z'
+    global.fetch = mockFetch([
+      {
+        // GET from fetchRsvp()
+        status: 200,
+        body: {
+          id: 'id2',
+          guestName: 'Retry User',
+          attending: false,
+          adultsCount: 0,
+          childrenCount: 0,
+          observations: null,
+          consentGiven: true,
+          createdAt: '2026-11-06T00:00:00Z',
+          updatedAt: '2026-11-06T00:00:00Z'
+        }
+      },
+      {
+        // POST from form submit
+        status: 201,
+        body: {
+          id: 'id2',
+          manageToken: 'existing-token',
+          guestName: 'Retry User',
+          attending: false,
+          adultsCount: 0,
+          childrenCount: 0,
+          observations: null,
+          consentGiven: true,
+          createdAt: '2026-11-06T00:00:00Z',
+          updatedAt: '2026-11-06T00:00:00Z'
+        }
       }
-    }]);
+    ]);
 
     const { setupRsvp } = await import('../src/dani-carine/rsvp.mjs?' + Math.random());
     setupRsvp();
@@ -152,20 +179,26 @@ describe('Frontend RSVP - Real DOM Tests', () => {
     assert.equal(fetchCalls[0].options.headers['Authorization'], 'Bearer existing-token');
   });
 
-  it('409 conflict shows message, keeps idempotency key', async () => {
+  it('409 conflict: message shown, key preserved, form NOT disabled', async () => {
     const { document, mockFetch } = await setupWindow();
     localStorage.setItem('rsvp_idempotency_key', 'conflict-key');
     
-    global.fetch = mockFetch([{
-      status: 409,
-      body: { error: 'Conflict' }
-    }]);
+    global.fetch = mockFetch([
+      { status: 401, body: { error: 'No token' } },
+      {
+        status: 409,
+        body: { error: 'Conflict' }
+      }
+    ]);
 
     const { setupRsvp } = await import('../src/dani-carine/rsvp.mjs?' + Math.random());
     setupRsvp();
 
     const form = document.getElementById('rsvp-form');
-    document.getElementById('rsvp-name').value = 'Conflict';
+    const nameInput = document.getElementById('rsvp-name');
+    const submitBtn = document.getElementById('rsvp-submit');
+    
+    nameInput.value = 'Conflict';
     document.getElementById('rsvp-consent').checked = true;
     document.getElementById('attending-true').checked = true;
 
@@ -177,8 +210,115 @@ describe('Frontend RSVP - Real DOM Tests', () => {
     const statusMsg = document.getElementById('rsvp-status-message');
     
     assert.equal(statusDiv.hidden, false);
-    assert.ok(statusMsg.textContent.includes('Conflito') || statusMsg.textContent.includes('idempotência'));
+    assert.ok(statusMsg.textContent.includes('já confirmou') || statusMsg.textContent.includes('mesmo dispositivo'));
     assert.equal(localStorage.getItem('rsvp_idempotency_key'), 'conflict-key'); // Preserved
+    
+    // Form NOT disabled (setBusyState(false) called)
+    assert.equal(submitBtn.disabled, false);
+    assert.equal(nameInput.disabled, false);
+    assert.equal(submitBtn.textContent, 'Confirmar Presença');
+  });
+
+  it('413 payload too large: field error shown, form enabled', async () => {
+    const { document, mockFetch } = await setupWindow();
+    
+    global.fetch = mockFetch([{
+      status: 413,
+      body: { error: 'Payload too large' }
+    }]);
+
+    const { setupRsvp } = await import('../src/dani-carine/rsvp.mjs?' + Math.random());
+    setupRsvp();
+
+    const form = document.getElementById('rsvp-form');
+    const nameInput = document.getElementById('rsvp-name');
+    const observationsInput = document.getElementById('rsvp-observations');
+    const submitBtn = document.getElementById('rsvp-submit');
+    
+    nameInput.value = '413 Test';
+    observationsInput.value = 'x'.repeat(600); // Too long
+    document.getElementById('rsvp-consent').checked = true;
+    document.getElementById('attending-true').checked = true;
+
+    form.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const statusDiv = document.getElementById('rsvp-status');
+    const statusMsg = document.getElementById('rsvp-status-message');
+    
+    assert.equal(statusDiv.hidden, false);
+    assert.ok(statusMsg.textContent.includes('longo') || statusMsg.textContent.includes('muito'));
+    
+    // Form enabled (setBusyState(false) called)
+    assert.equal(submitBtn.disabled, false);
+    assert.equal(nameInput.disabled, false);
+    assert.equal(observationsInput.disabled, false);
+  });
+
+  it('429 rate limit: message shown, form enabled', async () => {
+    const { document, mockFetch } = await setupWindow();
+    
+    global.fetch = mockFetch([{
+      status: 429,
+      body: { error: 'Too many requests' }
+    }]);
+
+    const { setupRsvp } = await import('../src/dani-carine/rsvp.mjs?' + Math.random());
+    setupRsvp();
+
+    const form = document.getElementById('rsvp-form');
+    const nameInput = document.getElementById('rsvp-name');
+    const submitBtn = document.getElementById('rsvp-submit');
+    
+    nameInput.value = '429 Test';
+    document.getElementById('rsvp-consent').checked = true;
+    document.getElementById('attending-true').checked = true;
+
+    form.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const statusDiv = document.getElementById('rsvp-status');
+    const statusMsg = document.getElementById('rsvp-status-message');
+    
+    assert.equal(statusDiv.hidden, false);
+    assert.ok(statusMsg.textContent.includes('Muitas requisições') || statusMsg.textContent.includes('Aguarde'));
+    
+    // Form enabled (setBusyState(false) called)
+    assert.equal(submitBtn.disabled, false);
+    assert.equal(nameInput.disabled, false);
+  });
+
+  it('Invalid JSON response: helpful error message, form enabled', async () => {
+    const { document } = await setupWindow();
+    
+    global.fetch = async () => ({
+      status: 200,
+      ok: true,
+      headers: { get: () => 'application/json' },
+      json: async () => { throw new SyntaxError('Unexpected token'); }
+    });
+
+    const { setupRsvp } = await import('../src/dani-carine/rsvp.mjs?' + Math.random());
+    setupRsvp();
+
+    const form = document.getElementById('rsvp-form');
+    const submitBtn = document.getElementById('rsvp-submit');
+    
+    document.getElementById('rsvp-name').value = 'JSON Test';
+    document.getElementById('rsvp-consent').checked = true;
+    document.getElementById('attending-true').checked = true;
+
+    form.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const statusMsg = document.getElementById('rsvp-status-message');
+    assert.ok(statusMsg.textContent.includes('inválida') || statusMsg.textContent.includes('servidor'));
+    
+    // Form enabled
+    assert.equal(submitBtn.disabled, false);
   });
 
   it('503 non-JSON handled gracefully', async () => {
@@ -330,8 +470,8 @@ describe('Frontend RSVP - Real DOM Tests', () => {
     const form = document.getElementById('rsvp-form');
     form.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
     
-    await Promise.resolve();
-    await Promise.resolve();
+    // Wait for all async operations (fetch + json + setViewMode)
+    await new Promise(resolve => setTimeout(resolve, 100));
 
     const submitBtn = document.getElementById('rsvp-submit');
     

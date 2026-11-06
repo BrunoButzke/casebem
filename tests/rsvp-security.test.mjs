@@ -28,7 +28,7 @@ describe('RSVP Security Tests', () => {
         },
         async run() {
           if (this.sql.includes('INSERT INTO rsvps')) {
-            const [id, weddingKey, guestName, attending, adultsCount, childrenCount, observations, consentGiven, tokenHash, tokenEncrypted, idemKey, idemFingerprint, createdAt, updatedAt] = this.bindings;
+            const [id, weddingKey, guestName, attending, adultsCount, childrenCount, observations, consentGiven, tokenHash, createdAt, updatedAt, idemKey, idemFingerprint] = this.bindings;
             
             // Check UNIQUE constraint
             const existing = mock.data.rsvps.find(r => r.wedding_key === weddingKey && r.idempotency_key === idemKey);
@@ -40,8 +40,9 @@ describe('RSVP Security Tests', () => {
               id, wedding_key: weddingKey, guest_name: guestName, attending,
               adults_count: adultsCount, children_count: childrenCount, observations,
               consent_given: consentGiven, manage_token_hash: tokenHash,
-              manage_token_encrypted: tokenEncrypted, idempotency_key: idemKey,
-              idempotency_fingerprint: idemFingerprint, created_at: createdAt, updated_at: updatedAt
+              created_at: createdAt, updated_at: updatedAt,
+              idempotency_key: idemKey,
+              idempotency_fingerprint: idemFingerprint
             });
             return { success: true };
           }
@@ -165,20 +166,36 @@ describe('RSVP Security Tests', () => {
   });
 
   describe('Rate Limiting', () => {
-    it.skip('should return 429 when rate limit hit (null first() result)', async () => {
+    it('should return 429 when rate limit hit (null first() result)', async () => {
       const { onRequest } = await import('../functions/api/rsvp.js');
       const db = new MockD1();
 
-      // Pre-fill rate limit to max
+      // Make 10 requests to hit the limit
       for (let i = 0; i < 10; i++) {
-        await db.prepare('').bind('id1', 'dani-carine', 'hash', '2026-11-06T07:00:00Z', 'ts', 'ts', 'ts', 10).run();
+        const request = new Request('https://casebem.pages.dev/api/rsvp', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Idempotency-Key': `test-rate-${i}`,
+            'CF-Connecting-IP': '1.1.1.1'
+          },
+          body: JSON.stringify({
+            guestName: `Guest ${i}`,
+            attending: true,
+            adultsCount: 0,
+            childrenCount: 0,
+            consentGiven: true
+          })
+        });
+        await onRequest({ request, env: { DB: db, RSVP_SECRET: TEST_SECRET } });
       }
 
+      // 11th request should be rate limited
       const request = new Request('https://casebem.pages.dev/api/rsvp', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Idempotency-Key': 'test-rate',
+          'Idempotency-Key': 'test-rate-11',
           'CF-Connecting-IP': '1.1.1.1'
         },
         body: JSON.stringify({
@@ -220,7 +237,7 @@ describe('RSVP Security Tests', () => {
       assert.equal(db.data.rsvps.length, 1); // Only one record
     });
 
-    it.skip('wrong bearer returns IDEMPOTENCY_CONFLICT', async () => {
+    it('wrong bearer returns UNAUTHORIZED', async () => {
       const { createRsvp } = await import('../functions/_lib/rsvp-service.mjs');
       const db = new MockD1();
 
@@ -236,12 +253,12 @@ describe('RSVP Security Tests', () => {
       const idemKey = 'replay-wrong-bearer';
       const result1 = await createRsvp(db, data, idemKey, TEST_SECRET, null);
       
-      // Replay with wrong bearer
+      // Replay with wrong bearer should throw UNAUTHORIZED
       try {
         await createRsvp(db, data, idemKey, TEST_SECRET, 'wrong-token');
-        assert.fail('Should have thrown IDEMPOTENCY_CONFLICT');
+        assert.fail('Should have thrown UNAUTHORIZED');
       } catch (error) {
-        assert.equal(error.message, 'IDEMPOTENCY_CONFLICT');
+        assert.equal(error.message, 'UNAUTHORIZED');
       }
     });
 

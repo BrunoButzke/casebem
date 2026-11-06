@@ -22,7 +22,8 @@ CREATE TABLE IF NOT EXISTS rsvps (
   CHECK (children_count >= 0 AND children_count <= 10),
   CHECK (consent_given = 1),
   CHECK (length(guest_name) >= 2 AND length(guest_name) <= 100),
-  CHECK (observations IS NULL OR length(observations) <= 500)
+  CHECK (observations IS NULL OR length(observations) <= 500),
+  CHECK (attending = 1 OR (adults_count = 0 AND children_count = 0))
 );
 
 -- Index for faster lookups by token hash
@@ -38,7 +39,7 @@ CREATE INDEX IF NOT EXISTS idx_rsvps_wedding
 CREATE TABLE IF NOT EXISTS rate_limits (
   id TEXT PRIMARY KEY,                    -- Composite key: wedding_key:ip_hash:window
   wedding_key TEXT NOT NULL,              -- Wedding event identifier
-  ip_hash TEXT NOT NULL,                  -- SHA-256 hash of IP (privacy)
+  ip_hash TEXT NOT NULL,                  -- HMAC-SHA256 of IP (privacy)
   window_start TEXT NOT NULL,             -- ISO 8601 timestamp (hour window)
   request_count INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL,

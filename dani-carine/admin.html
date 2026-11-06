@@ -102,6 +102,18 @@
       <p class="sub">Alterações no D1 — convidados veem via /api/gifts/catalog (sem rebuild).</p>
       <div id="catalog-table"></div>
 
+      <h2>Hospedagem / dicas</h2>
+      <p class="sub">Lista em /dani-carine/#hospedagem · API /api/lodging (migration 0008).</p>
+      <div class="toolbar" style="flex-direction:column;align-items:stretch;gap:0.5rem;max-width:640px">
+        <input id="lodge-name" type="text" placeholder="Nome (ex.: Pousada X)" maxlength="120" style="max-width:100%" />
+        <input id="lodge-area" type="text" placeholder="Área (ex.: Lagoa da Conceição)" maxlength="80" style="max-width:100%" />
+        <textarea id="lodge-desc" placeholder="Descrição / dica" maxlength="500"></textarea>
+        <input id="lodge-maps" type="url" placeholder="URL Maps (https://...)" maxlength="500" style="max-width:100%" />
+        <input id="lodge-web" type="url" placeholder="Site (opcional)" maxlength="500" style="max-width:100%" />
+        <button type="button" id="lodge-add-btn">Adicionar dica</button>
+      </div>
+      <div id="lodging-table"></div>
+
       <h2>Checkouts / presentes recebidos</h2>
       <div id="gifts-table"></div>
 
@@ -183,6 +195,7 @@
       $('gifts-table').innerHTML = renderGifts(data.gifts || []);
       $('messages-table').innerHTML = renderMessages(data.messages || []);
       await loadCatalogEditor();
+      await loadLodgingEditor();
     }
 
     async function loadCatalogEditor() {
@@ -193,6 +206,33 @@
         return;
       }
       $('catalog-table').innerHTML = renderCatalog(data.gifts || []);
+    }
+
+    async function loadLodgingEditor() {
+      const res = await fetch('/api/admin/lodging', { headers: authHeaders() });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        $('lodging-table').innerHTML = `<p class="err">${escapeHtml(data.message || data.error || 'Falha ao carregar hospedagem (rode migration 0008?)')}</p>`;
+        return;
+      }
+      $('lodging-table').innerHTML = renderLodging(data.tips || []);
+    }
+
+    function renderLodging(rows) {
+      if (!rows.length) return '<p class="sub">Nenhuma dica ainda.</p>';
+      return `<table><thead><tr>
+        <th>Nome</th><th>Área</th><th>Descrição</th><th>Ativo</th><th></th>
+      </tr></thead><tbody>
+      ${rows.map((t) => `<tr class="${t.active ? '' : 'hidden'}">
+        <td><input data-lodge-name="${escapeHtml(t.id)}" value="${escapeHtml(t.name)}" style="width:100%;max-width:160px;padding:0.35rem" /></td>
+        <td><input data-lodge-area="${escapeHtml(t.id)}" value="${escapeHtml(t.area || '')}" style="width:100%;max-width:120px;padding:0.35rem" /></td>
+        <td><input data-lodge-desc="${escapeHtml(t.id)}" value="${escapeHtml(t.description)}" style="width:100%;min-width:180px;padding:0.35rem" /></td>
+        <td><input data-lodge-active="${escapeHtml(t.id)}" type="checkbox" ${t.active ? 'checked' : ''} /></td>
+        <td class="row-actions">
+          <button type="button" class="secondary" data-lodge-save="${escapeHtml(t.id)}">Salvar</button>
+        </td>
+      </tr>`).join('')}
+      </tbody></table>`;
     }
 
     function renderCatalog(rows) {
@@ -387,6 +427,60 @@
         return;
       }
       await loadCatalogEditor();
+    });
+
+    $('lodge-add-btn').addEventListener('click', async () => {
+      const res = await fetch('/api/admin/lodging', {
+        method: 'POST',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: $('lodge-name').value,
+          area: $('lodge-area').value,
+          description: $('lodge-desc').value,
+          mapsUrl: $('lodge-maps').value,
+          websiteUrl: $('lodge-web').value,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        $('panel-err').hidden = false;
+        $('panel-err').textContent = (data.details && data.details.join(', ')) || data.message || data.error || 'Falha ao adicionar dica';
+        return;
+      }
+      $('lodge-name').value = '';
+      $('lodge-area').value = '';
+      $('lodge-desc').value = '';
+      $('lodge-maps').value = '';
+      $('lodge-web').value = '';
+      await loadLodgingEditor();
+    });
+
+    $('lodging-table').addEventListener('click', async (ev) => {
+      const btn = ev.target.closest('button[data-lodge-save]');
+      if (!btn) return;
+      const id = btn.getAttribute('data-lodge-save');
+      const nameEl = $('lodging-table').querySelector(`input[data-lodge-name="${CSS.escape(id)}"]`);
+      const areaEl = $('lodging-table').querySelector(`input[data-lodge-area="${CSS.escape(id)}"]`);
+      const descEl = $('lodging-table').querySelector(`input[data-lodge-desc="${CSS.escape(id)}"]`);
+      const activeEl = $('lodging-table').querySelector(`input[data-lodge-active="${CSS.escape(id)}"]`);
+      const res = await fetch('/api/admin/lodging', {
+        method: 'PATCH',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id,
+          name: nameEl?.value,
+          area: areaEl?.value,
+          description: descEl?.value,
+          active: Boolean(activeEl?.checked),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        $('panel-err').hidden = false;
+        $('panel-err').textContent = (data.details && data.details.join(', ')) || data.message || data.error || 'Falha ao salvar dica';
+        return;
+      }
+      await loadLodgingEditor();
     });
 
     $('messages-table').addEventListener('click', async (ev) => {

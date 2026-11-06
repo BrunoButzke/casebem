@@ -107,27 +107,35 @@ export async function createRsvp(db, data, idempotencyKey, secret, bearerToken =
   const id = generateUuid();
   const manageToken = await generateToken();
   const tokenHash = await hashToken(manageToken);
-  const tokenEncrypted = await encryptToken(manageToken, keys.encryptionKey);
+  // Token encryption not needed: replay requires bearer, no recovery path
+  const tokenEncrypted = null;
   const timestamp = now();
 
-  const result = await db.batch([
-    db.prepare(
-      `INSERT INTO rsvps (
-        id, wedding_key, guest_name, attending,
-        adults_count, children_count, observations,
-        consent_given, manage_token_hash, manage_token_encrypted,
-        idempotency_key, idempotency_fingerprint, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).bind(
-      id, WEDDING_KEY, normalizedData.guestName,
-      normalizedData.attending ? 1 : 0,
-      normalizedData.adultsCount, normalizedData.childrenCount,
-      normalizedData.observations, 1,
-      tokenHash, tokenEncrypted,
-      idempotencyKey || null, fingerprint,
-      timestamp, timestamp
-    ),
-  ]);
+  let result;
+  try {
+    result = await db.batch([
+      db.prepare(
+        `INSERT INTO rsvps (
+          id, wedding_key, guest_name, attending,
+          adults_count, children_count, observations,
+          consent_given, manage_token_hash, manage_token_encrypted,
+          idempotency_key, idempotency_fingerprint, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(
+        id, WEDDING_KEY, normalizedData.guestName,
+        normalizedData.attending ? 1 : 0,
+        normalizedData.adultsCount, normalizedData.childrenCount,
+        normalizedData.observations, 1,
+        tokenHash, tokenEncrypted,
+        idempotencyKey || null, fingerprint,
+        timestamp, timestamp
+      ),
+    ]);
+  } catch (batchError) {
+    // D1 batch can throw on UNIQUE constraint violation
+    // Treat as result[0].success = false with error message
+    result = [{ success: false, error: batchError.message || 'UNIQUE constraint' }];
+  }
 
   if (!result[0].success) {
     // UNIQUE constraint violation - concurrent insert

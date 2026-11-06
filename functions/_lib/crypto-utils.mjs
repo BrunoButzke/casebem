@@ -13,7 +13,18 @@ export async function deriveRsvpKeys(base64Secret) {
     throw new Error('RSVP_SECRET environment variable not configured');
   }
 
-  const secretBytes = Uint8Array.from(atob(base64Secret), c => c.charCodeAt(0));
+  // Validate base64 format and decode
+  let secretBytes;
+  try {
+    secretBytes = Uint8Array.from(atob(base64Secret), c => c.charCodeAt(0));
+  } catch (error) {
+    throw new Error('RSVP_SECRET is not valid base64');
+  }
+
+  // Validate 32 bytes minimum
+  if (secretBytes.length < 32) {
+    throw new Error('RSVP_SECRET must be at least 32 bytes');
+  }
   
   // Import base secret
   const baseKey = await crypto.subtle.importKey(

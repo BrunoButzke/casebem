@@ -49,18 +49,43 @@ export function setupRsvp() {
     errors.forEach((el) => (el.textContent = ''));
   }
 
-  function toggleFieldsDisabled(disabled) {
-    const inputs = form.querySelectorAll('input, textarea, button[type="submit"]');
-    inputs.forEach((input) => {
-      // Never re-enable name or consent after they've been locked
-      if (input === nameInput && nameInput.disabled && !disabled) {
-        return; // Keep disabled
+  function setViewMode(mode) {
+    // mode: 'create' | 'view' | 'edit'
+    const allInputs = form.querySelectorAll('input, textarea, button[type="submit"]');
+    
+    if (mode === 'create') {
+      // Fresh form: all enabled
+      allInputs.forEach((input) => (input.disabled = false));
+      if (submitBtn) {
+        submitBtn.hidden = false;
+        submitBtn.textContent = 'Confirmar Presença';
       }
-      if (input === consentCheckbox && consentCheckbox.disabled && !disabled) {
-        return; // Keep disabled
+      if (editBtn) editBtn.hidden = true;
+    } else if (mode === 'view') {
+      // Response saved: all disabled, show edit button
+      allInputs.forEach((input) => (input.disabled = true));
+      if (submitBtn) submitBtn.hidden = true;
+      if (editBtn) editBtn.hidden = false;
+    } else if (mode === 'edit') {
+      // Edit mode: unlock editable fields, keep name/consent locked
+      allInputs.forEach((input) => {
+        if (input === nameInput || input === consentCheckbox) {
+          input.disabled = true; // Name/consent always locked after first save
+        } else {
+          input.disabled = false;
+        }
+      });
+      if (submitBtn) {
+        submitBtn.hidden = false;
+        submitBtn.textContent = 'Atualizar Confirmação';
       }
-      input.disabled = disabled;
-    });
+      if (editBtn) editBtn.hidden = true;
+    }
+  }
+
+  function setBusyState(busy) {
+    const allInputs = form.querySelectorAll('input, textarea, button');
+    allInputs.forEach((input) => (input.disabled = busy));
   }
 
   function updateCountsVisibility() {
@@ -77,14 +102,24 @@ export function setupRsvp() {
     }
   }
 
-  // Generate stable idempotency key
+  // Generate or get idempotency key (rotates on field change or after success)
   function getIdempotencyKey() {
     let key = localStorage.getItem('rsvp_idempotency_key');
     if (!key) {
-      key = `web-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+      key = crypto.randomUUID();
       localStorage.setItem('rsvp_idempotency_key', key);
     }
     return key;
+  }
+
+  function rotateIdempotencyKey() {
+    const key = crypto.randomUUID();
+    localStorage.setItem('rsvp_idempotency_key', key);
+    return key;
+  }
+
+  function clearIdempotencyKey() {
+    localStorage.removeItem('rsvp_idempotency_key');
   }
 
   async function fetchRsvp() {
@@ -102,7 +137,9 @@ export function setupRsvp() {
         if (response.status === 401) {
           localStorage.removeItem(TOKEN_KEY);
           manageToken = null;
+          rotateIdempotencyKey(); // New key for fresh attempt
           showError('rsvp-name', 'Token inválido. Faça uma nova confirmação.');
+          setViewMode('create');
           return;
         }
         throw new Error(`HTTP ${response.status}`);
@@ -110,47 +147,31 @@ export function setupRsvp() {
 
       const data = await response.json();
       populateForm(data);
-      showEditButton();
+      setViewMode('view');
     } catch (error) {
       console.error('Failed to fetch RSVP:', error);
     }
   }
 
   function populateForm(data) {
-    if (nameInput) {
-      nameInput.value = data.guestName;
-      nameInput.disabled = true;
-    }
+    if (nameInput) nameInput.value = data.guestName;
 
     const attendingRadio = document.querySelector(`input[name="attending"][value="${data.attending}"]`);
-    if (attendingRadio) {
-      attendingRadio.checked = true;
-    }
+    if (attendingRadio) attendingRadio.checked = true;
 
     if (adultsInput) adultsInput.value = data.adultsCount;
     if (childrenInput) childrenInput.value = data.childrenCount;
     if (observationsTextarea) observationsTextarea.value = data.observations || '';
-
-    if (consentCheckbox) {
-      consentCheckbox.checked = true;
-      consentCheckbox.disabled = true;
-    }
+    if (consentCheckbox) consentCheckbox.checked = true;
 
     updateCountsVisibility();
     updateObservationsCount();
-    toggleFieldsDisabled(true);
-  }
-
-  function showEditButton() {
-    if (submitBtn) submitBtn.hidden = true;
-    if (editBtn) editBtn.hidden = false;
   }
 
   function enableEditMode() {
     isEditMode = true;
-    if (submitBtn) submitBtn.hidden = false;
-    if (editBtn) editBtn.hidden = true;
-    toggleFieldsDisabled(false);
+    setViewMode('edit');
+    hideStatus();
   }
 
   function updateObservationsCount() {
@@ -164,6 +185,7 @@ export function setupRsvp() {
     clearErrors();
     hideStatus();
 
+    const savedMode = isEditMode; // Capture before async
     const attending = document.querySelector('input[name="attending"]:checked')?.value === 'true';
 
     const payload = {
@@ -175,18 +197,24 @@ export function setupRsvp() {
       consentGiven: consentCheckbox?.checked === true,
     };
 
-    const method = isEditMode ? 'PUT' : 'POST';
+    const method = savedMode ? 'PUT' : 'POST';
     const headers = {
       'Content-Type': 'application/json',
-      'Idempotency-Key': getIdempotencyKey(),
     };
 
-    if (method === 'PUT' && manageToken) {
+    // POST: send idempotency key + bearer if token exists (for network retry)
+    // PUT: send bearer (idempotency optional, not required by spec)
+    if (method === 'POST') {
+      headers['Idempotency-Key'] = getIdempotencyKey();
+      if (manageToken) {
+        headers['Authorization'] = `Bearer ${manageToken}`;
+      }
+    } else if (method === 'PUT' && manageToken) {
       headers['Authorization'] = `Bearer ${manageToken}`;
     }
 
-    toggleFieldsDisabled(true);
-    submitBtn.textContent = isEditMode ? 'Atualizando...' : 'Enviando...';
+    setBusyState(true);
+    if (submitBtn) submitBtn.textContent = savedMode ? 'Atualizando...' : 'Enviando...';
 
     try {
       const response = await fetch(API_URL, { method, headers, body: JSON.stringify(payload) });
@@ -201,7 +229,10 @@ export function setupRsvp() {
 
       if (!response.ok) {
         if (response.status === 409) {
-          showStatus('Esta confirmação já foi enviada. Verifique seu token.', 'error');
+          showStatus(
+            'Conflito de idempotência. Esta confirmação pode já ter sido enviada anteriormente. Para criar uma nova confirmação, recarregue a página.',
+            'error'
+          );
           return;
         }
         if (response.status === 413) {
@@ -212,34 +243,45 @@ export function setupRsvp() {
           showStatus('Muitas requisições. Aguarde alguns minutos.', 'error');
           return;
         }
+        if (response.status === 401) {
+          // Token invalid on PUT
+          localStorage.removeItem(TOKEN_KEY);
+          manageToken = null;
+          rotateIdempotencyKey();
+          showStatus('Token inválido. Faça uma nova confirmação.', 'error');
+          setViewMode('create');
+          isEditMode = false;
+          return;
+        }
         throw new Error(data.error || 'Erro desconhecido');
       }
 
+      // Success!
       if (method === 'POST' && data.manageToken) {
         manageToken = data.manageToken;
         localStorage.setItem(TOKEN_KEY, manageToken);
+        clearIdempotencyKey(); // Clear after successful create
       }
 
       showStatus(
-        isEditMode ? 'Confirmação atualizada com sucesso!' : 'Confirmação enviada com sucesso!',
+        savedMode ? 'Confirmação atualizada com sucesso!' : 'Confirmação enviada com sucesso!',
         'success'
       );
 
-      // Lock name and consent after success
-      if (nameInput) nameInput.disabled = true;
-      if (consentCheckbox) consentCheckbox.disabled = true;
-
-      showEditButton();
+      setViewMode('view');
       isEditMode = false;
     } catch (error) {
       console.error('Failed to submit RSVP:', error);
       showStatus(error.message || 'Erro ao enviar confirmação. Tente novamente.', 'error');
-    } finally {
-      // Restore button text, but never re-enable locked fields
-      submitBtn.textContent = isEditMode ? 'Atualizar Confirmação' : 'Confirmar Presença';
-      if (!isEditMode) {
-        toggleFieldsDisabled(false);
+      // On error, restore editable state
+      if (savedMode) {
+        setViewMode('edit');
+      } else {
+        setViewMode('create');
       }
+    } finally {
+      // Restore button text based on saved mode
+      if (submitBtn) submitBtn.textContent = savedMode ? 'Atualizar Confirmação' : 'Confirmar Presença';
     }
   }
 

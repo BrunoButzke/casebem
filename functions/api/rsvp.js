@@ -23,23 +23,45 @@ import {
  */
 function getAllowedOrigins(request) {
   const requestUrl = new URL(request.url);
-  const origin = requestUrl.origin; // e.g., https://casebem.pages.dev
+  const requestOrigin = requestUrl.origin;
+  const hostname = requestUrl.hostname;
   
-  // Also allow common production domains
-  const allowedOrigins = [
-    origin,
-    'https://casebem.pages.dev',
-    'https://www.casebem.pages.dev',
-    'https://casebem.com',
-    'https://www.casebem.com',
-  ];
+  const allowedOrigins = [requestOrigin]; // Always allow same-origin
   
-  // Development: allow localhost
-  if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
-    allowedOrigins.push(origin);
+  // Production: casebem.pages.dev and preview branches
+  if (hostname === 'casebem.pages.dev' || hostname.endsWith('.casebem.pages.dev')) {
+    allowedOrigins.push(
+      'https://casebem.pages.dev',
+      'https://www.casebem.pages.dev',
+      'https://casebem.com',
+      'https://www.casebem.com'
+    );
+    // Also allow any preview URL as cross-origin if request is from pages.dev
+    const requestOriginParsed = request.headers.get('Origin');
+    if (requestOriginParsed && requestOriginParsed.startsWith('https://') && 
+        (requestOriginParsed.includes('.casebem.pages.dev') || requestOriginParsed.includes('casebem.pages.dev'))) {
+      allowedOrigins.push(requestOriginParsed);
+    }
   }
   
-  return allowedOrigins;
+  // Production: casebem.com apex/www
+  if (hostname === 'casebem.com' || hostname === 'www.casebem.com') {
+    allowedOrigins.push(
+      'https://casebem.com',
+      'https://www.casebem.com',
+      'https://casebem.pages.dev'
+    );
+  }
+  
+  // Development: localhost only
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    allowedOrigins.push(
+      'http://localhost:5173',
+      'http://127.0.0.1:5173'
+    );
+  }
+  
+  return [...new Set(allowedOrigins)]; // Remove duplicates
 }
 
 /**

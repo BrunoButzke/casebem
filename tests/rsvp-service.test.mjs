@@ -275,7 +275,7 @@ describe('createRsvp', () => {
     assert.equal(db.data.rsvps[0].children_count, 0);
   });
 
-  it('should store token as hash and encrypted', async () => {
+  it('should store token as hash only (no encryption)', async () => {
     const data = {
       guestName: 'Test User',
       attending: true,
@@ -290,9 +290,8 @@ describe('createRsvp', () => {
     const storedTokenEncrypted = db.data.rsvps[0].manage_token_encrypted;
 
     assert.notEqual(storedTokenHash, result.manageToken);
-    assert.equal(storedTokenHash.length, 64);
-    assert.ok(storedTokenEncrypted); // Encrypted token stored
-    assert.notEqual(storedTokenEncrypted, result.manageToken);
+    assert.equal(storedTokenHash.length, 64); // SHA-256 hash
+    assert.equal(storedTokenEncrypted, null); // No encryption (bearer required for replay)
   });
 
   it('should generate unique IDs', async () => {

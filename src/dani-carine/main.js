@@ -1,6 +1,7 @@
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import Lenis from 'lenis';
+import { setupRsvp } from './rsvp.mjs';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -587,6 +588,7 @@ async function runPreloader() {
     .from('.nav', { y: -40, opacity: 0, duration: 0.9, clearProps: 'transform,opacity' }, 0.7);
 }
 
+
 function boot() {
   cloneMarquee();
   setupCursor();
@@ -598,6 +600,7 @@ function boot() {
   setupHow();
   setupDressRecolor();
   setupGifts();
+  setupRsvp();
   setupReveals();
   ScrollTrigger.sort();
   window.addEventListener('load', () => ScrollTrigger.refresh());

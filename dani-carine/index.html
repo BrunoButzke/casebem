@@ -48,6 +48,7 @@
       <nav class="nav__links" aria-label="Seções">
         <a href="#o-dia">O dia</a>
         <a href="#local">Local</a>
+        <a href="#confirmar-presenca">Confirmar presença</a>
         <a href="#dress-code">Dress code</a>
         <a href="#presentes">Presentes</a>
       </nav>
@@ -300,6 +301,152 @@
                 </button>
               </div>
             </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="rsvp" id="confirmar-presenca">
+        <div class="container">
+          <p class="eyebrow">Confirme sua presença</p>
+          <h2>Você vai estar com a gente?</h2>
+          <p class="rsvp__lead">
+            Sua presença é o nosso maior presente. Confirme até 15 de novembro.
+          </p>
+
+          <div class="rsvp__form-container">
+            <form class="rsvp__form" id="rsvp-form" novalidate>
+              <div class="rsvp__status" id="rsvp-status" hidden>
+                <p class="rsvp__status-message" id="rsvp-status-message"></p>
+              </div>
+
+              <div class="rsvp__fields" id="rsvp-fields">
+                <div class="form-field">
+                  <label for="rsvp-name">Seu nome completo <span class="required">*</span></label>
+                  <input
+                    type="text"
+                    id="rsvp-name"
+                    name="guestName"
+                    required
+                    maxlength="100"
+                    autocomplete="name"
+                    aria-describedby="rsvp-name-error"
+                  />
+                  <span class="form-error" id="rsvp-name-error" role="alert"></span>
+                </div>
+
+                <fieldset class="form-field">
+                  <legend>Você vai comparecer? <span class="required">*</span></legend>
+                  <div class="radio-group">
+                    <label class="radio-label">
+                      <input
+                        type="radio"
+                        name="attending"
+                        value="yes"
+                        required
+                        aria-describedby="rsvp-attending-error"
+                      />
+                      <span>Sim, estarei lá! ✨</span>
+                    </label>
+                    <label class="radio-label">
+                      <input
+                        type="radio"
+                        name="attending"
+                        value="no"
+                      />
+                      <span>Infelizmente não poderei ir</span>
+                    </label>
+                  </div>
+                  <span class="form-error" id="rsvp-attending-error" role="alert"></span>
+                </fieldset>
+
+                <div class="form-row">
+                  <div class="form-field">
+                    <label for="rsvp-adults">Acompanhantes adultos</label>
+                    <input
+                      type="number"
+                      id="rsvp-adults"
+                      name="adultsCount"
+                      min="0"
+                      max="10"
+                      value="0"
+                      inputmode="numeric"
+                      aria-describedby="rsvp-adults-hint rsvp-adults-error"
+                    />
+                    <span class="form-hint" id="rsvp-adults-hint">Máximo 10 pessoas</span>
+                    <span class="form-error" id="rsvp-adults-error" role="alert"></span>
+                  </div>
+
+                  <div class="form-field">
+                    <label for="rsvp-children">Crianças</label>
+                    <input
+                      type="number"
+                      id="rsvp-children"
+                      name="childrenCount"
+                      min="0"
+                      max="10"
+                      value="0"
+                      inputmode="numeric"
+                      aria-describedby="rsvp-children-hint rsvp-children-error"
+                    />
+                    <span class="form-hint" id="rsvp-children-hint">Máximo 10 crianças</span>
+                    <span class="form-error" id="rsvp-children-error" role="alert"></span>
+                  </div>
+                </div>
+
+                <div class="form-field">
+                  <label for="rsvp-observations">Observações</label>
+                  <textarea
+                    id="rsvp-observations"
+                    name="observations"
+                    maxlength="500"
+                    rows="3"
+                    placeholder="Alergias alimentares, restrições dietéticas ou outras informações..."
+                    aria-describedby="rsvp-observations-hint rsvp-observations-error"
+                  ></textarea>
+                  <span class="form-hint" id="rsvp-observations-hint">
+                    <span id="rsvp-observations-count">0</span>/500 caracteres
+                  </span>
+                  <span class="form-error" id="rsvp-observations-error" role="alert"></span>
+                </div>
+
+                <div class="form-field">
+                  <label class="checkbox-label">
+                    <input
+                      type="checkbox"
+                      name="consentGiven"
+                      id="rsvp-consent"
+                      required
+                      aria-describedby="rsvp-consent-error"
+                    />
+                    <span>
+                      Concordo que meu nome e resposta sejam armazenados para a organização do evento. 
+                      Minhas observações são privadas e visíveis apenas aos noivos.
+                    </span>
+                  </label>
+                  <span class="form-error" id="rsvp-consent-error" role="alert"></span>
+                </div>
+
+                <button type="submit" class="btn magnetic rsvp__submit" id="rsvp-submit">
+                  Confirmar presença
+                </button>
+
+                <button 
+                  type="button" 
+                  class="btn btn--ghost magnetic rsvp__edit" 
+                  id="rsvp-edit" 
+                  hidden
+                >
+                  Alterar minha resposta
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <div class="rsvp__privacy">
+            <p>
+              <strong>🔒 Privacidade:</strong> Seus dados são usados apenas para a organização do evento. 
+              Suas observações nunca serão compartilhadas publicamente.
+            </p>
           </div>
         </div>
       </section>

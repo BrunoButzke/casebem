@@ -543,6 +543,7 @@ h2 {
   font-size: 0.85rem;
   line-height: 1.4;
   color: var(--cream);
+  max-width: 100%;
 }
 
 .app-highlight__status svg {

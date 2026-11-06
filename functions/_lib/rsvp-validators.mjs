@@ -159,6 +159,16 @@ export function validateRsvpCreate(data) {
     };
   }
 
+  // Reject unknown fields
+  const allowedFields = ['guestName', 'attending', 'adultsCount', 'childrenCount', 'observations', 'consentGiven'];
+  const unknownFields = Object.keys(data).filter(k => !allowedFields.includes(k));
+  if (unknownFields.length > 0) {
+    return {
+      valid: false,
+      errors: { _: `Campos não permitidos: ${unknownFields.join(', ')}` }
+    };
+  }
+
   const errors = {};
   const validated = {};
   

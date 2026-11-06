@@ -1,15 +1,16 @@
 /**
- * RSVP Service
- * Business logic for RSVP operations with D1 database
+ * RSVP Service - Secure implementation with idempotency
  */
 
 import { WEDDING_KEY } from './rsvp-validators.mjs';
-import { encryptToken, decryptToken, hmacHash } from './crypto-utils.mjs';
+import { 
+  deriveRsvpKeys, 
+  encryptToken, 
+  decryptToken, 
+  hmacHash, 
+  createPayloadFingerprint 
+} from './crypto-utils.mjs';
 
-/**
- * Generate cryptographically secure random token
- * @returns {Promise<string>} Base64url encoded token (32 bytes)
- */
 export async function generateToken() {
   const bytes = new Uint8Array(32);
   crypto.getRandomValues(bytes);
@@ -19,10 +20,6 @@ export async function generateToken() {
     .replace(/=/g, '');
 }
 
-/**
- * Hash token using SHA-256 (for database lookup only)
- * Note: 256-bit random token provides sufficient entropy
- */
 export async function hashToken(token) {
   const encoder = new TextEncoder();
   const data = encoder.encode(token);
@@ -31,53 +28,66 @@ export async function hashToken(token) {
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-/**
- * Generate UUID v4
- */
 export function generateUuid() {
   return crypto.randomUUID();
 }
 
-/**
- * Get current ISO timestamp
- */
 export function now() {
   return new Date().toISOString();
 }
 
 /**
- * Create new RSVP with idempotency support
- * @param {object} db - D1 database binding
- * @param {object} data - Validated RSVP data
- * @param {string} idempotencyKey - Client-provided idempotency key
- * @param {string} encryptionKey - env.RSVP_TOKEN_KEY for token encryption
- * @returns {Promise<object>} Created RSVP with manage token
+ * Create RSVP with secure idempotency
+ * NEVER returns decrypted token without Authorization + fingerprint match
  */
-export async function createRsvp(db, data, idempotencyKey, encryptionKey) {
-  // Server-side normalization: attending=false forces counts to 0
+export async function createRsvp(db, data, idempotencyKey, secret, bearerToken = null) {
+  const keys = await deriveRsvpKeys(secret);
+  
+  // Normalize: attending=false forces counts to 0
   const normalizedData = {
     ...data,
     adultsCount: data.attending ? data.adultsCount : 0,
     childrenCount: data.attending ? data.childrenCount : 0,
   };
 
-  // Check for existing idempotent request
+  const fingerprint = await createPayloadFingerprint(normalizedData);
+
+  // Check idempotency: MUST have Bearer token AND matching fingerprint
   if (idempotencyKey) {
     const existing = await db
       .prepare(
-        `SELECT 
-          id, guest_name, attending, adults_count, children_count, 
-          observations, manage_token_encrypted, created_at, updated_at
-        FROM rsvps 
-        WHERE wedding_key = ? AND idempotency_key = ?`
+        `SELECT id, guest_name, attending, adults_count, children_count,
+                observations, manage_token_hash, manage_token_encrypted,
+                idempotency_fingerprint, created_at, updated_at
+         FROM rsvps
+         WHERE wedding_key = ? AND idempotency_key = ?`
       )
       .bind(WEDDING_KEY, idempotencyKey)
       .first();
 
     if (existing) {
-      // Idempotent replay - decrypt and return existing token
-      const manageToken = await decryptToken(existing.manage_token_encrypted, encryptionKey);
+      // Idempotent replay: MUST verify Authorization + fingerprint
+      if (!bearerToken) {
+        // Idempotency key exists but no auth - generic 409
+        throw new Error('IDEMPOTENCY_CONFLICT');
+      }
+
+      const bearerHash = await hashToken(bearerToken);
       
+      // Verify Bearer matches this record
+      if (bearerHash !== existing.manage_token_hash) {
+        // Wrong bearer for this idempotency key
+        throw new Error('UNAUTHORIZED');
+      }
+
+      // Verify fingerprint matches (same request data)
+      if (fingerprint !== existing.idempotency_fingerprint) {
+        // Same key, different data, but bearer valid = conflict
+        throw new Error('IDEMPOTENCY_CONFLICT');
+      }
+
+      // Valid replay: Bearer + fingerprint match, return same token (echo)
+      // NO DECRYPTION - just return the bearer they already have
       return {
         id: existing.id,
         weddingKey: WEDDING_KEY,
@@ -88,89 +98,106 @@ export async function createRsvp(db, data, idempotencyKey, encryptionKey) {
         observations: existing.observations,
         createdAt: existing.created_at,
         updatedAt: existing.updated_at,
-        manageToken,
+        manageToken: bearerToken, // Echo their valid token
       };
     }
   }
 
+  // New RSVP creation
   const id = generateUuid();
   const manageToken = await generateToken();
   const tokenHash = await hashToken(manageToken);
-  const tokenEncrypted = await encryptToken(manageToken, encryptionKey);
+  const tokenEncrypted = await encryptToken(manageToken, keys.encryptionKey);
   const timestamp = now();
 
-  // Use D1 batch for atomic transaction
   const result = await db.batch([
     db.prepare(
       `INSERT INTO rsvps (
-        id, wedding_key, guest_name, attending, 
-        adults_count, children_count, observations, 
+        id, wedding_key, guest_name, attending,
+        adults_count, children_count, observations,
         consent_given, manage_token_hash, manage_token_encrypted,
-        idempotency_key, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        idempotency_key, idempotency_fingerprint, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).bind(
-      id,
-      WEDDING_KEY,
-      normalizedData.guestName,
+      id, WEDDING_KEY, normalizedData.guestName,
       normalizedData.attending ? 1 : 0,
-      normalizedData.adultsCount,
-      normalizedData.childrenCount,
-      normalizedData.observations,
-      1,
-      tokenHash,
-      tokenEncrypted,
-      idempotencyKey || null,
-      timestamp,
-      timestamp
+      normalizedData.adultsCount, normalizedData.childrenCount,
+      normalizedData.observations, 1,
+      tokenHash, tokenEncrypted,
+      idempotencyKey || null, fingerprint,
+      timestamp, timestamp
     ),
   ]);
 
   if (!result[0].success) {
-    // Check if it's a duplicate idempotency key (UNIQUE constraint violation)
-    if (result[0].error && result[0].error.includes('UNIQUE')) {
-      throw new Error('IDEMPOTENCY_CONFLICT');
+    // UNIQUE constraint violation - concurrent insert
+    // Re-read and verify as above
+    if (idempotencyKey && result[0].error?.includes('UNIQUE')) {
+      // Retry logic: read existing, verify bearer+fingerprint
+      const existing = await db
+        .prepare(
+          `SELECT id, guest_name, attending, adults_count, children_count,
+                  observations, manage_token_hash, idempotency_fingerprint,
+                  created_at, updated_at
+           FROM rsvps
+           WHERE wedding_key = ? AND idempotency_key = ?`
+        )
+        .bind(WEDDING_KEY, idempotencyKey)
+        .first();
+
+      if (existing) {
+        if (!bearerToken) {
+          throw new Error('IDEMPOTENCY_CONFLICT');
+        }
+        const bearerHash = await hashToken(bearerToken);
+        if (bearerHash !== existing.manage_token_hash || 
+            fingerprint !== existing.idempotency_fingerprint) {
+          throw new Error('IDEMPOTENCY_CONFLICT');
+        }
+        // Valid replay
+        return {
+          id: existing.id,
+          weddingKey: WEDDING_KEY,
+          guestName: existing.guest_name,
+          attending: existing.attending === 1,
+          adultsCount: existing.adults_count,
+          childrenCount: existing.children_count,
+          observations: existing.observations,
+          createdAt: existing.created_at,
+          updatedAt: existing.updated_at,
+          manageToken: bearerToken,
+        };
+      }
     }
     throw new Error('Failed to create RSVP');
   }
 
   return {
-    id,
-    weddingKey: WEDDING_KEY,
+    id, weddingKey: WEDDING_KEY,
     guestName: normalizedData.guestName,
     attending: normalizedData.attending,
     adultsCount: normalizedData.adultsCount,
     childrenCount: normalizedData.childrenCount,
     observations: normalizedData.observations,
-    createdAt: timestamp,
-    updatedAt: timestamp,
-    manageToken,
+    createdAt: timestamp, updatedAt: timestamp,
+    manageToken, // Only new creation returns token
   };
 }
 
-/**
- * Get RSVP by token
- * @param {object} db - D1 database binding
- * @param {string} token - Manage token
- * @returns {Promise<object|null>} RSVP data or null if not found
- */
 export async function getRsvpByToken(db, token) {
   const tokenHash = await hashToken(token);
-
   const result = await db
     .prepare(
-      `SELECT 
-        id, wedding_key, guest_name, attending, 
-        adults_count, children_count, observations,
-        created_at, updated_at
-      FROM rsvps 
-      WHERE manage_token_hash = ? AND wedding_key = ?`
+      `SELECT id, wedding_key, guest_name, attending,
+              adults_count, children_count, observations,
+              created_at, updated_at
+       FROM rsvps
+       WHERE manage_token_hash = ? AND wedding_key = ?`
     )
     .bind(tokenHash, WEDDING_KEY)
     .first();
 
-  if (!result) {
-    return null;
-  }
+  if (!result) return null;
 
   return {
     id: result.id,
@@ -185,22 +212,12 @@ export async function getRsvpByToken(db, token) {
   };
 }
 
-/**
- * Update RSVP by token
- * @param {object} db - D1 database binding
- * @param {string} token - Manage token
- * @param {object} data - Validated update data (partial)
- * @returns {Promise<object|null>} Updated RSVP or null if not found
- */
 export async function updateRsvpByToken(db, token, data) {
   const tokenHash = await hashToken(token);
-
   const existing = await getRsvpByToken(db, token);
-  if (!existing) {
-    return null;
-  }
+  if (!existing) return null;
 
-  // Server-side normalization: if attending changed to false, force counts to 0
+  // Normalize: attending=false forces counts to 0
   const normalizedData = { ...data };
   if ('attending' in data && data.attending === false) {
     normalizedData.adultsCount = 0;
@@ -230,85 +247,52 @@ export async function updateRsvpByToken(db, token, data) {
   const timestamp = now();
   fields.push('updated_at = ?');
   values.push(timestamp);
-
-  values.push(tokenHash);
-  values.push(WEDDING_KEY);
+  values.push(tokenHash, WEDDING_KEY);
 
   const result = await db
     .prepare(
-      `UPDATE rsvps 
-       SET ${fields.join(', ')}
+      `UPDATE rsvps SET ${fields.join(', ')}
        WHERE manage_token_hash = ? AND wedding_key = ?`
     )
     .bind(...values)
     .run();
 
-  if (!result.success) {
-    throw new Error('Failed to update RSVP');
-  }
-
+  if (!result.success) throw new Error('Failed to update RSVP');
   return await getRsvpByToken(db, token);
 }
 
-/**
- * Check rate limit with UPSERT and cleanup
- * @param {object} db - D1 database binding
- * @param {string} ipAddress - Client IP address (CF-Connecting-IP)
- * @param {string} hmacSecret - env.RSVP_HASH_KEY for HMAC
- * @param {number} limit - Max requests per hour (default 10)
- * @returns {Promise<object>} { allowed: boolean, remaining: number }
- */
-export async function checkRateLimit(db, ipAddress, hmacSecret, limit = 10) {
-  const ipHash = await hmacHash(ipAddress, hmacSecret);
+export async function checkRateLimit(db, ipAddress, secret, limit = 10) {
+  const keys = await deriveRsvpKeys(secret);
+  const ipHash = await hmacHash(ipAddress, keys.hmacKey);
   const windowStart = getHourWindow();
   const rateLimitId = `${WEDDING_KEY}:${ipHash}:${windowStart}`;
   const timestamp = now();
 
-  // Atomic UPSERT with conditional increment
-  const result = await db.batch([
-    // Try to INSERT, or UPDATE if exists and under limit
-    db.prepare(
+  // Atomic UPSERT with RETURNING
+  const upsert = await db
+    .prepare(
       `INSERT INTO rate_limits (id, wedding_key, ip_hash, window_start, request_count, created_at, updated_at)
        VALUES (?, ?, ?, ?, 1, ?, ?)
-       ON CONFLICT(id) DO UPDATE 
-       SET request_count = request_count + 1,
-           updated_at = ?
-       WHERE request_count < ?`
-    ).bind(rateLimitId, WEDDING_KEY, ipHash, windowStart, timestamp, timestamp, timestamp, limit),
-    
-    // Cleanup old rate limit windows (>26 hours)
-    db.prepare(
-      `DELETE FROM rate_limits 
-       WHERE window_start < datetime('now', '-26 hours')`
-    ),
-  ]);
+       ON CONFLICT(id) DO UPDATE
+       SET request_count = request_count + 1, updated_at = ?
+       WHERE request_count < ?
+       RETURNING request_count`
+    )
+    .bind(rateLimitId, WEDDING_KEY, ipHash, windowStart, timestamp, timestamp, timestamp, limit)
+    .first();
 
-  // Check if the row was actually updated/inserted
-  const changes = result[0].meta?.changes || 0;
-  
-  if (changes === 0) {
-    // Hit the limit - no row was changed
+  // Cleanup old windows
+  await db.prepare(`DELETE FROM rate_limits WHERE window_start < datetime('now', '-26 hours')`).run();
+
+  if (!upsert) {
+    // No row returned = hit limit
     return { allowed: false, remaining: 0 };
   }
 
-  // Fetch current count
-  const current = await db
-    .prepare(`SELECT request_count FROM rate_limits WHERE id = ?`)
-    .bind(rateLimitId)
-    .first();
-
-  const count = current ? Number(current.request_count) : 1;
-  
-  return { 
-    allowed: true, 
-    remaining: Math.max(0, limit - count) 
-  };
+  const count = Number(upsert.request_count);
+  return { allowed: true, remaining: Math.max(0, limit - count) };
 }
 
-/**
- * Get current hour window for rate limiting
- * Returns ISO string truncated to hour
- */
 export function getHourWindow() {
   const date = new Date();
   date.setMinutes(0, 0, 0);

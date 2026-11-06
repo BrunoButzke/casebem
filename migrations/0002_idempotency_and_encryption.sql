@@ -1,22 +1,21 @@
--- Migration 0002: Add Idempotency and Token Encryption
+-- Migration 0002: Add Idempotency, Encryption and Invariant Checks
 -- Created: 2026-11-06
 -- Database: Cloudflare D1
 
--- Add idempotency column to rsvps table
+-- Add idempotency columns
 ALTER TABLE rsvps ADD COLUMN idempotency_key TEXT;
-
--- Add encrypted token column (AES-GCM encrypted manageToken)
+ALTER TABLE rsvps ADD COLUMN idempotency_fingerprint TEXT NOT NULL DEFAULT '';
 ALTER TABLE rsvps ADD COLUMN manage_token_encrypted TEXT NOT NULL DEFAULT '';
 
 -- Create unique index for idempotency per wedding
-CREATE UNIQUE INDEX IF NOT EXISTS idx_rsvps_idempotency 
-  ON rsvps(wedding_key, idempotency_key) 
+CREATE UNIQUE INDEX IF NOT EXISTS idx_rsvps_idempotency
+  ON rsvps(wedding_key, idempotency_key)
   WHERE idempotency_key IS NOT NULL;
+
+-- Note: SQLite ALTER TABLE cannot add CHECK constraints to existing tables
+-- For new deployments, use 0001_rsvps_v2.sql with constraints built-in
+-- For existing data, the application enforces: attending=0 => counts=0
 
 -- Update migration metadata
 INSERT INTO schema_migrations (version, applied_at, description)
-VALUES ('0002', datetime('now'), 'Add idempotency key and encrypted token storage');
-
--- Note: Existing rsvps will have empty manage_token_encrypted
--- This is OK for MVP as they already have manage_token_hash for auth
--- New creates will use both hash (for lookup) and encrypted (for recovery)
+VALUES ('0002', datetime('now'), 'Add idempotency, encryption, and fingerprint columns');

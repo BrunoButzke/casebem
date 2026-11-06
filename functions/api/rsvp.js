@@ -172,12 +172,16 @@ async function handlePost(request, env) {
       );
     }
 
-    // Create RSVP with idempotency and encryption
+    // Extract bearer token for idempotent replay verification
+    const bearerToken = extractBearerToken(request);
+    
+    // Create RSVP with idempotency (requires bearer for replay)
     const rsvp = await createRsvp(
-      env.DB, 
-      validation.data, 
-      idempotencyKey, 
-      env.RSVP_TOKEN_KEY
+      env.DB,
+      validation.data,
+      idempotencyKey,
+      env.RSVP_SECRET,
+      bearerToken
     );
     return jsonResponse(request, rsvp, 201);
   } catch (error) {
@@ -189,6 +193,10 @@ async function handlePost(request, env) {
         'Conflito: mesma chave de idempotência com dados diferentes',
         409
       );
+    }
+    
+    if (error.message === 'UNAUTHORIZED') {
+      return errorResponse(request, 'Token de autorização inválido', 401);
     }
     
     return errorResponse(request, 'Erro ao criar confirmação', 500);
@@ -250,7 +258,7 @@ async function handlePut(request, env) {
   try {
     // Rate limit PUT requests too
     const ip = getClientIp(request);
-    const rateLimit = await checkRateLimit(env.DB, ip, env.RSVP_HASH_KEY, 10);
+    const rateLimit = await checkRateLimit(env.DB, ip, env.RSVP_SECRET, 10);
     
     if (!rateLimit.allowed) {
       return errorResponse(
@@ -317,17 +325,8 @@ export async function onRequest(context) {
     );
   }
 
-  if (!env.RSVP_TOKEN_KEY) {
-    console.error('RSVP_TOKEN_KEY not configured');
-    return errorResponse(
-      request,
-      'Serviço temporariamente indisponível. Configuração incompleta.',
-      503
-    );
-  }
-
-  if (!env.RSVP_HASH_KEY) {
-    console.error('RSVP_HASH_KEY not configured');
+  if (!env.RSVP_SECRET) {
+    console.error('RSVP_SECRET not configured');
     return errorResponse(
       request,
       'Serviço temporariamente indisponível. Configuração incompleta.',

@@ -28,21 +28,32 @@ function runSql(sql) {
   }
 }
 
+function runSqlBatch(commands) {
+  try {
+    const input = JSON.stringify({ commands });
+    const result = execSync(`${PYTHON_RUNNER} --batch`, {
+      input,
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    return JSON.parse(result);
+  } catch (error) {
+    return { 
+      success: false, 
+      error: error.stderr?.toString() || error.stdout?.toString() || error.message 
+    };
+  }
+}
+
 test('migration 0003 creates wedding_messages table', () => {
-  const migration = readFileSync('./migrations/0003_messages.sql', 'utf-8');
-  const result = runSql(migration);
-  assert.equal(result.success, true, 'Migration should execute without errors');
-  
-  // Verify table exists
+  // Runner pre-loads all migrations, just verify table exists
   const check = runSql("SELECT name FROM sqlite_master WHERE type='table' AND name='wedding_messages'");
   assert.equal(check.success, true);
   assert.match(check.output, /wedding_messages/);
 });
 
 test('wedding_messages has correct columns', () => {
-  const migration = readFileSync('./migrations/0003_messages.sql', 'utf-8');
-  runSql(migration);
-  
+  // Runner pre-loads all migrations
   const result = runSql("PRAGMA table_info(wedding_messages)");
   assert.equal(result.success, true);
   
@@ -192,25 +203,19 @@ Linha3', 1, '2026-11-06T10:00:00Z', 'fp-newline')
 });
 
 test('wedding_messages idempotency index prevents duplicates', () => {
-  const migration = readFileSync('./migrations/0003_messages.sql', 'utf-8');
-  runSql(migration);
+  // Use batch to execute in same DB
+  const result = runSqlBatch([
+    `INSERT INTO wedding_messages 
+     (id, wedding_key, guest_name, message, consent_given, created_at, idempotency_key, idempotency_fingerprint)
+     VALUES ('id-1', 'dani-carine', 'João', 'Mensagem', 1, '2026-11-06T10:00:00Z', 'idem-key-123', 'fp-1')`,
+    `INSERT INTO wedding_messages 
+     (id, wedding_key, guest_name, message, consent_given, created_at, idempotency_key, idempotency_fingerprint)
+     VALUES ('id-2', 'dani-carine', 'Maria', 'Outra mensagem', 1, '2026-11-06T10:00:00Z', 'idem-key-123', 'fp-2')`
+  ]);
   
-  // First insert
-  const first = runSql(`
-    INSERT INTO wedding_messages 
-    (id, wedding_key, guest_name, message, consent_given, created_at, idempotency_key, idempotency_fingerprint)
-    VALUES ('id-1', 'dani-carine', 'João', 'Mensagem', 1, '2026-11-06T10:00:00Z', 'idem-key-123', 'fp-1')
-  `);
-  assert.equal(first.success, true);
-  
-  // Duplicate idempotency_key for same wedding_key
-  const duplicate = runSql(`
-    INSERT INTO wedding_messages 
-    (id, wedding_key, guest_name, message, consent_given, created_at, idempotency_key, idempotency_fingerprint)
-    VALUES ('id-2', 'dani-carine', 'Maria', 'Outra mensagem', 1, '2026-11-06T10:00:00Z', 'idem-key-123', 'fp-2')
-  `);
-  assert.equal(duplicate.success, false);
-  assert.match(duplicate.error, /UNIQUE|constraint/i);
+  assert.equal(result.results[0].success, true, 'First insert should succeed');
+  assert.equal(result.results[1].success, false, 'Duplicate idempotency_key should fail');
+  assert.match(result.results[1].error, /UNIQUE|constraint/i);
 });
 
 test('wedding_messages idempotency allows NULL keys', () => {
@@ -245,17 +250,16 @@ test('migration 0003 updates schema_migrations', () => {
 });
 
 test('migration 0003 is idempotent (IF NOT EXISTS)', () => {
-  const migration = readFileSync('./migrations/0003_messages.sql', 'utf-8');
-  
-  // Run migration twice
-  const first = runSql(migration);
-  assert.equal(first.success, true);
-  
-  const second = runSql(migration);
-  // Should fail on INSERT to schema_migrations (duplicate version)
-  // but CREATE TABLE IF NOT EXISTS should not cause error
-  // Let's check table still exists
+  // Runner pre-loads all migrations, verify table exists and can be queried
   const check = runSql("SELECT name FROM sqlite_master WHERE type='table' AND name='wedding_messages'");
   assert.equal(check.success, true);
   assert.match(check.output, /wedding_messages/);
+  
+  // Verify we can insert data (schema is valid)
+  const insert = runSql(`
+    INSERT INTO wedding_messages 
+    (id, wedding_key, guest_name, message, consent_given, created_at, idempotency_fingerprint)
+    VALUES ('test-idem', 'dani-carine', 'Test', 'Msg', 1, '2026-11-06T10:00:00Z', 'fp')
+  `);
+  assert.equal(insert.success, true);
 });

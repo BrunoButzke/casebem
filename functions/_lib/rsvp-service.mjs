@@ -5,8 +5,6 @@
 import { WEDDING_KEY } from './rsvp-validators.mjs';
 import { 
   deriveRsvpKeys, 
-  encryptToken, 
-  decryptToken, 
   hmacHash, 
   createPayloadFingerprint 
 } from './crypto-utils.mjs';

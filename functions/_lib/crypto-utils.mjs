@@ -1,12 +1,13 @@
 /**
  * Cryptography utilities for RSVP system
- * Uses single RSVP_SECRET with HKDF derivation for domain separation
+ * Uses single RSVP_SECRET with HKDF derivation for HMAC key
+ * Token encryption removed: replay requires bearer token, no recovery path needed
  */
 
 /**
- * Derive separate keys for encryption and HMAC using HKDF
- * @param {string} base64Secret - Base64-encoded secret from env.RSVP_SECRET
- * @returns {Promise<{encryptionKey: CryptoKey, hmacKey: CryptoKey}>}
+ * Derive HMAC key from RSVP_SECRET using HKDF
+ * @param {string} base64Secret - Base64-encoded secret from env.RSVP_SECRET (32+ bytes)
+ * @returns {Promise<{hmacKey: CryptoKey}>}
  */
 export async function deriveRsvpKeys(base64Secret) {
   if (!base64Secret || typeof base64Secret !== 'string') {
@@ -37,21 +38,7 @@ export async function deriveRsvpKeys(base64Secret) {
 
   const salt = new TextEncoder().encode('casebem-rsvp-v1');
 
-  // Derive AES-256-GCM key for token encryption
-  const encryptionKey = await crypto.subtle.deriveKey(
-    {
-      name: 'HKDF',
-      hash: 'SHA-256',
-      salt,
-      info: new TextEncoder().encode('token-encryption-v1'),
-    },
-    baseKey,
-    { name: 'AES-GCM', length: 256 },
-    false,
-    ['encrypt', 'decrypt']
-  );
-
-  // Derive HMAC-SHA256 key for IP hashing
+  // Derive HMAC-SHA256 key for IP hashing (rate limiting)
   const hmacKey = await crypto.subtle.deriveKey(
     {
       name: 'HKDF',
@@ -65,60 +52,7 @@ export async function deriveRsvpKeys(base64Secret) {
     ['sign']
   );
 
-  return { encryptionKey, hmacKey };
-}
-
-/**
- * Encrypt token using AES-GCM
- * @param {string} plaintext - Token to encrypt
- * @param {CryptoKey} key - Derived AES-GCM key
- * @returns {Promise<string>} Base64url-encoded encrypted data with IV
- */
-export async function encryptToken(plaintext, key) {
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const encoder = new TextEncoder();
-  const data = encoder.encode(plaintext);
-
-  const encrypted = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv },
-    key,
-    data
-  );
-
-  const combined = new Uint8Array(iv.length + encrypted.byteLength);
-  combined.set(iv);
-  combined.set(new Uint8Array(encrypted), iv.length);
-
-  return btoa(String.fromCharCode(...combined))
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=/g, '');
-}
-
-/**
- * Decrypt token using AES-GCM
- * @param {string} ciphertext - Base64url-encoded encrypted token
- * @param {CryptoKey} key - Derived AES-GCM key
- * @returns {Promise<string>} Decrypted plaintext token
- */
-export async function decryptToken(ciphertext, key) {
-  const normalized = ciphertext
-    .replace(/-/g, '+')
-    .replace(/_/g, '/');
-  
-  const combined = Uint8Array.from(atob(normalized), c => c.charCodeAt(0));
-  
-  const iv = combined.slice(0, 12);
-  const data = combined.slice(12);
-
-  const decrypted = await crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv },
-    key,
-    data
-  );
-
-  const decoder = new TextDecoder();
-  return decoder.decode(decrypted);
+  return { hmacKey };
 }
 
 /**

@@ -4,6 +4,7 @@ import Lenis from 'lenis';
 import { setupRsvp } from './rsvp.mjs';
 import { initMessages } from './messages.mjs';
 import { initCart } from './cart.mjs';
+import { initLodging } from './lodging.mjs';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -605,6 +606,7 @@ function boot() {
   setupRsvp();
   initMessages();
   initCart();
+  initLodging();
   setupReveals();
   ScrollTrigger.sort();
   window.addEventListener('load', () => ScrollTrigger.refresh());

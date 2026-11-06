@@ -677,6 +677,76 @@ h2 {
   object-fit: cover;
 }
 
+/* Hospedagem / dicas */
+.lodging {
+  padding: clamp(4.5rem, 10vw, 8rem) 0;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--cream) 70%, #dfe8e2) 0%, var(--cream) 100%);
+}
+
+.lodging h2 {
+  margin: 0.35rem 0 0.75rem;
+}
+
+.lodging__lead {
+  max-width: 36rem;
+  margin: 0 0 2rem;
+  color: var(--muted);
+}
+
+.lodging__list {
+  display: grid;
+  gap: 1.25rem;
+}
+
+@media (min-width: 800px) {
+  .lodging__list {
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem 2rem;
+  }
+}
+
+.lodging__item {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.lodging__item h3 {
+  margin: 0 0 0.35rem;
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-size: clamp(1.35rem, 2.4vw, 1.7rem);
+  font-weight: 500;
+}
+
+.lodging__area {
+  margin: 0 0 0.55rem;
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.lodging__item > p:not(.lodging__area):not(.lodging__links) {
+  margin: 0;
+  color: color-mix(in srgb, var(--ink) 88%, transparent);
+}
+
+.lodging__links {
+  margin: 0.85rem 0 0;
+  font-size: 0.95rem;
+}
+
+.lodging__link {
+  color: var(--forest, var(--accent, #3d5a4c));
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+
+.lodging__link:hover {
+  opacity: 0.85;
+}
+
 /* Dress */
 .dress {
   padding: clamp(4.5rem, 10vw, 8rem) 0;

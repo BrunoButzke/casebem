@@ -12,6 +12,9 @@ function setupDOM() {
   const window = new Window();
   const document = window.document;
   
+  // Set base URL para fetch relativo funcionar
+  window.location.href = 'https://casebem.com.br/dani-carine/';
+  
   // Setup HTML structure (simulando dani-carine/index.html)
   document.body.innerHTML = `
     <header>
@@ -83,9 +86,10 @@ function setupDOM() {
   window.clearTimeout = clearTimeout;
   window.clearInterval = clearInterval;
   
-  global.fetch = async () => ({
+  // Mock window.fetch (não global.fetch - Happy-DOM usa window.fetch)
+  window.fetch = async () => ({
     ok: true,
-    json: async () => ({ ok: true, method: 'pix', status: 'pending', payment: { qrCode: 'test' } }),
+    json: async () => ({ ok: true, method: 'pix', status: 'pending', payment: { qrCode: 'test', qrCodeBase64: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==' } }),
   });
 
   return { window, document };
@@ -226,10 +230,10 @@ test('Cart validation: rejeita nome vazio/curto', async () => {
 });
 
 test('Cart XSS: rejeita QR code base64 com script tags', async () => {
-  const { document } = setupDOM();
+  const { window, document } = setupDOM();
   
-  // Mock fetch com payload malicioso
-  global.fetch = async () => ({
+  // Mock window.fetch com payload malicioso
+  window.fetch = async () => ({
     ok: true,
     json: async () => ({
       ok: true,
@@ -268,7 +272,7 @@ test('Cart XSS: rejeita QR code base64 com script tags', async () => {
 });
 
 test('Cart XSS: valida base64 estritamente', async () => {
-  const { document } = setupDOM();
+  const { window, document } = setupDOM();
   
   const testCases = [
     { base64: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', valid: true },
@@ -278,7 +282,7 @@ test('Cart XSS: valida base64 estritamente', async () => {
   ];
 
   for (const testCase of testCases) {
-    global.fetch = async () => ({
+    window.fetch = async () => ({
       ok: true,
       json: async () => ({
         ok: true,
@@ -293,7 +297,7 @@ test('Cart XSS: valida base64 estritamente', async () => {
     });
 
     const { initCart, addToCart, openCartModal } = await import('../src/dani-carine/cart.mjs');
-    initCart(global.window);
+    initCart(window);  // Usar window do setupDOM atual, não global.window
 
     addToCart('danca', 1);
 
@@ -317,10 +321,7 @@ test('Cart XSS: valida base64 estritamente', async () => {
     }
 
     cleanupDOM();
-    setupDOM();  // Reset para próximo teste
   }
-
-  cleanupDOM();
 });
 
 test('Cart: badge atualiza corretamente com quantidade', async () => {
@@ -396,9 +397,9 @@ test('Cart: ajuste de quantidade via botões + e -', async () => {
 });
 
 test('Cart: verdadeira mensagem sobre confirmação pendente/manual', async () => {
-  const { document } = setupDOM();
+  const { window, document } = setupDOM();
   
-  global.fetch = async () => ({
+  window.fetch = async () => ({
     ok: true,
     json: async () => ({
       ok: true,

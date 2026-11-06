@@ -454,16 +454,6 @@ function createCartItemElement(item, gift, subtotal) {
   decBtn.dataset.giftId = item.giftId;
   decBtn.setAttribute('aria-label', 'Diminuir quantidade');
   decBtn.textContent = '−';
-  decBtn.addEventListener('click', () => {
-    if (item.quantity > 1) {
-      cart.updateQuantity(item.giftId, item.quantity - 1);
-    } else {
-      cart.removeItem(item.giftId);
-    }
-    resetIntentKey();
-    updateCartBadge();
-    renderCartItems();
-  });
   actions.appendChild(decBtn);
   
   const qty = _document.createElement('span');
@@ -479,12 +469,6 @@ function createCartItemElement(item, gift, subtotal) {
   incBtn.dataset.giftId = item.giftId;
   incBtn.setAttribute('aria-label', 'Aumentar quantidade');
   incBtn.textContent = '+';
-  incBtn.addEventListener('click', () => {
-    cart.updateQuantity(item.giftId, item.quantity + 1);
-    resetIntentKey();
-    updateCartBadge();
-    renderCartItems();
-  });
   actions.appendChild(incBtn);
   
   article.appendChild(actions);
@@ -502,12 +486,6 @@ function createCartItemElement(item, gift, subtotal) {
   removeBtn.dataset.giftId = item.giftId;
   removeBtn.setAttribute('aria-label', `Remover ${gift.name}`);
   removeBtn.textContent = '×';
-  removeBtn.addEventListener('click', () => {
-    cart.removeItem(item.giftId);
-    resetIntentKey();
-    updateCartBadge();
-    renderCartItems();
-  });
   article.appendChild(removeBtn);
 
   // Event listeners
@@ -543,7 +521,7 @@ function renderCartItems() {
     return;
   }
 
-  // Limpar container
+  // Limpar container e remover event listeners antigos
   container.innerHTML = '';
 
   // Calcular total e renderizar items
@@ -563,6 +541,99 @@ function renderCartItems() {
 
   const checkoutBtn = _document.getElementById('cart-checkout-btn');
   if (checkoutBtn) checkoutBtn.disabled = false;
+  
+  // Setup event delegation para botões de quantidade e remoção
+  setupCartItemsEvents(container);
+}
+
+/**
+ * Setup event delegation para cart items (uma vez por render)
+ * @private
+ */
+let lastActionTimestamp = 0;
+const ACTION_DEBOUNCE_MS = 50;
+
+function setupCartItemsEvents(container) {
+  // Remover listener antigo se existir
+  const oldListener = container._cartClickListener;
+  if (oldListener) {
+    container.removeEventListener('click', oldListener);
+  }
+  
+  // Novo listener com delegation
+  const clickListener = (e) => {
+    // Guard contra duplo processamento
+    if (isProcessingCartAction) return;
+    
+    const target = e.target;
+    
+    // Botão incrementar
+    if (target.matches('[data-action="inc"]')) {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      // Debounce para evitar duplo click
+      const now = Date.now();
+      if (now - lastActionTimestamp < ACTION_DEBOUNCE_MS) return;
+      lastActionTimestamp = now;
+      
+      const giftId = target.dataset.giftId;
+      const currentItem = cart.getItems().find(i => i.giftId === giftId);
+      if (currentItem) {
+        cart.updateQuantity(giftId, currentItem.quantity + 1);
+        resetIntentKey();
+        updateCartBadge();
+        renderCartItems();
+      }
+      return;
+    }
+    
+    // Botão decrementar
+    if (target.matches('[data-action="dec"]')) {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      // Debounce para evitar duplo click
+      const now = Date.now();
+      if (now - lastActionTimestamp < ACTION_DEBOUNCE_MS) return;
+      lastActionTimestamp = now;
+      
+      const giftId = target.dataset.giftId;
+      const currentItem = cart.getItems().find(i => i.giftId === giftId);
+      if (currentItem) {
+        if (currentItem.quantity > 1) {
+          cart.updateQuantity(giftId, currentItem.quantity - 1);
+        } else {
+          cart.removeItem(giftId);
+        }
+        resetIntentKey();
+        updateCartBadge();
+        renderCartItems();
+      }
+      return;
+    }
+    
+    // Botão remover
+    if (target.matches('.cart-item__remove')) {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      // Debounce para evitar duplo click
+      const now = Date.now();
+      if (now - lastActionTimestamp < ACTION_DEBOUNCE_MS) return;
+      lastActionTimestamp = now;
+      
+      const giftId = target.dataset.giftId;
+      cart.removeItem(giftId);
+      resetIntentKey();
+      updateCartBadge();
+      renderCartItems();
+      return;
+    }
+  };
+  
+  container.addEventListener('click', clickListener);
+  container._cartClickListener = clickListener;
 }
 
 /**
@@ -695,7 +766,7 @@ async function handleCheckout() {
 }
 
 /**
- * Valida base64 string
+ * Valida base64 string ou data URI
  * @param {string} str - String para validar
  * @returns {boolean}
  */
@@ -703,9 +774,22 @@ function isValidBase64(str) {
   if (typeof str !== 'string' || str.length === 0) return false;
   if (str.length > 100000) return false; // Max 100KB
   
-  // Base64 pattern with padding
+  // Se é data URI, extrair apenas a parte base64
+  let base64String = str;
+  if (str.startsWith('data:')) {
+    const match = str.match(/^data:image\/(png|jpeg|jpg|gif|webp);base64,(.+)$/);
+    if (!match) return false; // data URI mas formato inválido
+    base64String = match[2];
+  }
+  
+  // Base64 puro: validar pattern e padding
   const base64Pattern = /^[A-Za-z0-9+/]*={0,2}$/;
-  return base64Pattern.test(str);
+  if (!base64Pattern.test(base64String)) return false;
+  
+  // Validar padding correto (length % 4 === 0)
+  if (base64String.length % 4 !== 0) return false;
+  
+  return true;
 }
 
 /**
@@ -719,10 +803,52 @@ function showPaymentResult(data) {
   
   if (!checkoutEl || !resultEl || !itemsEl) return;
 
+  const { payment } = data;
+  
+  // Validar resposta de pagamento
+  if (!payment || !payment.qrCode || typeof payment.qrCode !== 'string') {
+    resultEl.innerHTML = '';
+    const errorDiv = _document.createElement('div');
+    errorDiv.className = 'payment-error';
+    
+    const errorTitle = _document.createElement('h4');
+    errorTitle.textContent = 'Resposta de pagamento inválida';
+    errorDiv.appendChild(errorTitle);
+    
+    const errorMsg = _document.createElement('p');
+    errorMsg.textContent = 'Não efetue o pagamento e entre em contato com o suporte. A resposta do servidor não contém um código Pix válido.';
+    errorDiv.appendChild(errorMsg);
+    
+    resultEl.appendChild(errorDiv);
+    resultEl.hidden = false;
+    checkoutEl.hidden = true;
+    itemsEl.hidden = true;
+    return;
+  }
+  
+  // Validar QR code base64 se presente (falha completa se malformado)
+  if (payment.qrCodeBase64 && !isValidBase64(payment.qrCodeBase64)) {
+    resultEl.innerHTML = '';
+    const errorDiv = _document.createElement('div');
+    errorDiv.className = 'payment-error';
+    
+    const errorTitle = _document.createElement('h4');
+    errorTitle.textContent = 'QR Code inválido';
+    errorDiv.appendChild(errorTitle);
+    
+    const errorMsg = _document.createElement('p');
+    errorMsg.textContent = 'O QR Code retornado pelo servidor está em formato inválido. Não efetue o pagamento e entre em contato com o suporte.';
+    errorDiv.appendChild(errorMsg);
+    
+    resultEl.appendChild(errorDiv);
+    resultEl.hidden = false;
+    checkoutEl.hidden = true;
+    itemsEl.hidden = true;
+    return; // Não continuar com renderização
+  }
+
   checkoutEl.hidden = true;
   itemsEl.hidden = true;
-
-  const { payment } = data;
 
   // Criar elementos de forma segura (sem innerHTML)
   const container = _document.createElement('div');
@@ -739,7 +865,10 @@ function showPaymentResult(data) {
   // QR Code image (validar base64 antes de usar)
   if (payment.qrCodeBase64 && isValidBase64(payment.qrCodeBase64)) {
     const qrImg = _document.createElement('img');
-    qrImg.src = `data:image/png;base64,${payment.qrCodeBase64}`;
+    // Se já é data URI, usar direto; senão adicionar prefix
+    qrImg.src = payment.qrCodeBase64.startsWith('data:') 
+      ? payment.qrCodeBase64 
+      : `data:image/png;base64,${payment.qrCodeBase64}`;
     qrImg.alt = 'QR Code Pix';
     qrImg.className = 'gift-modal__qr';
     qrImg.width = 200;

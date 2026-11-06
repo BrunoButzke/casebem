@@ -380,10 +380,11 @@ function initWaitlist() {
   let savedPlan = 'pro';
 
   const updatePayButton = () => {
-    if (!payBtn || success.hidden) return;
+    if (!payBtn) return;
+    if (success.hidden) return;
     if (savedPlan === 'basic') {
       payBtn.hidden = true;
-      if (!payMsg.textContent || !payMsg.textContent.includes('gratuito')) {
+      if (!payMsg.textContent.includes('gratuito')) {
         payMsg.textContent = 'Plano Básico é gratuito. Entraremos em contato em breve!';
       }
     } else {

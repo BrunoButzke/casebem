@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS rsvps (
   children_count INTEGER NOT NULL DEFAULT 0, -- 0-10 children
   observations TEXT,                      -- Optional notes (max 500 chars)
   consent_given INTEGER NOT NULL,         -- 1 = consented, required
-  manage_token_hash TEXT NOT NULL UNIQUE, -- bcrypt hash of manage token
+  manage_token_hash TEXT NOT NULL UNIQUE, -- SHA-256 hash of manage token (not reversible)
   created_at TEXT NOT NULL,               -- ISO 8601 timestamp
   updated_at TEXT NOT NULL,               -- ISO 8601 timestamp
   

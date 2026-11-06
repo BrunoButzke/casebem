@@ -22,7 +22,7 @@ interface RSVP {
   childrenCount: number;         // 0-10 crianças
   observations: string | null;   // Opcional, até 500 chars
   consentGiven: boolean;         // Consentimento LGPD explícito
-  manageTokenHash: string;       // Hash bcrypt do token (servidor)
+  manageTokenHash: string;       // SHA-256 hash do token (servidor, não reversível)
   createdAt: string;             // ISO 8601 timestamp
   updatedAt: string;             // ISO 8601 timestamp
 }
@@ -59,9 +59,10 @@ interface RSVP {
 6. **Token de Gerenciamento**
    - Gerado no POST (criação): 32 bytes random → base64url
    - Retornado UMA VEZ na resposta do POST
-   - Armazenado hasheado (bcrypt) no banco
-   - Usado via Authorization Bearer para GET/PUT
+   - Armazenado como SHA-256 hash no banco (não reversível, alta entropia)
+   - Usado via Authorization Bearer para GET/PUT e idempotent POST retry
    - Não expira (MVP simples)
+   - Token plaintext NUNCA armazenado ou encriptado (replay requer bearer, sem recovery)
 
 ## Endpoints
 
@@ -258,33 +259,43 @@ DELETE /api/rsvp
 - Validar Origin header
 - Rejeitar Origins não permitidos (403)
 
-### Rate Limiting (D1 UPSERT)
-- Estratégia: HMAC-SHA256 de IP com secret `env.RSVP_HASH_KEY`
+### Rate Limiting (D1 Atomic UPSERT)
+- Estratégia: HMAC-SHA256 de IP com HKDF-derived key de `env.RSVP_SECRET`
 - Limite: 10 requisições POST/PUT por IP por hora
-- Atomic UPSERT: `INSERT ... ON CONFLICT DO UPDATE WHERE count < limit`
+- Atomic UPSERT: `INSERT ... ON CONFLICT DO UPDATE SET count = count + 1 WHERE count < ? RETURNING count`
 - Cleanup automático de janelas antigas (>26 horas) em cada request
 - IP source: `CF-Connecting-IP` (production, não pode ser spoofed)
 - Fallback `X-Forwarded-For` apenas para dev local (best effort)
 
 ### Tokens
 - Geração: 32 bytes crypto-random, base64url encoded
-- Storage: SHA-256 hash (para lookup rápido) + AES-GCM encrypted (para recuperação idempotente)
+- Storage: SHA-256 hash apenas (não reversível, alta entropia suficiente)
 - Bearer format: `Authorization: Bearer <token>`
+- Token plaintext NUNCA armazenado (nem encrypted)
 - Não logar tokens completos
 
 ### Idempotência
 - Header obrigatório: `Idempotency-Key` (até 128 chars, alphanumeric + `-_`)
 - Único por wedding + key
-- Mesma key + body retorna mesmo `manageToken` (decrypted from DB)
-- Mesma key + body diferente retorna 409 Conflict
-- Token encrypted com AES-GCM usando `env.RSVP_TOKEN_KEY`
+- Mesma key + payload SHA-256 fingerprint + bearer válido = retorna bearer fornecido (201)
+- Mesma key + payload diferente = 409 Conflict
+- Mesma key sem bearer = 409 Conflict (não vaza token)
+- Request fingerprint: canonical JSON sorted keys
 
 ### Environment Secrets
-**Obrigatórios para produção:**
-- `RSVP_TOKEN_KEY`: 32 bytes random, base64 encoded (AES-GCM encryption)
-- `RSVP_HASH_KEY`: Secret string (HMAC pepper for IP hashing)
+**Obrigatório para produção:**
+- `RSVP_SECRET`: 32 bytes random, base64 encoded
 
-**Nota:** Use derivação separada (HKDF) para diferentes domínios criptográficos, ou secrets independentes. Nunca commitar secrets no repositório.
+**Como funciona:**
+- HKDF deriva HMAC key com salt `casebem-rsvp-v1` e info `rate-limit-ip-hmac-v1`
+- Runtime valida: base64 format + >= 32 bytes, erro 503 se misconfig
+- Nunca commitar secret no repositório
+
+**Exemplo setup:**
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+wrangler pages secret put RSVP_SECRET
+```
 
 ## Privacidade (LGPD)
 

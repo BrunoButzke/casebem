@@ -6,11 +6,10 @@ Este guia explica como configurar o Cloudflare D1 para o sistema de RSVP do site
 
 **O sistema RSVP NÃO funcionará em produção sem:**
 1. Database D1 criado e vinculado (binding `DB`)
-2. Secret `RSVP_TOKEN_KEY` configurado (AES-GCM encryption)
-3. Secret `RSVP_HASH_KEY` configurado (HMAC para IPs)
-4. Migrations aplicadas (0001 + 0002)
+2. Secret `RSVP_SECRET` configurado (32 bytes base64, HKDF derivation para HMAC)
+3. Migrations aplicadas (0001_rsvps.sql + 0002_idempotency_and_encryption.sql)
 
-**Nunca exponha os secrets em código, logs ou documentação pública.**
+**Nunca exponha o secret em código, logs ou documentação pública.**
 
 ## Pré-requisitos
 
@@ -54,26 +53,29 @@ Este guia explica como configurar o Cloudflare D1 para o sistema de RSVP do site
    - **D1 database:** `casebem-rsvps-production`
 7. Clique em **Save**
 
-### Passo 4: Configurar Secrets de Criptografia
+### Passo 4: Configurar Secret RSVP_SECRET
 
-O sistema RSVP requer dois secrets para segurança:
+O sistema RSVP requer um único secret para segurança (32 bytes base64):
 
-1. **RSVP_TOKEN_KEY** (32 bytes para AES-GCM)
-   ```bash
-   # Gerar chave aleatória
-   node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
-   ```
+```bash
+# Gerar secret aleatório (32 bytes, base64)
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+```
 
-2. **RSVP_HASH_KEY** (string secreta para HMAC)
-   ```bash
-   # Gerar secret aleatório
-   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-   ```
+**Exemplo de output:** `AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=`
 
 **Adicionar no Cloudflare Pages:**
-- Settings → Environment Variables
-- Adicionar ambas variáveis (Production + Preview)
-- **Nunca** commitar esses valores no repositório
+1. Settings → Environment Variables
+2. Nome: `RSVP_SECRET`
+3. Valor: (copie o output do comando acima)
+4. Tipo: **Encrypted** (secret)
+5. Adicionar para Production + Preview
+6. **Nunca** commitar este valor no repositório
+
+**Como funciona:**
+- HKDF deriva HMAC key para rate limiting (IP hashing)
+- Runtime valida: base64 format + >= 32 bytes
+- Erro 503 claro se misconfig
 
 ### Passo 5: Aplicar Migrations
 

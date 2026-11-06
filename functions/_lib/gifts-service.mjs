@@ -74,25 +74,48 @@ export function validateCheckoutRequest(request) {
 }
 
 /**
- * Normaliza items do carrinho (merge duplicatas)
+ * Normaliza items do carrinho (merge duplicatas) com validação de limites
  * @param {Array} items - Items do carrinho
- * @returns {Array} Items normalizados
+ * @param {Array} catalog - Catálogo de presentes (para validar giftIds)
+ * @returns {{valid: boolean, items?: Array, error?: string}}
  */
-function normalizeCartItems(items) {
+export function normalizeCartItems(items, catalog = GIFTS_CATALOG) {
   const merged = new Map();
   
   for (const item of items) {
+    // Ignorar items com giftId inválido (não no catálogo)
+    if (!catalog.find(g => g.id === item.giftId)) {
+      continue;
+    }
+    
+    // Validar qty individual antes de merge
+    if (item.quantity > 99) {
+      return { valid: false, error: 'Quantidade por item deve ser no máximo 99' };
+    }
+    
     const existing = merged.get(item.giftId);
     if (existing) {
-      // Merge quantidade, respeitando limite
-      const newQty = Math.min(existing.quantity + item.quantity, 99);
+      // Merge quantidade SEM saturar - rejeitar se exceder
+      const newQty = existing.quantity + item.quantity;
+      if (newQty > 99) {
+        return { valid: false, error: `Quantidade total do presente ${item.giftId} excede o limite de 99 unidades` };
+      }
       merged.set(item.giftId, { giftId: item.giftId, quantity: newQty });
     } else {
       merged.set(item.giftId, { giftId: item.giftId, quantity: item.quantity });
     }
   }
   
-  return Array.from(merged.values());
+  // Calcular total de items APÓS merge
+  const mergedItems = Array.from(merged.values());
+  const totalItems = mergedItems.reduce((sum, item) => sum + item.quantity, 0);
+  
+  // Validar total de items (sum de quantities após merge)
+  if (totalItems > 999) {
+    return { valid: false, error: 'Total de itens no carrinho excede o limite de 999 unidades' };
+  }
+  
+  return { valid: true, items: mergedItems };
 }
 
 /**
@@ -137,8 +160,12 @@ export async function createCheckoutPayment(request, env, db, ipAddress) {
     throw new Error('Intent key obrigatório');
   }
 
-  // Normalizar items (merge duplicatas)
-  const normalizedItems = normalizeCartItems(request.items);
+  // Normalizar items (merge duplicatas) com validação de limites
+  const normalizationResult = normalizeCartItems(request.items, GIFTS_CATALOG);
+  if (!normalizationResult.valid) {
+    throw new Error(normalizationResult.error);
+  }
+  const normalizedItems = normalizationResult.items;
 
   // Recalcular total no servidor (não confiar no cliente)
   const totalInCents = calculateTotal(normalizedItems);
@@ -318,16 +345,17 @@ async function createPixCheckout({ gifterName, items, totalInCents, intentKey, e
     })
     .join(', ');
 
-  // Chamar MP com idempotency key
+  // Chamar MP com nova assinatura (intentKey estável, items canônicos)
   const result = await createPixPayment({
     accessToken: env.MP_ACCESS_TOKEN,
-    amount: totalInCents / 100,
-    title: `Presentes - ${gifterName}`,
-    email: 'noreply@casebem.com',
-    message: description,
-    giftId: `intent:${intentKey}`,
-    payerName: gifterName,
-    idempotencyKey: mpIdempotencyKey,  // MP idempotency
+    gifterName,
+    items: normalizedItems.map(item => ({
+      giftId: item.giftId,
+      quantity: item.quantity,
+      priceInCents: getGiftById(item.giftId)?.priceInCents || 0,
+    })),
+    totalInCents,
+    intentKey,
   });
 
   if (!result.ok) {

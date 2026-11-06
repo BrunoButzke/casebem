@@ -379,6 +379,21 @@ function initWaitlist() {
   let savedEmail = '';
   let savedPlan = 'pro';
 
+  const updatePayButton = () => {
+    if (!payBtn || success.hidden) return;
+    if (savedPlan === 'basic') {
+      payBtn.hidden = true;
+      if (!payMsg.textContent || !payMsg.textContent.includes('gratuito')) {
+        payMsg.textContent = 'Plano Básico é gratuito. Entraremos em contato em breve!';
+      }
+    } else {
+      payBtn.hidden = false;
+      if (payMsg.textContent.includes('gratuito')) {
+        payMsg.textContent = '';
+      }
+    }
+  };
+
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const name = form.name.value.trim();
@@ -423,25 +438,15 @@ function initWaitlist() {
         form.hidden = true;
         success.hidden = false;
         gsap.from(success, { opacity: 0, y: 30, duration: 0.6, ease: 'power3.out' });
+        updatePayButton();
       },
     });
   });
 
-  // Atualiza visibilidade do botão quando plano muda
-  const updatePayButton = () => {
-    if (!payBtn) return;
-    if (savedPlan === 'basic') {
-      payBtn.hidden = true;
-      payMsg.textContent = 'Plano Básico é gratuito. Entraremos em contato em breve!';
-    } else {
-      payBtn.hidden = false;
-      payMsg.textContent = '';
-    }
-  };
-
   form.addEventListener('change', (e) => {
     if (e.target.name === 'plan') {
       savedPlan = e.target.value;
+      updatePayButton();
     }
   });
 
@@ -451,7 +456,6 @@ function initWaitlist() {
       return;
     }
     
-    // Plano básico é gratuito, não precisa de checkout
     if (savedPlan === 'basic') {
       updatePayButton();
       return;
@@ -475,9 +479,6 @@ function initWaitlist() {
       payBtn.disabled = false;
     }
   });
-
-  // Configura estado inicial do botão baseado no plano selecionado
-  updatePayButton();
 }
 
 async function boot() {

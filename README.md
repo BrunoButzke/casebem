@@ -53,9 +53,9 @@ Saída em `dist/` (Cloudflare Pages: build `npm run build`, output `dist`). A pa
 
 ## Planos (marketing)
 
-- **Standard** R$ 299,90 — site + convite + lista → Pix
-- **Plus** R$ 499,90 — Standard + app/dinâmicas + sessões + painel de mesas
-- **VIP** R$ 1.199,90 — Plus + site exclusivo + link personalizado + assessor
+- **Básico** Gratuito — site + convite + lista → Pix
+- **Pro** R$ 299,00 — Básico + app/dinâmicas + sessões + painel de mesas
+- **VIP** R$ 499,00 — Pro + site exclusivo + link personalizado + assessor
 
 ## Conteúdo do exemplo
 

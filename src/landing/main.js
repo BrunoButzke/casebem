@@ -377,14 +377,14 @@ function initWaitlist() {
   const payMsg = $('[data-pay-msg]', success);
   const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
   let savedEmail = '';
-  let savedPlan = 'plus';
+  let savedPlan = 'pro';
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const name = form.name.value.trim();
     const email = form.email.value.trim().toLowerCase();
     const consent = form.consent.checked;
-    const plan = form.querySelector('input[name="plan"]:checked')?.value || 'plus';
+    const plan = form.querySelector('input[name="plan"]:checked')?.value || 'pro';
     const emailField = form.email.closest('.waitlist__field');
     const nameField = form.name.closest('.waitlist__field');
 
@@ -432,6 +432,14 @@ function initWaitlist() {
       payMsg.textContent = 'Volte e preencha o formulário antes de pagar.';
       return;
     }
+    
+    // Plano básico é gratuito, não precisa de checkout
+    if (savedPlan === 'basic') {
+      payMsg.textContent = 'O plano Básico é gratuito! Aguarde nosso contato.';
+      payBtn.disabled = true;
+      return;
+    }
+    
     payBtn.disabled = true;
     payMsg.textContent = 'Abrindo Mercado Pago…';
     try {

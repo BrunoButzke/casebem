@@ -1,9 +1,9 @@
 import { createPlanPreference } from '../_lib/mercadopago.mjs';
 
 const PLANS = {
-  standard: { name: 'Standard', amount: 299.9 },
-  plus: { name: 'Plus', amount: 499.9 },
-  vip: { name: 'VIP', amount: 1199.9 },
+  basic: { name: 'Básico', amount: 0 },
+  pro: { name: 'Pro', amount: 299 },
+  vip: { name: 'VIP', amount: 499 },
 };
 
 export async function onRequestPost(context) {

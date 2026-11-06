@@ -176,11 +176,11 @@ describe('RSVP Security Tests', () => {
       const { deriveRsvpKeys, hmacHash } = await import('../functions/_lib/crypto-utils.mjs');
       const db = new MockD1();
 
-      // Pre-compute the rate limit ID that will be used
+      // Pre-compute the rate limit ID that will be used (with rsvp: namespace)
       const keys = await deriveRsvpKeys(TEST_SECRET);
       const ipHash = await hmacHash('1.1.1.1', keys.hmacKey);
       const windowStart = getHourWindow();
-      const rateLimitId = `dani-carine:${ipHash}:${windowStart}`;
+      const rateLimitId = `rsvp:dani-carine:${ipHash}:${windowStart}`;
 
       // Pre-populate rate_limits to simulate 10 requests already made
       db.data.rate_limits.push({

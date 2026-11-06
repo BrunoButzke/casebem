@@ -34,8 +34,9 @@ Abre em `/landing-page-animada/`.
 9. Migration `0006_rsvp_closed.sql` — RSVP aberto/fechado + lista no painel
 10. Migration `0007_gifts_catalog.sql` — catálogo editável no painel (`/api/gifts/catalog`)
 11. Migration `0008_lodging_tips.sql` — hospedagem/dicas no site + painel (`/api/lodging`)
+12. Migration `0009_stationery.sql` — papelaria / convite WhatsApp (`/api/stationery`)
 
-**Custo:** mantenha **Workers/Pages Free**. Não ative Workers Paid. E-mail é opcional e externo.
+**Custo:** mantenha **Workers/Pages Free**. Não ative Workers Paid. E-mail é opcional e externo. Subdomínio `casal.casebem.com` fica para depois (Cloudflare for SaaS).
 
 ### O que está integrado
 

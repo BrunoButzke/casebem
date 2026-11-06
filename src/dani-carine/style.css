@@ -2044,3 +2044,51 @@ h2 {
     border-top: 1px solid var(--border);
   }
 }
+
+/* Papelaria / convite WhatsApp */
+.stationery {
+  padding: clamp(4.5rem, 10vw, 8rem) 0;
+  background: var(--cream);
+}
+
+.stationery h2 {
+  margin: 0.35rem 0 0.75rem;
+}
+
+.stationery__lead {
+  max-width: 34rem;
+  margin: 0 0 2rem;
+  color: var(--muted);
+}
+
+.stationery__list {
+  display: grid;
+  gap: 1.75rem;
+}
+
+@media (min-width: 800px) {
+  .stationery__list {
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+  }
+}
+
+.stationery__item h3 {
+  margin: 0 0 0.5rem;
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-size: clamp(1.35rem, 2.4vw, 1.7rem);
+  font-weight: 500;
+}
+
+.stationery__preview {
+  margin: 0 0 1rem;
+  color: color-mix(in srgb, var(--ink) 88%, transparent);
+  white-space: pre-wrap;
+}
+
+.stationery__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+}

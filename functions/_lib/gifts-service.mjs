@@ -69,6 +69,28 @@ export function validateCheckoutRequest(request) {
 }
 
 /**
+ * Normaliza items do carrinho (merge duplicatas)
+ * @param {Array} items - Items do carrinho
+ * @returns {Array} Items normalizados
+ */
+function normalizeCartItems(items) {
+  const merged = new Map();
+  
+  for (const item of items) {
+    const existing = merged.get(item.giftId);
+    if (existing) {
+      // Merge quantidade, respeitando limite
+      const newQty = Math.min(existing.quantity + item.quantity, 99);
+      merged.set(item.giftId, { giftId: item.giftId, quantity: newQty });
+    } else {
+      merged.set(item.giftId, { giftId: item.giftId, quantity: item.quantity });
+    }
+  }
+  
+  return Array.from(merged.values());
+}
+
+/**
  * Cria pagamento via adapter
  * @param {object} request - Requisição validada
  * @param {object} env - Environment variables
@@ -81,14 +103,17 @@ export async function createCheckoutPayment(request, env) {
     throw new Error(validation.error);
   }
 
-  const { paymentMethod, gifterName, items } = request;
+  const { paymentMethod, gifterName } = request;
+
+  // Normalizar items (merge duplicatas)
+  const normalizedItems = normalizeCartItems(request.items);
 
   // Recalcular total no servidor (não confiar no cliente)
-  const totalInCents = calculateTotal(items);
+  const totalInCents = calculateTotal(normalizedItems);
 
   // Processar pagamento conforme método
   if (paymentMethod === 'pix') {
-    return await createPixCheckout({ gifterName, items, totalInCents, env });
+    return await createPixCheckout({ gifterName, items: normalizedItems, totalInCents, env });
   }
 
   if (paymentMethod === 'card' || paymentMethod === 'boleto') {
@@ -110,6 +135,16 @@ export async function createCheckoutPayment(request, env) {
  * @private
  */
 async function createPixCheckout({ gifterName, items, totalInCents, env }) {
+  // Verificar token MP configurado
+  if (!env.MP_ACCESS_TOKEN) {
+    return {
+      ok: false,
+      status: 503,
+      error: 'PAYMENT_SERVICE_NOT_CONFIGURED',
+      message: 'Serviço de pagamento não configurado. Contate o suporte.',
+    };
+  }
+
   // Mock para testes unitários (se globalThis.__testCreatePixPayment definido)
   if (typeof globalThis.__testCreatePixPayment === 'function') {
     const mockResult = await globalThis.__testCreatePixPayment({
@@ -119,7 +154,12 @@ async function createPixCheckout({ gifterName, items, totalInCents, env }) {
     });
 
     if (!mockResult.ok) {
-      throw new Error(mockResult.error || 'Falha ao criar pagamento Pix');
+      return {
+        ok: false,
+        status: mockResult.status || 503,
+        error: mockResult.error || 'PAYMENT_SERVICE_ERROR',
+        message: mockResult.message || 'Erro ao processar pagamento',
+      };
     }
 
     return {
@@ -156,13 +196,45 @@ async function createPixCheckout({ gifterName, items, totalInCents, env }) {
   });
 
   if (!result.ok) {
-    throw new Error(result.error || 'Falha ao criar pagamento Pix');
+    // Erro do provedor (Mercado Pago)
+    return {
+      ok: false,
+      status: 503,
+      error: 'PAYMENT_SERVICE_ERROR',
+      message: 'Erro ao processar pagamento. Tente novamente.',
+    };
+  }
+
+  // Validar resposta do MP
+  const payment = result.payment;
+  if (!payment || !payment.id) {
+    return {
+      ok: false,
+      status: 502,
+      error: 'INVALID_PAYMENT_RESPONSE',
+      message: 'Resposta inválida do serviço de pagamento',
+    };
+  }
+
+  // Validar dados Pix
+  const hasQrCode = payment.qrCode && typeof payment.qrCode === 'string';
+  if (!hasQrCode) {
+    return {
+      ok: false,
+      status: 502,
+      error: 'MISSING_PIX_DATA',
+      message: 'Dados Pix incompletos na resposta',
+    };
   }
 
   return {
     ok: true,
     method: 'pix',
     status: 'pending',
-    payment: result.payment,
+    payment: {
+      id: payment.id,
+      qrCode: payment.qrCode,
+      qrCodeBase64: payment.qrCodeBase64 || '',
+    },
   };
 }

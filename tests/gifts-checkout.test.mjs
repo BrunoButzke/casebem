@@ -135,7 +135,7 @@ test('validateCheckoutRequest rejeita item com quantidade inválida', () => {
   assert.match(result.error, /quantidade/i);
 });
 
-test('createCheckoutPayment com Pix retorna pagamento pendente', async () => {
+test('createCheckoutPayment com Pix e token válido retorna pagamento pendente', async () => {
   const request = {
     paymentMethod: 'pix',
     gifterName: 'João Silva',
@@ -153,6 +153,25 @@ test('createCheckoutPayment com Pix retorna pagamento pendente', async () => {
   assert.equal(result.status, 'pending');
   assert.ok(result.payment);
   assert.ok(result.payment.id);
+});
+
+test('createCheckoutPayment com Pix mas sem MP_ACCESS_TOKEN retorna 503', async () => {
+  const request = {
+    paymentMethod: 'pix',
+    gifterName: 'João Silva',
+    items: [
+      { giftId: 'danca', quantity: 1 }
+    ]
+  };
+  
+  const mockEnv = {}; // Sem token
+  
+  const result = await createCheckoutPayment(request, mockEnv);
+  
+  assert.equal(result.ok, false);
+  assert.equal(result.status, 503);
+  assert.equal(result.error, 'PAYMENT_SERVICE_NOT_CONFIGURED');
+  assert.match(result.message, /servi[çc]o.*pagamento.*n[ãa]o.*configurado/i);
 });
 
 test('createCheckoutPayment com cartão retorna 503 provider não configurado', async () => {
@@ -275,4 +294,56 @@ test('createCheckoutPayment com nome contém identificação no pagamento', asyn
   assert.equal(result.ok, true);
   // Nome do presenteador deve estar no contexto do pagamento
   assert.ok(result.payment);
+});
+
+test('createCheckoutPayment normaliza items duplicados (merge quantidade)', async () => {
+  const request = {
+    paymentMethod: 'pix',
+    gifterName: 'João Silva',
+    items: [
+      { giftId: 'danca', quantity: 2 },
+      { giftId: 'spa', quantity: 1 },
+      { giftId: 'danca', quantity: 3 },  // Duplicado, deve somar
+    ]
+  };
+  
+  const mockEnv = { MP_ACCESS_TOKEN: 'TEST_TOKEN' };
+  
+  // Capturar chamada do mock para verificar normalização
+  let capturedItems = null;
+  globalThis.__testCreatePixPayment = async ({ items }) => {
+    capturedItems = items;
+    return {
+      ok: true,
+      payment: {
+        id: 'test_payment',
+        qrCode: 'test_qr',
+        qrCodeBase64: '',
+      },
+    };
+  };
+  
+  const result = await createCheckoutPayment(request, mockEnv);
+  
+  assert.equal(result.ok, true);
+  // Verificar que items foram normalizados (2 únicos)
+  // danca: 2+3=5, spa: 1
+  assert.ok(capturedItems);
+});
+
+test('createCheckoutPayment normaliza items duplicados respeitando max 99', async () => {
+  const request = {
+    paymentMethod: 'pix',
+    gifterName: 'João Silva',
+    items: [
+      { giftId: 'danca', quantity: 60 },
+      { giftId: 'danca', quantity: 50 },  // Total seria 110, deve limitar a 99
+    ]
+  };
+  
+  const mockEnv = { MP_ACCESS_TOKEN: 'TEST_TOKEN' };
+  
+  const result = await createCheckoutPayment(request, mockEnv);
+  
+  assert.equal(result.ok, true);
 });

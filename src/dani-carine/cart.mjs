@@ -103,6 +103,48 @@ function showCartFeedback(message) {
   }, 2000);
 }
 
+let previousActiveElement = null;
+
+/**
+ * Focus trap para modal
+ * @private
+ */
+function setupFocusTrap(modal) {
+  const focusableElements = modal.querySelectorAll(
+    'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+  );
+  
+  if (focusableElements.length === 0) return;
+  
+  const firstElement = focusableElements[0];
+  const lastElement = focusableElements[focusableElements.length - 1];
+
+  const trapFocus = (e) => {
+    if (e.key !== 'Tab') return;
+
+    if (e.shiftKey) {
+      // Shift + Tab
+      if (document.activeElement === firstElement) {
+        e.preventDefault();
+        lastElement.focus();
+      }
+    } else {
+      // Tab
+      if (document.activeElement === lastElement) {
+        e.preventDefault();
+        firstElement.focus();
+      }
+    }
+  };
+
+  modal.addEventListener('keydown', trapFocus);
+  
+  // Retornar função de cleanup
+  return () => {
+    modal.removeEventListener('keydown', trapFocus);
+  };
+}
+
 /**
  * Abre modal do carrinho
  */
@@ -114,13 +156,31 @@ function openCartModal() {
     document.body.appendChild(modal);
   }
 
+  // Salvar elemento ativo anterior
+  previousActiveElement = document.activeElement;
+
   renderCartItems();
   modal.hidden = false;
   document.body.style.overflow = 'hidden';
   
+  // Tornar background inert (apenas modal interativo)
+  const mainContent = document.querySelector('main');
+  if (mainContent) {
+    mainContent.setAttribute('inert', '');
+    mainContent.setAttribute('aria-hidden', 'true');
+  }
+
+  // Setup focus trap
+  setupFocusTrap(modal);
+  
   // Focus no primeiro elemento interativo
   const firstButton = modal.querySelector('button:not([disabled])');
-  if (firstButton) firstButton.focus();
+  if (firstButton) {
+    // Pequeno delay para garantir que o modal está visível
+    requestAnimationFrame(() => {
+      firstButton.focus();
+    });
+  }
 }
 
 /**
@@ -132,6 +192,19 @@ function closeCartModal() {
 
   modal.hidden = true;
   document.body.style.overflow = '';
+
+  // Remover inert do background
+  const mainContent = document.querySelector('main');
+  if (mainContent) {
+    mainContent.removeAttribute('inert');
+    mainContent.removeAttribute('aria-hidden');
+  }
+
+  // Restaurar focus anterior
+  if (previousActiveElement && typeof previousActiveElement.focus === 'function') {
+    previousActiveElement.focus();
+  }
+  previousActiveElement = null;
 }
 
 /**
@@ -222,7 +295,90 @@ function createCartModal() {
 }
 
 /**
- * Renderiza itens do carrinho
+ * Cria elemento de item do carrinho (XSS-safe)
+ * @private
+ */
+function createCartItemElement(item, gift, subtotal) {
+  const article = document.createElement('article');
+  article.className = 'cart-item';
+
+  // Imagem
+  const img = document.createElement('img');
+  img.src = gift.imageUrl;
+  img.alt = gift.name;
+  img.width = 80;
+  img.height = 80;
+  article.appendChild(img);
+
+  // Info
+  const info = document.createElement('div');
+  info.className = 'cart-item__info';
+  
+  const h4 = document.createElement('h4');
+  h4.textContent = gift.name;
+  info.appendChild(h4);
+  
+  const price = document.createElement('p');
+  price.textContent = formatPrice(gift.priceInCents);
+  info.appendChild(price);
+  
+  article.appendChild(info);
+
+  // Actions (quantidade)
+  const actions = document.createElement('div');
+  actions.className = 'cart-item__actions';
+  
+  const decBtn = document.createElement('button');
+  decBtn.type = 'button';
+  decBtn.className = 'cart-qty-btn';
+  decBtn.dataset.action = 'dec';
+  decBtn.dataset.giftId = item.giftId;
+  decBtn.setAttribute('aria-label', 'Diminuir quantidade');
+  decBtn.textContent = '−';
+  actions.appendChild(decBtn);
+  
+  const qty = document.createElement('span');
+  qty.className = 'cart-qty';
+  qty.setAttribute('aria-label', 'Quantidade');
+  qty.textContent = String(item.quantity);
+  actions.appendChild(qty);
+  
+  const incBtn = document.createElement('button');
+  incBtn.type = 'button';
+  incBtn.className = 'cart-qty-btn';
+  incBtn.dataset.action = 'inc';
+  incBtn.dataset.giftId = item.giftId;
+  incBtn.setAttribute('aria-label', 'Aumentar quantidade');
+  incBtn.textContent = '+';
+  actions.appendChild(incBtn);
+  
+  article.appendChild(actions);
+
+  // Subtotal
+  const subtotalDiv = document.createElement('div');
+  subtotalDiv.className = 'cart-item__subtotal';
+  subtotalDiv.textContent = formatPrice(subtotal);
+  article.appendChild(subtotalDiv);
+
+  // Botão remover
+  const removeBtn = document.createElement('button');
+  removeBtn.type = 'button';
+  removeBtn.className = 'cart-item__remove';
+  removeBtn.dataset.giftId = item.giftId;
+  removeBtn.setAttribute('aria-label', `Remover ${gift.name}`);
+  removeBtn.textContent = '×';
+  article.appendChild(removeBtn);
+
+  // Event listeners
+  decBtn.addEventListener('click', handleQuantityChange);
+  incBtn.addEventListener('click', handleQuantityChange);
+  removeBtn.addEventListener('click', handleRemoveItem);
+
+  return article;
+}
+
+/**
+ * Renderiza itens do carrinho (XSS-safe)
  */
 function renderCartItems() {
   const container = document.getElementById('cart-items');
@@ -232,7 +388,12 @@ function renderCartItems() {
   const items = cart.getItems();
 
   if (items.length === 0) {
-    container.innerHTML = '<p class="cart-empty">Seu carrinho está vazio</p>';
+    container.innerHTML = '';
+    const emptyMsg = document.createElement('p');
+    emptyMsg.className = 'cart-empty';
+    emptyMsg.textContent = 'Seu carrinho está vazio';
+    container.appendChild(emptyMsg);
+    
     totalEl.textContent = 'R$ 0,00';
     
     const checkoutBtn = document.getElementById('cart-checkout-btn');
@@ -241,46 +402,23 @@ function renderCartItems() {
     return;
   }
 
-  // Calcular total
+  // Limpar container
+  container.innerHTML = '';
+
+  // Calcular total e renderizar items
   let total = 0;
-  const itemsHtml = items.map(item => {
+  items.forEach(item => {
     const gift = getGiftById(item.giftId);
-    if (!gift) return '';
+    if (!gift) return;
 
     const subtotal = gift.priceInCents * item.quantity;
     total += subtotal;
 
-    return `
-      <article class="cart-item">
-        <img src="${gift.imageUrl}" alt="${gift.name}" width="80" height="80" />
-        <div class="cart-item__info">
-          <h4>${gift.name}</h4>
-          <p>${formatPrice(gift.priceInCents)}</p>
-        </div>
-        <div class="cart-item__actions">
-          <button type="button" class="cart-qty-btn" data-action="dec" data-gift-id="${item.giftId}" aria-label="Diminuir quantidade">−</button>
-          <span class="cart-qty" aria-label="Quantidade">${item.quantity}</span>
-          <button type="button" class="cart-qty-btn" data-action="inc" data-gift-id="${item.giftId}" aria-label="Aumentar quantidade">+</button>
-        </div>
-        <div class="cart-item__subtotal">
-          ${formatPrice(subtotal)}
-        </div>
-        <button type="button" class="cart-item__remove" data-gift-id="${item.giftId}" aria-label="Remover ${gift.name}">×</button>
-      </article>
-    `;
-  }).join('');
+    const itemElement = createCartItemElement(item, gift, subtotal);
+    container.appendChild(itemElement);
+  });
 
-  container.innerHTML = itemsHtml;
   totalEl.textContent = formatPrice(total);
-
-  // Event listeners para quantidade
-  container.querySelectorAll('.cart-qty-btn').forEach(btn => {
-    btn.addEventListener('click', handleQuantityChange);
-  });
-
-  container.querySelectorAll('.cart-item__remove').forEach(btn => {
-    btn.addEventListener('click', handleRemoveItem);
-  });
 
   const checkoutBtn = document.getElementById('cart-checkout-btn');
   if (checkoutBtn) checkoutBtn.disabled = false;
@@ -407,7 +545,22 @@ async function handleCheckout() {
 }
 
 /**
+ * Valida base64 string
+ * @param {string} str - String para validar
+ * @returns {boolean}
+ */
+function isValidBase64(str) {
+  if (typeof str !== 'string' || str.length === 0) return false;
+  if (str.length > 100000) return false; // Max 100KB
+  
+  // Base64 pattern with padding
+  const base64Pattern = /^[A-Za-z0-9+/]*={0,2}$/;
+  return base64Pattern.test(str);
+}
+
+/**
  * Mostra resultado do pagamento (Pix)
+ * XSS-safe: usa createElement e textContent
  */
 function showPaymentResult(data) {
   const checkoutEl = document.getElementById('cart-checkout');
@@ -421,55 +574,83 @@ function showPaymentResult(data) {
 
   const { payment } = data;
 
-  resultEl.innerHTML = `
-    <div class="payment-success">
-      <h4>Pagamento Pix gerado!</h4>
-      <p>Escaneie o QR Code ou copie o código Pix:</p>
-      
-      ${payment.qrCodeBase64 ? `
-        <img 
-          src="data:image/png;base64,${payment.qrCodeBase64}" 
-          alt="QR Code Pix" 
-          class="gift-modal__qr"
-          width="200"
-          height="200"
-        />
-      ` : ''}
-      
-      <label for="pix-code-final">Código Pix copia e cola:</label>
-      <textarea id="pix-code-final" rows="3" readonly>${payment.qrCode}</textarea>
-      
-      <button type="button" class="btn btn--ghost" id="copy-pix-final">
-        Copiar código
-      </button>
-      
-      <p class="payment-note">
-        Após o pagamento, o presente será confirmado automaticamente.
-      </p>
-      
-      <button type="button" class="btn" data-close-cart>
-        Fechar
-      </button>
-    </div>
-  `;
+  // Criar elementos de forma segura (sem innerHTML)
+  const container = document.createElement('div');
+  container.className = 'payment-success';
 
+  const title = document.createElement('h4');
+  title.textContent = 'Pagamento Pix gerado!';
+  container.appendChild(title);
+
+  const instruction = document.createElement('p');
+  instruction.textContent = 'Escaneie o QR Code ou copie o código Pix:';
+  container.appendChild(instruction);
+
+  // QR Code image (validar base64 antes de usar)
+  if (payment.qrCodeBase64 && isValidBase64(payment.qrCodeBase64)) {
+    const qrImg = document.createElement('img');
+    qrImg.src = `data:image/png;base64,${payment.qrCodeBase64}`;
+    qrImg.alt = 'QR Code Pix';
+    qrImg.className = 'gift-modal__qr';
+    qrImg.width = 200;
+    qrImg.height = 200;
+    container.appendChild(qrImg);
+  }
+
+  // Label do código Pix
+  const label = document.createElement('label');
+  label.setAttribute('for', 'pix-code-final');
+  label.textContent = 'Código Pix copia e cola:';
+  container.appendChild(label);
+
+  // Textarea com código Pix (usar .value, não innerHTML)
+  const textarea = document.createElement('textarea');
+  textarea.id = 'pix-code-final';
+  textarea.rows = 3;
+  textarea.readOnly = true;
+  textarea.value = payment.qrCode || '';
+  container.appendChild(textarea);
+
+  // Botão copiar
+  const copyBtn = document.createElement('button');
+  copyBtn.type = 'button';
+  copyBtn.className = 'btn btn--ghost';
+  copyBtn.id = 'copy-pix-final';
+  copyBtn.textContent = 'Copiar código';
+  container.appendChild(copyBtn);
+
+  // Nota sobre confirmação (corrigida: não promete automático)
+  const note = document.createElement('p');
+  note.className = 'payment-note';
+  note.textContent = 'Aguarde a confirmação do pagamento. Isso pode levar alguns minutos.';
+  container.appendChild(note);
+
+  // Botão fechar
+  const closeBtn = document.createElement('button');
+  closeBtn.type = 'button';
+  closeBtn.className = 'btn';
+  closeBtn.setAttribute('data-close-cart', '');
+  closeBtn.textContent = 'Fechar';
+  container.appendChild(closeBtn);
+
+  // Limpar e adicionar container
+  resultEl.innerHTML = '';
+  resultEl.appendChild(container);
   resultEl.hidden = false;
 
-  // Copiar código Pix
-  const copyBtn = resultEl.querySelector('#copy-pix-final');
-  const codeTextarea = resultEl.querySelector('#pix-code-final');
-  
-  if (copyBtn && codeTextarea) {
-    copyBtn.addEventListener('click', async () => {
-      try {
-        await navigator.clipboard.writeText(codeTextarea.value);
-        copyBtn.textContent = 'Copiado!';
-        setTimeout(() => {
-          copyBtn.textContent = 'Copiar código';
-        }, 2000);
-      } catch {
-        codeTextarea.select();
-      }
-    });
-  }
+  // Event listener para copiar
+  copyBtn.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(textarea.value);
+      copyBtn.textContent = 'Copiado!';
+      setTimeout(() => {
+        copyBtn.textContent = 'Copiar código';
+      }, 2000);
+    } catch {
+      textarea.select();
+    }
+  });
+
+  // Event listener para fechar
+  closeBtn.addEventListener('click', closeCartModal);
 }

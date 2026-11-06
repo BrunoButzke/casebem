@@ -106,9 +106,19 @@ wrangler d1 execute casebem-rsvps-production --remote --file=migrations/0003_mes
 
 # Migration 0004: Checkout intents (idempotência de pagamentos)
 wrangler d1 execute casebem-rsvps-production --remote --file=migrations/0004_checkout_intents.sql
+
+# Migration 0005: painel admin (paid_at + hidden em recados)
+wrangler d1 execute casebem-rsvps-production --remote --file=migrations/0005_admin_and_paid.sql
 ```
 
-**Nota**: Todas as migrations usam `CREATE TABLE IF NOT EXISTS` e `INSERT ... ON CONFLICT(version) DO NOTHING` para serem idempotentes e seguras para reaplicação. Não é necessário configurar `migrations_dir` no `wrangler.toml`.
+**Nota**: Todas as migrations usam `CREATE TABLE IF NOT EXISTS` / `ALTER TABLE ... ADD COLUMN` e `INSERT ... ON CONFLICT(version) DO NOTHING` para serem idempotentes e seguras para reaplicação. Não é necessário configurar `migrations_dir` no `wrangler.toml`.
+
+### Free-tier Cloudflare (obrigatório para este projeto)
+
+- Use **Pages Free** + **D1 Free** apenas — **não** ative Workers Paid.
+- Painel: `ADMIN_PANEL_SECRET` (Bearer) — sem Cloudflare Access pago.
+- E-mail opcional via **Resend** (fora da CF). Sem key = sem e-mail, sem custo.
+- Webhook MP: `POST /api/webhooks/mercadopago` (conta no limite diário de Functions).
 
 ### Migration 0004: Checkout Intents
 

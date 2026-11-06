@@ -2,8 +2,13 @@
  * Gifts Service - Lógica de negócio para checkout de presentes
  */
 
-import { GIFTS_CATALOG, getGiftById, calculateTotal } from '../../data/gifts-catalog.mjs';
+import { GIFTS_CATALOG, getGiftById } from '../../data/gifts-catalog.mjs';
 import { validateCartItems } from '../../src/dani-carine/cart-storage.mjs';
+import {
+  getActiveCatalog,
+  getGiftFromCatalog,
+  calculateTotalFromCatalog,
+} from './catalog-service.mjs';
 
 const ALLOWED_PAYMENT_METHODS = ['pix', 'card', 'boleto'];
 
@@ -56,18 +61,10 @@ export function validateCheckoutRequest(request) {
     return { valid: false, error: 'Carrinho vazio' };
   }
 
-  // Validar estrutura dos items
+  // Validar estrutura dos items (existência no catálogo: createCheckoutPayment / D1)
   const cartValidation = validateCartItems(items);
   if (!cartValidation.valid) {
     return cartValidation;
-  }
-
-  // Validar que todos os giftIds existem no catálogo
-  for (const item of items) {
-    const gift = getGiftById(item.giftId);
-    if (!gift) {
-      return { valid: false, error: `Presente não encontrado: ${item.giftId}` };
-    }
   }
 
   return { valid: true };
@@ -160,15 +157,24 @@ export async function createCheckoutPayment(request, env, db, ipAddress) {
     throw new Error('Intent key obrigatório');
   }
 
+  // Catálogo ativo (D1 + seed; fallback estático)
+  const catalog = await getActiveCatalog(db);
+
+  for (const item of request.items) {
+    if (!getGiftFromCatalog(catalog, item.giftId)) {
+      throw new Error(`Presente não encontrado: ${item.giftId}`);
+    }
+  }
+
   // Normalizar items (merge duplicatas) com validação de limites
-  const normalizationResult = normalizeCartItems(request.items, GIFTS_CATALOG);
+  const normalizationResult = normalizeCartItems(request.items, catalog);
   if (!normalizationResult.valid) {
     throw new Error(normalizationResult.error);
   }
   const normalizedItems = normalizationResult.items;
 
   // Recalcular total no servidor (não confiar no cliente)
-  const totalInCents = calculateTotal(normalizedItems);
+  const totalInCents = calculateTotalFromCatalog(normalizedItems, catalog);
 
   // Verificar método de pagamento antes de criar intent
   if (paymentMethod === 'card' || paymentMethod === 'boleto') {
@@ -285,9 +291,16 @@ export async function createCheckoutPayment(request, env, db, ipAddress) {
 
   // Lease adquirido, processar pagamento
   try {
+    const pricedItems = normalizedItems.map((item) => ({
+      giftId: item.giftId,
+      quantity: item.quantity,
+      priceInCents: getGiftFromCatalog(catalog, item.giftId)?.priceInCents || 0,
+      name: getGiftFromCatalog(catalog, item.giftId)?.name || item.giftId,
+    }));
+
     const result = await createPixCheckout({
       gifterName,
-      items: normalizedItems,
+      items: pricedItems,
       totalInCents,
       intentKey,
       env,
@@ -372,20 +385,17 @@ async function createPixCheckout({ gifterName, items, totalInCents, intentKey, e
 
   // Montar descrição dos itens
   const description = items
-    .map(item => {
-      const gift = getGiftById(item.giftId);
-      return `${gift?.name || item.giftId} x${item.quantity}`;
-    })
+    .map((item) => `${item.name || item.giftId} x${item.quantity}`)
     .join(', ');
 
   // Chamar MP com nova assinatura (intentKey estável, items canônicos)
   const result = await createPixPayment({
     accessToken: env.MP_ACCESS_TOKEN,
     gifterName,
-    items: items.map(item => ({
+    items: items.map((item) => ({
       giftId: item.giftId,
       quantity: item.quantity,
-      priceInCents: getGiftById(item.giftId)?.priceInCents || 0,
+      priceInCents: item.priceInCents || 0,
     })),
     totalInCents,
     intentKey,

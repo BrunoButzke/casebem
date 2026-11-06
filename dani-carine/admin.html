@@ -98,7 +98,11 @@
       <h2>RSVPs</h2>
       <div id="rsvp-table"></div>
 
-      <h2>Presentes</h2>
+      <h2>Catálogo (editar preços)</h2>
+      <p class="sub">Alterações no D1 — convidados veem via /api/gifts/catalog (sem rebuild).</p>
+      <div id="catalog-table"></div>
+
+      <h2>Checkouts / presentes recebidos</h2>
       <div id="gifts-table"></div>
 
       <h2>Mural</h2>
@@ -178,6 +182,32 @@
       $('rsvp-table').innerHTML = renderRsvps(data.rsvps || []);
       $('gifts-table').innerHTML = renderGifts(data.gifts || []);
       $('messages-table').innerHTML = renderMessages(data.messages || []);
+      await loadCatalogEditor();
+    }
+
+    async function loadCatalogEditor() {
+      const res = await fetch('/api/admin/gifts', { headers: authHeaders() });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        $('catalog-table').innerHTML = `<p class="err">${escapeHtml(data.message || data.error || 'Falha ao carregar catálogo (rode migration 0007?)')}</p>`;
+        return;
+      }
+      $('catalog-table').innerHTML = renderCatalog(data.gifts || []);
+    }
+
+    function renderCatalog(rows) {
+      if (!rows.length) return '<p class="sub">Catálogo vazio.</p>';
+      return `<table><thead><tr>
+        <th>ID</th><th>Nome</th><th>Preço (centavos)</th><th>Ativo</th><th></th>
+      </tr></thead><tbody>
+      ${rows.map((g) => `<tr class="${g.active ? '' : 'hidden'}">
+        <td>${escapeHtml(g.id)}</td>
+        <td><input data-cat-name="${escapeHtml(g.id)}" value="${escapeHtml(g.name)}" style="width:100%;max-width:220px;padding:0.35rem" /></td>
+        <td><input data-cat-price="${escapeHtml(g.id)}" type="number" min="99" value="${g.priceInCents}" style="width:110px;padding:0.35rem" /></td>
+        <td><input data-cat-active="${escapeHtml(g.id)}" type="checkbox" ${g.active ? 'checked' : ''} /></td>
+        <td><button type="button" class="secondary" data-cat-save="${escapeHtml(g.id)}">Salvar</button></td>
+      </tr>`).join('')}
+      </tbody></table>`;
     }
 
     function renderGuests(rows) {
@@ -331,6 +361,32 @@
         return;
       }
       await load();
+    });
+
+    $('catalog-table').addEventListener('click', async (ev) => {
+      const btn = ev.target.closest('button[data-cat-save]');
+      if (!btn) return;
+      const id = btn.getAttribute('data-cat-save');
+      const nameEl = $('catalog-table').querySelector(`input[data-cat-name="${CSS.escape(id)}"]`);
+      const priceEl = $('catalog-table').querySelector(`input[data-cat-price="${CSS.escape(id)}"]`);
+      const activeEl = $('catalog-table').querySelector(`input[data-cat-active="${CSS.escape(id)}"]`);
+      const res = await fetch('/api/admin/gifts', {
+        method: 'PATCH',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id,
+          name: nameEl?.value,
+          priceInCents: Number(priceEl?.value),
+          active: Boolean(activeEl?.checked),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        $('panel-err').hidden = false;
+        $('panel-err').textContent = (data.details && data.details.join(', ')) || data.message || data.error || 'Falha ao salvar presente';
+        return;
+      }
+      await loadCatalogEditor();
     });
 
     $('messages-table').addEventListener('click', async (ev) => {

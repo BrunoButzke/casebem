@@ -229,16 +229,24 @@ test('validateCheckoutRequest rejeita items vazio', () => {
   assert.match(result.error, /carrinho.*vazio/i);
 });
 
-test('validateCheckoutRequest rejeita item com giftId inexistente', () => {
+test('createCheckoutPayment rejeita item com giftId inexistente (catálogo D1/estático)', async () => {
   const request = {
     paymentMethod: 'pix',
     gifterName: 'João Silva',
-    items: [{ giftId: 'inexistente', quantity: 1 }]
+    items: [{ giftId: 'inexistente', quantity: 1 }],
+    intentKey: '550e8400-e29b-41d4-a716-446655440099',
   };
-  
-  const result = validateCheckoutRequest(request);
-  assert.equal(result.valid, false);
-  assert.match(result.error, /presente.*inv[áa]lido|n[ãa]o.*encontrado/i);
+
+  const mockEnv = {
+    MP_ACCESS_TOKEN: 'TEST_TOKEN',
+    RSVP_SECRET: Buffer.from('a'.repeat(32)).toString('base64'),
+  };
+  const mockDB = new MockD1Database();
+
+  await assert.rejects(
+    async () => await createCheckoutPayment(request, mockEnv, mockDB, '127.0.0.1'),
+    { message: /presente.*n[ãa]o.*encontrado|inexistente/i }
+  );
 });
 
 test('validateCheckoutRequest rejeita item com quantidade inválida', () => {

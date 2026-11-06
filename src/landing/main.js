@@ -427,6 +427,24 @@ function initWaitlist() {
     });
   });
 
+  // Atualiza visibilidade do botão quando plano muda
+  const updatePayButton = () => {
+    if (!payBtn) return;
+    if (savedPlan === 'basic') {
+      payBtn.hidden = true;
+      payMsg.textContent = 'Plano Básico é gratuito. Entraremos em contato em breve!';
+    } else {
+      payBtn.hidden = false;
+      payMsg.textContent = '';
+    }
+  };
+
+  form.addEventListener('change', (e) => {
+    if (e.target.name === 'plan') {
+      savedPlan = e.target.value;
+    }
+  });
+
   payBtn?.addEventListener('click', async () => {
     if (!savedEmail) {
       payMsg.textContent = 'Volte e preencha o formulário antes de pagar.';
@@ -435,8 +453,7 @@ function initWaitlist() {
     
     // Plano básico é gratuito, não precisa de checkout
     if (savedPlan === 'basic') {
-      payMsg.textContent = 'O plano Básico é gratuito! Aguarde nosso contato.';
-      payBtn.disabled = true;
+      updatePayButton();
       return;
     }
     
@@ -458,6 +475,9 @@ function initWaitlist() {
       payBtn.disabled = false;
     }
   });
+
+  // Configura estado inicial do botão baseado no plano selecionado
+  updatePayButton();
 }
 
 async function boot() {

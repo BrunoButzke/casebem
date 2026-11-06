@@ -29,6 +29,11 @@ function setupDOM() {
         
         <div id="cart-items"></div>
         
+        <div class="cart-total">
+          <strong>Total:</strong>
+          <span id="cart-total-value">R$ 0,00</span>
+        </div>
+        
         <div class="cart-checkout" id="cart-checkout">
           <div class="form-field">
             <label for="gifter-name">Seu nome <span class="required">*</span></label>
@@ -347,33 +352,44 @@ test('Cart: badge atualiza corretamente com quantidade', async () => {
 test('Cart: ajuste de quantidade via botões + e -', async () => {
   const { document } = setupDOM();
   
-  const { initCart, addToCart, openCartModal } = await import('../src/dani-carine/cart.mjs');
+  const cartModule = await import('../src/dani-carine/cart.mjs');
+  const { initCart, addToCart, openCartModal } = cartModule;
   initCart(global.window);
-
+  
   // Adicionar item
   addToCart('danca', 1);
 
   // Abrir modal
   openCartModal();
-  await new Promise(resolve => setTimeout(resolve, 10));
+  await new Promise(resolve => setTimeout(resolve, 50));
 
   const cartItems = document.getElementById('cart-items');
-  const plusButton = cartItems.querySelector('[data-action="inc"]');
-  const minusButton = cartItems.querySelector('[data-action="dec"]');
-  const quantityDisplay = cartItems.querySelector('.cart-qty');
+  assert.ok(cartItems, 'Container cart-items deve existir');
+  
+  let plusButton = cartItems.querySelector('[data-action="inc"]');
+  let minusButton = cartItems.querySelector('[data-action="dec"]');
+  let quantityDisplay = cartItems.querySelector('.cart-qty');
 
   assert.ok(plusButton, 'Botão + deve existir');
   assert.ok(minusButton, 'Botão - deve existir');
+  assert.ok(quantityDisplay, 'Display de quantidade deve existir');
   assert.equal(quantityDisplay.textContent, '1', 'Quantidade inicial deve ser 1');
 
   // Aumentar quantidade
   plusButton.click();
-  await new Promise(resolve => setTimeout(resolve, 10));
+  await new Promise(resolve => setTimeout(resolve, 100));
+  
+  // Re-query após re-render
+  quantityDisplay = cartItems.querySelector('.cart-qty');
   assert.equal(quantityDisplay.textContent, '2', 'Quantidade deve aumentar para 2');
 
   // Diminuir quantidade
+  minusButton = cartItems.querySelector('[data-action="dec"]');
   minusButton.click();
-  await new Promise(resolve => setTimeout(resolve, 10));
+  await new Promise(resolve => setTimeout(resolve, 100));
+  
+  // Re-query após re-render
+  quantityDisplay = cartItems.querySelector('.cart-qty');
   assert.equal(quantityDisplay.textContent, '1', 'Quantidade deve voltar para 1');
 
   cleanupDOM();

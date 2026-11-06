@@ -29,17 +29,20 @@ Este guia explica como configurar o Cloudflare D1 para o sistema de RSVP do site
 5. Clique em **Create**
 6. **Anote o Database ID** que aparecerá (formato UUID)
 
-### Passo 2: Executar Migration SQL
+### Passo 2: Executar Migrations SQL
 
 1. No dashboard D1, selecione o database recém-criado
 2. Vá para a aba **Console**
-3. Copie e cole o conteúdo completo do arquivo `migrations/0001_rsvps.sql`
-4. Clique em **Execute**
-5. Verifique se as tabelas foram criadas:
+3. Execute as migrations em ordem:
+   - Copie e cole o conteúdo completo do arquivo `migrations/0001_rsvps.sql`
+   - Clique em **Execute**
+   - Repita para `migrations/0002_idempotency_and_encryption.sql`
+   - Repita para `migrations/0003_messages.sql`
+4. Verifique se as tabelas foram criadas:
    ```sql
    SELECT name FROM sqlite_master WHERE type='table';
    ```
-   Deve retornar: `rsvps`, `rate_limits`, `schema_migrations`
+   Deve retornar: `rsvps`, `rate_limits`, `wedding_messages`, `schema_migrations`
 
 ### Passo 3: Configurar Binding no Cloudflare Pages
 

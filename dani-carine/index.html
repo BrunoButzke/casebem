@@ -51,6 +51,7 @@
         <a href="#confirmar-presenca">Confirmar presença</a>
         <a href="#dress-code">Dress code</a>
         <a href="#presentes">Presentes</a>
+        <a href="#mural-recados">Mural</a>
       </nav>
       <a
         class="btn btn--sm magnetic"
@@ -700,6 +701,90 @@
           </div>
         </div>
       </div>
+
+      <section class="messages" id="mural-recados">
+        <div class="container">
+          <p class="eyebrow">Mural de recados</p>
+          <h2>Deixe uma mensagem</h2>
+          <p class="messages__lead">
+            Compartilhe suas felicitações e bons desejos para o casal.
+          </p>
+
+          <div class="messages__form-container">
+            <form class="messages__form" id="messages-form" novalidate>
+              <div class="messages__status" id="messages-status"></div>
+
+              <div class="messages__fields" id="messages-fields">
+                <div class="form-field">
+                  <label for="guest-name">Seu nome <span class="required">*</span></label>
+                  <input
+                    type="text"
+                    id="guest-name"
+                    name="guestName"
+                    required
+                    maxlength="100"
+                    autocomplete="name"
+                    aria-describedby="guest-name-error"
+                  />
+                  <span class="form-error" id="guest-name-error" role="alert"></span>
+                </div>
+
+                <div class="form-field">
+                  <label for="message-text">Sua mensagem <span class="required">*</span></label>
+                  <textarea
+                    id="message-text"
+                    name="message"
+                    required
+                    maxlength="500"
+                    rows="4"
+                    placeholder="Escreva suas felicitações para Dani e Carine..."
+                    aria-describedby="message-text-hint message-text-error"
+                  ></textarea>
+                  <span class="form-hint" id="message-text-hint">
+                    <span id="message-text-count">0</span>/500 caracteres
+                  </span>
+                  <span class="form-error" id="message-text-error" role="alert"></span>
+                </div>
+
+                <div class="form-field">
+                  <label class="checkbox-label">
+                    <input
+                      type="checkbox"
+                      name="consentGiven"
+                      id="consent-checkbox"
+                      required
+                      aria-describedby="consent-error"
+                    />
+                    <span>
+                      Concordo em compartilhar minha mensagem publicamente no mural do casal.
+                    </span>
+                  </label>
+                  <span class="form-error" id="consent-error" role="alert"></span>
+                </div>
+
+                <button type="submit" class="btn magnetic messages__submit" id="submit-btn">
+                  Enviar mensagem
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <div class="messages__list" id="messages-list">
+            <noscript>
+              <p class="messages__noscript">O mural de recados requer JavaScript ativado.</p>
+            </noscript>
+          </div>
+
+          <button 
+            type="button" 
+            class="btn btn--ghost magnetic messages__load-more" 
+            id="load-more-btn" 
+            style="display: none;"
+          >
+            Carregar mais mensagens
+          </button>
+        </div>
+      </section>
 
       <section class="atmosphere">
         <div class="atmosphere__bg" data-parallax>

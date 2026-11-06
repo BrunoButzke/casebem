@@ -1,11 +1,10 @@
--- Migration 0002: Add Idempotency, Encryption and Invariant Checks
+-- Migration 0002: Add Idempotency and Fingerprint Columns
 -- Created: 2026-11-06
 -- Database: Cloudflare D1
 
 -- Add idempotency columns
 ALTER TABLE rsvps ADD COLUMN idempotency_key TEXT;
 ALTER TABLE rsvps ADD COLUMN idempotency_fingerprint TEXT NOT NULL DEFAULT '';
-ALTER TABLE rsvps ADD COLUMN manage_token_encrypted TEXT NOT NULL DEFAULT '';
 
 -- Create unique index for idempotency per wedding
 CREATE UNIQUE INDEX IF NOT EXISTS idx_rsvps_idempotency
@@ -18,4 +17,4 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_rsvps_idempotency
 
 -- Update migration metadata
 INSERT INTO schema_migrations (version, applied_at, description)
-VALUES ('0002', datetime('now'), 'Add idempotency, encryption, and fingerprint columns');
+VALUES ('0002', datetime('now'), 'Add idempotency key and fingerprint columns');

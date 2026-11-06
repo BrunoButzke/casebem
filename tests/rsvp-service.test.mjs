@@ -287,11 +287,10 @@ describe('createRsvp', () => {
 
     const result = await createRsvp(db, data, 'idem-key-3', TEST_SECRET, null);
     const storedTokenHash = db.data.rsvps[0].manage_token_hash;
-    const storedTokenEncrypted = db.data.rsvps[0].manage_token_encrypted;
 
     assert.notEqual(storedTokenHash, result.manageToken);
     assert.equal(storedTokenHash.length, 64); // SHA-256 hash
-    assert.equal(storedTokenEncrypted, null); // No encryption (bearer required for replay)
+    // manage_token_encrypted removed from schema (NULL was stored, column no longer exists)
   });
 
   it('should generate unique IDs', async () => {

@@ -280,7 +280,7 @@ MP_ACCESS_TOKEN=APP_USR-xxxxxxxx  # Mercado Pago (já existe)
 ## Próximos Passos (fora desta PR)
 
 1. Criar tabela D1 `gift_orders` para histórico rico
-2. UX pós-redirect (`?pago=ok|erro|pendente`)
+2. ~~UX pós-redirect (`?pago=ok|erro|pendente`)~~ — banner em `/dani-carine/` + limpa carrinho em `pago=ok`
 3. Relatórios / export CSV de presentes pagos
 
 ---

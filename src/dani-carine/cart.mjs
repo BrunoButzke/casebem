@@ -4,6 +4,7 @@
 
 import { CartStorage } from './cart-storage.mjs';
 import { GIFTS_CATALOG, getGiftById as getStaticGiftById, formatPrice } from '../../data/gifts-catalog.mjs';
+import { initPaymentReturn } from './payment-return.mjs';
 
 let cart = null;
 let _window = null;
@@ -70,6 +71,23 @@ export function initCart(windowObj) {
   // Atualiza preços/nomes do D1 sem rebuild (Free-tier)
   refreshCatalogFromApi().then(() => {
     updateCartBadge();
+  });
+
+  // Retorno Checkout Pro (?pago=ok|erro|pendente)
+  initPaymentReturn(_window, {
+    clearCart: () => {
+      try {
+        cart?.clear();
+        resetIntentKey();
+        updateCartBadge();
+      } catch {
+        /* ignore */
+      }
+    },
+    openGifts: () => {
+      const el = _document.getElementById('presentes');
+      el?.scrollIntoView({ behavior: 'smooth' });
+    },
   });
 }
 

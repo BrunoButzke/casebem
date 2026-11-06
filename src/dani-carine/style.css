@@ -2045,6 +2045,63 @@ h2 {
   }
 }
 
+/* Retorno Checkout Pro (?pago=) */
+.payment-return {
+  position: relative;
+  z-index: 40;
+  padding: 0.85rem 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
+  background: color-mix(in srgb, var(--cream) 70%, #dff3ea);
+}
+
+.payment-return--error {
+  background: color-mix(in srgb, var(--cream) 65%, #f8d7da);
+}
+
+.payment-return--pending {
+  background: color-mix(in srgb, var(--cream) 65%, #fff3cd);
+}
+
+.payment-return__inner {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.payment-return__copy {
+  display: grid;
+  gap: 0.25rem;
+  max-width: 40rem;
+}
+
+.payment-return__copy p {
+  margin: 0;
+  color: color-mix(in srgb, var(--ink) 85%, transparent);
+}
+
+.payment-return__meta {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.payment-return__actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.payment-return__close {
+  border: 0;
+  background: transparent;
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--ink);
+  padding: 0.2rem 0.45rem;
+}
+
 /* Playlist / vídeo */
 .playlist {
   padding: clamp(4.5rem, 10vw, 8rem) 0;

@@ -6,6 +6,7 @@ import { initMessages } from './messages.mjs';
 import { initCart } from './cart.mjs';
 import { initLodging } from './lodging.mjs';
 import { initStationery } from './stationery.mjs';
+import { initMedia } from './media.mjs';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -609,6 +610,7 @@ function boot() {
   initCart();
   initLodging();
   initStationery();
+  initMedia();
   setupReveals();
   ScrollTrigger.sort();
   window.addEventListener('load', () => ScrollTrigger.refresh());

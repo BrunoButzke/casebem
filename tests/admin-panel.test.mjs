@@ -5,7 +5,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { requireAdmin } from '../functions/_lib/admin-auth.mjs';
-import { rsvpsToCsv, markIntentPaidByProviderRef, setMessageHidden } from '../functions/_lib/admin-service.mjs';
+import {
+  rsvpsToCsv,
+  giftsToCsv,
+  markIntentPaidByProviderRef,
+  setMessageHidden,
+} from '../functions/_lib/admin-service.mjs';
 import { processMercadoPagoWebhook } from '../functions/_lib/mp-webhook.mjs';
 import { sendAdminNotification } from '../functions/_lib/notify-email.mjs';
 
@@ -52,6 +57,29 @@ test('rsvpsToCsv: gera header e escapa vírgulas', () => {
   ]);
   assert.match(csv, /^id,guest_name/);
   assert.match(csv, /"Ana, Maria"/);
+  assert.match(csv, /yes/);
+});
+
+test('giftsToCsv: header + itens + valor BRL', () => {
+  const csv = giftsToCsv([
+    {
+      intentKey: '550e8400-e29b-41d4-a716-446655440000',
+      gifterName: 'João, Silva',
+      amountCents: 15000,
+      paymentMethod: 'pix',
+      status: 'pending',
+      paid: true,
+      paidAt: '2026-01-02T00:00:00.000Z',
+      providerReference: 'pay_1',
+      items: [{ giftId: 'danca', quantity: 2 }, { giftId: 'spa', quantity: 1 }],
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-02T00:00:00.000Z',
+    },
+  ]);
+  assert.match(csv, /^intent_key,gifter_name/);
+  assert.match(csv, /"João, Silva"/);
+  assert.match(csv, /150\.00/);
+  assert.match(csv, /dancax2;spax1/);
   assert.match(csv, /yes/);
 });
 

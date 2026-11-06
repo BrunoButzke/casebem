@@ -58,29 +58,21 @@ describe('Frontend RSVP - Real DOM Tests', () => {
   it('POST 201 success: token stored, fields locked, edit button visible', async () => {
     const { document, fetchCalls, mockFetch } = await setupWindow();
     
-    global.fetch = mockFetch([
-      {
-        // First call is GET from fetchRsvp() - return 401 (no token)
-        status: 401,
-        body: { error: 'No token' }
-      },
-      {
-        // Second call is POST from form submit
-        status: 201,
-        body: {
-          id: 'id1',
-          manageToken: 'token-success',
-          guestName: 'Test User',
-          attending: true,
-          adultsCount: 2,
-          childrenCount: 0,
-          observations: null,
-          consentGiven: true,
-          createdAt: '2026-11-06T00:00:00Z',
-          updatedAt: '2026-11-06T00:00:00Z'
-        }
+    global.fetch = mockFetch([{
+      status: 201,
+      body: {
+        id: 'id1',
+        manageToken: 'token-success',
+        guestName: 'Test User',
+        attending: true,
+        adultsCount: 2,
+        childrenCount: 0,
+        observations: null,
+        consentGiven: true,
+        createdAt: '2026-11-06T00:00:00Z',
+        updatedAt: '2026-11-06T00:00:00Z'
       }
-    ]);
+    }]);
 
     const { setupRsvp } = await import('../src/dani-carine/rsvp.mjs?' + Math.random());
     setupRsvp();
@@ -183,13 +175,10 @@ describe('Frontend RSVP - Real DOM Tests', () => {
     const { document, mockFetch } = await setupWindow();
     localStorage.setItem('rsvp_idempotency_key', 'conflict-key');
     
-    global.fetch = mockFetch([
-      { status: 401, body: { error: 'No token' } },
-      {
-        status: 409,
-        body: { error: 'Conflict' }
-      }
-    ]);
+    global.fetch = mockFetch([{
+      status: 409,
+      body: { error: 'Conflict' }
+    }]);
 
     const { setupRsvp } = await import('../src/dani-carine/rsvp.mjs?' + Math.random());
     setupRsvp();
@@ -402,8 +391,8 @@ describe('Frontend RSVP - Real DOM Tests', () => {
     const { setupRsvp } = await import('../src/dani-carine/rsvp.mjs?' + Math.random());
     setupRsvp();
     
-    await Promise.resolve();
-    await Promise.resolve();
+    // Wait for GET from fetchRsvp() to complete
+    await new Promise(resolve => setTimeout(resolve, 100));
 
     const editBtn = document.getElementById('rsvp-edit');
     const nameInput = document.getElementById('rsvp-name');
@@ -458,8 +447,8 @@ describe('Frontend RSVP - Real DOM Tests', () => {
     const { setupRsvp } = await import('../src/dani-carine/rsvp.mjs?' + Math.random());
     setupRsvp();
     
-    await Promise.resolve();
-    await Promise.resolve();
+    // Wait for GET from fetchRsvp() to complete
+    await new Promise(resolve => setTimeout(resolve, 100));
 
     const editBtn = document.getElementById('rsvp-edit');
     editBtn.click();

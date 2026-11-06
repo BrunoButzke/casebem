@@ -23,15 +23,16 @@ export async function createPixPayment({
   items,
   totalInCents,
   intentKey,
+  payerEmail,
 }) {
   if (!accessToken) {
     return jsonError(500, 'MP_ACCESS_TOKEN não configurado no servidor.');
   }
-
+  
   // Suportar nova e antiga assinatura (backward compatible)
   const isNewSignature = intentKey && items && totalInCents !== undefined;
   
-  let finalAmount, finalDescription, finalExternalRef, finalIdempotencyKey, finalItems;
+  let finalAmount, finalDescription, finalExternalRef, finalIdempotencyKey, finalItems, finalPayerEmail;
   
   if (isNewSignature) {
     // Nova assinatura: multi-item com intentKey estável
@@ -39,6 +40,7 @@ export async function createPixPayment({
     finalDescription = `Presentes CaseBem - ${gifterName || 'Convidado'}`.slice(0, 200);
     finalExternalRef = `casebem:gift:${intentKey}`; // ESTÁVEL - sem timestamp
     finalIdempotencyKey = intentKey; // Usar intentKey como idempotency key do MP
+    finalPayerEmail = payerEmail || 'noreply@casebem.com'; // Service email, not customer identity
     
     // Items em ordem canônica (alfabética por giftId) para consistência
     const sortedItems = [...items].sort((a, b) => a.giftId.localeCompare(b.giftId));
@@ -71,6 +73,7 @@ export async function createPixPayment({
     description: finalDescription,
     payment_method_id: 'pix',
     payer: isNewSignature ? {
+      email: finalPayerEmail,
       first_name: (gifterName || 'Convidado').slice(0, 60),
     } : {
       email: String(email || '').trim().toLowerCase(),

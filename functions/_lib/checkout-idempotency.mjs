@@ -251,14 +251,12 @@ function getHourWindow() {
  * @param {D1Database} db - D1 database
  * @param {string} intentKey - Intent UUID
  * @param {number} ttlSeconds - Lease time-to-live (default 120s)
- * @param {object} clock - Optional injected clock for testing (default Date)
+ * @param {object} clock - Optional injected clock {now: () => ISO string}
  * @returns {Promise<boolean>} true se adquiriu lease, false se já ocupado
  */
-export async function acquireLease(db, intentKey, ttlSeconds = 120, clock = Date) {
-  const now = clock.now ? clock.now() : new Date().toISOString();
-  const leaseUntil = clock.now 
-    ? new Date(new Date(clock.now()).getTime() + ttlSeconds * 1000).toISOString()
-    : new Date(Date.now() + ttlSeconds * 1000).toISOString();
+export async function acquireLease(db, intentKey, ttlSeconds = 120, clock = { now: () => new Date().toISOString() }) {
+  const nowISO = clock.now();
+  const leaseUntilISO = new Date(Date.parse(nowISO) + ttlSeconds * 1000).toISOString();
   
   // Compare-and-swap: só atualiza se (lease_until IS NULL OR lease_until < now) AND status = 'creating'
   const result = await db.prepare(
@@ -267,10 +265,11 @@ export async function acquireLease(db, intentKey, ttlSeconds = 120, clock = Date
      WHERE intent_key = ?
        AND status = 'creating'
        AND (lease_until IS NULL OR lease_until < ?)`
-  ).bind(leaseUntil, now, intentKey, now).run();
+  ).bind(leaseUntilISO, nowISO, intentKey, nowISO).run();
   
-  // changes > 0 significa que conseguiu adquirir lease
-  return result.changes > 0;
+  // D1 oficial retorna result.meta.changes, mocks podem usar result.changes
+  const changes = Number(result?.meta?.changes ?? result?.changes ?? 0);
+  return changes > 0;
 }
 
 /**
@@ -280,11 +279,11 @@ export async function acquireLease(db, intentKey, ttlSeconds = 120, clock = Date
  * @returns {Promise<void>}
  */
 export async function releaseLease(db, intentKey) {
-  const now = new Date().toISOString();
+  const nowISO = new Date().toISOString();
   
   await db.prepare(
     `UPDATE checkout_intents
      SET lease_until = NULL, updated_at = ?
      WHERE intent_key = ?`
-  ).bind(now, intentKey).run();
+  ).bind(nowISO, intentKey).run();
 }

@@ -382,13 +382,14 @@ async function createPixCheckout({ gifterName, items, totalInCents, intentKey, e
   const result = await createPixPayment({
     accessToken: env.MP_ACCESS_TOKEN,
     gifterName,
-    items: normalizedItems.map(item => ({
+    items: items.map(item => ({
       giftId: item.giftId,
       quantity: item.quantity,
       priceInCents: getGiftById(item.giftId)?.priceInCents || 0,
     })),
     totalInCents,
     intentKey,
+    payerEmail: env.MP_PAYER_EMAIL || 'noreply@casebem.com',
   });
 
   if (!result.ok) {

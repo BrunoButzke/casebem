@@ -77,7 +77,7 @@ class MockD1Statement {
       const existing = this.db.data.get(intentKey);
       
       if (!existing) {
-        return { success: true, changes: 0 };
+        return { success: true, meta: { changes: 0 } };
       }
       
       // WHERE status = 'creating' AND (lease_until IS NULL OR lease_until < now)
@@ -87,10 +87,10 @@ class MockD1Statement {
       if (canAcquire) {
         existing.lease_until = leaseUntil;
         existing.updated_at = updatedAt;
-        return { success: true, changes: 1 };
+        return { success: true, meta: { changes: 1 } };
       }
       
-      return { success: true, changes: 0 };
+      return { success: true, meta: { changes: 0 } };
     }
     
     // UPDATE intent with payment result

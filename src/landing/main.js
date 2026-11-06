@@ -377,14 +377,30 @@ function initWaitlist() {
   const payMsg = $('[data-pay-msg]', success);
   const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
   let savedEmail = '';
-  let savedPlan = 'plus';
+  let savedPlan = 'pro';
+
+  const updatePayButton = () => {
+    if (!payBtn) return;
+    if (success.hidden) return;
+    if (savedPlan === 'basic') {
+      payBtn.hidden = true;
+      if (!payMsg.textContent.includes('gratuito')) {
+        payMsg.textContent = 'Plano Básico é gratuito. Entraremos em contato em breve!';
+      }
+    } else {
+      payBtn.hidden = false;
+      if (payMsg.textContent.includes('gratuito')) {
+        payMsg.textContent = '';
+      }
+    }
+  };
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const name = form.name.value.trim();
     const email = form.email.value.trim().toLowerCase();
     const consent = form.consent.checked;
-    const plan = form.querySelector('input[name="plan"]:checked')?.value || 'plus';
+    const plan = form.querySelector('input[name="plan"]:checked')?.value || 'pro';
     const emailField = form.email.closest('.waitlist__field');
     const nameField = form.name.closest('.waitlist__field');
 
@@ -423,8 +439,16 @@ function initWaitlist() {
         form.hidden = true;
         success.hidden = false;
         gsap.from(success, { opacity: 0, y: 30, duration: 0.6, ease: 'power3.out' });
+        updatePayButton();
       },
     });
+  });
+
+  form.addEventListener('change', (e) => {
+    if (e.target.name === 'plan') {
+      savedPlan = e.target.value;
+      updatePayButton();
+    }
   });
 
   payBtn?.addEventListener('click', async () => {
@@ -432,6 +456,12 @@ function initWaitlist() {
       payMsg.textContent = 'Volte e preencha o formulário antes de pagar.';
       return;
     }
+    
+    if (savedPlan === 'basic') {
+      updatePayButton();
+      return;
+    }
+    
     payBtn.disabled = true;
     payMsg.textContent = 'Abrindo Mercado Pago…';
     try {

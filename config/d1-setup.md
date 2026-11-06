@@ -101,11 +101,26 @@ wrangler d1 execute casebem-rsvps-production --remote --file=migrations/0001_rsv
 # Migration 0002: Idempotência e criptografia
 wrangler d1 execute casebem-rsvps-production --remote --file=migrations/0002_idempotency_and_encryption.sql
 
-# Migration 0003: Mural de recados (nova)
+# Migration 0003: Mural de recados
 wrangler d1 execute casebem-rsvps-production --remote --file=migrations/0003_messages.sql
+
+# Migration 0004: Checkout intents (idempotência de pagamentos)
+wrangler d1 execute casebem-rsvps-production --remote --file=migrations/0004_checkout_intents.sql
 ```
 
 **Nota**: Todas as migrations usam `CREATE TABLE IF NOT EXISTS` e `INSERT ... ON CONFLICT(version) DO NOTHING` para serem idempotentes e seguras para reaplicação. Não é necessário configurar `migrations_dir` no `wrangler.toml`.
+
+### Migration 0004: Checkout Intents
+
+A migration 0004 adiciona a tabela `checkout_intents` para prevenir cobranças duplicadas via:
+- **intent_key**: UUID gerado pelo cliente (36 chars, único)
+- **fingerprint**: SHA-256 do payload canonicalizado (64 chars hex)
+- **provider_reference**: ID do pagamento no Mercado Pago
+- **status**: `creating`, `pending`, ou `failed`
+- **Idempotência**: Mesmo intent_key + mesmo fingerprint = retorna mesmo pagamento
+- **Conflito**: Mesmo intent_key + fingerprint diferente = erro 409
+
+A tabela compartilha a mesma database com `rsvps`, `wedding_messages` e `rate_limits`.
 
 ### Passo 6: Verificar Configuração
 

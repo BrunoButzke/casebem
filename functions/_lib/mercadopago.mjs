@@ -17,40 +17,75 @@ export async function createPixPayment({
   message = '',
   giftId = '',
   payerName = '',
+  idempotencyKey = null,
+  // Nova assinatura para checkout multi-item
+  gifterName,
+  items,
+  totalInCents,
+  intentKey,
+  payerEmail,
 }) {
   if (!accessToken) {
     return jsonError(500, 'MP_ACCESS_TOKEN não configurado no servidor.');
   }
-
-  const value = Number(amount);
-  if (!Number.isFinite(value) || value < 0.99) {
-    return jsonError(400, 'Valor mínimo é R$ 0,99.');
+  
+  // Suportar nova e antiga assinatura (backward compatible)
+  const isNewSignature = intentKey && items && totalInCents !== undefined;
+  
+  let finalAmount, finalDescription, finalExternalRef, finalIdempotencyKey, finalItems, finalPayerEmail;
+  
+  if (isNewSignature) {
+    // Nova assinatura: multi-item com intentKey estável
+    finalAmount = totalInCents / 100; // Converter cents para reais
+    finalDescription = `Presentes CaseBem - ${gifterName || 'Convidado'}`.slice(0, 200);
+    finalExternalRef = `casebem:gift:${intentKey}`; // ESTÁVEL - sem timestamp
+    finalIdempotencyKey = intentKey; // Usar intentKey como idempotency key do MP
+    finalPayerEmail = payerEmail || 'noreply@casebem.com'; // Service email, not customer identity
+    
+    // Items em ordem canônica (alfabética por giftId) para consistência
+    const sortedItems = [...items].sort((a, b) => a.giftId.localeCompare(b.giftId));
+    finalItems = sortedItems.map(item => ({
+      title: item.giftId,
+      quantity: item.quantity,
+      unit_price: Math.round((item.priceInCents || 0) / 100 * 100) / 100,
+    }));
+  } else {
+    // Antiga assinatura: single gift (planos)
+    const value = Number(amount);
+    if (!Number.isFinite(value) || value < 0.99) {
+      return jsonError(400, 'Valor mínimo é R$ 0,99.');
+    }
+    
+    const payerEmail = String(email || '').trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(payerEmail)) {
+      return jsonError(400, 'Informe um e-mail válido para o Pix.');
+    }
+    
+    finalAmount = value;
+    finalDescription = String(title || 'Presente CaseBem').slice(0, 200);
+    finalIdempotencyKey = idempotencyKey || crypto.randomUUID();
+    finalExternalRef = `casebem:plan:${finalIdempotencyKey}`; // Estável via idempotencyKey
+    finalItems = null;
   }
-
-  const payerEmail = String(email || '')
-    .trim()
-    .toLowerCase();
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(payerEmail)) {
-    return jsonError(400, 'Informe um e-mail válido para o Pix.');
-  }
-
-  const description = String(title || 'Presente CaseBem').slice(0, 200);
-  const idempotencyKey = crypto.randomUUID();
 
   const body = {
-    transaction_amount: Math.round(value * 100) / 100,
-    description,
+    transaction_amount: Math.round(finalAmount * 100) / 100,
+    description: finalDescription,
     payment_method_id: 'pix',
-    payer: {
-      email: payerEmail,
+    payer: isNewSignature ? {
+      email: finalPayerEmail,
+      first_name: (gifterName || 'Convidado').slice(0, 60),
+    } : {
+      email: String(email || '').trim().toLowerCase(),
       ...(payerName ? { first_name: String(payerName).slice(0, 60) } : {}),
     },
     metadata: {
-      gift_id: String(giftId).slice(0, 60),
+      gift_id: isNewSignature ? 'multi' : String(giftId).slice(0, 60),
       message: String(message).slice(0, 300),
       source: 'casebem-dani-carine',
     },
-    external_reference: `gift:${giftId || 'custom'}:${Date.now()}`,
+    external_reference: finalExternalRef,
+    ...(finalItems ? { items: finalItems } : {}),
   };
 
   const res = await fetch(`${MP_API}/v1/payments`, {
@@ -58,7 +93,7 @@ export async function createPixPayment({
     headers: {
       Authorization: `Bearer ${accessToken}`,
       'Content-Type': 'application/json',
-      'X-Idempotency-Key': idempotencyKey,
+      'X-Idempotency-Key': finalIdempotencyKey,
       Accept: 'application/json',
     },
     body: JSON.stringify(body),

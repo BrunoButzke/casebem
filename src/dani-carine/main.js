@@ -3,6 +3,7 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import Lenis from 'lenis';
 import { setupRsvp } from './rsvp.mjs';
 import { initMessages } from './messages.mjs';
+import { initCart } from './cart.mjs';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -603,6 +604,7 @@ function boot() {
   setupGifts();
   setupRsvp();
   initMessages();
+  initCart();
   setupReveals();
   ScrollTrigger.sort();
   window.addEventListener('load', () => ScrollTrigger.refresh());

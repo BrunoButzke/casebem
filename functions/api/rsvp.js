@@ -196,6 +196,16 @@ async function handlePost(request, env) {
       );
     }
 
+    // RSVP fechado: nome precisa estar na lista (Free-tier D1)
+    const { assertGuestAllowed } = await import('../_lib/rsvp-guest-list.mjs');
+    const gate = await assertGuestAllowed(env.DB, validation.data.guestName);
+    if (!gate.allowed) {
+      return errorResponse(request, gate.message || 'Convidado não autorizado', 403, {
+        error: gate.error,
+        rsvpMode: gate.mode,
+      });
+    }
+
     // Extract bearer token for idempotent replay verification
     const bearerToken = extractBearerToken(request);
     

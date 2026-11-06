@@ -10,6 +10,7 @@ import {
   listMessagesAdmin,
   listGiftsAdmin,
 } from '../../_lib/admin-service.mjs';
+import { getRsvpMode, listGuestList } from '../../_lib/rsvp-guest-list.mjs';
 import { getCorsHeaders } from '../../_lib/http-helpers.mjs';
 
 export async function onRequestOptions(context) {
@@ -37,10 +38,12 @@ export async function onRequestGet(context) {
   }
 
   try {
-    const [rsvps, messages, gifts] = await Promise.all([
+    const [rsvps, messages, gifts, rsvpMode, guestList] = await Promise.all([
       listRsvps(env.DB),
       listMessagesAdmin(env.DB),
       listGiftsAdmin(env.DB),
+      getRsvpMode(env.DB),
+      listGuestList(env.DB),
     ]);
 
     const attending = rsvps.filter((r) => r.attending);
@@ -62,7 +65,11 @@ export async function onRequestGet(context) {
           giftsPending: gifts.filter((g) => !g.paid && g.status === 'pending').length,
           giftsPaid: paidGifts.length,
           giftsPaidCents: paidCents,
+          rsvpMode,
+          guestListCount: guestList.length,
         },
+        rsvpMode,
+        guestList,
         rsvps,
         messages,
         gifts,

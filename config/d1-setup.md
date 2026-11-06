@@ -109,6 +109,9 @@ wrangler d1 execute casebem-rsvps-production --remote --file=migrations/0004_che
 
 # Migration 0005: painel admin (paid_at + hidden em recados)
 wrangler d1 execute casebem-rsvps-production --remote --file=migrations/0005_admin_and_paid.sql
+
+# Migration 0006: RSVP fechado (lista de convidados)
+wrangler d1 execute casebem-rsvps-production --remote --file=migrations/0006_rsvp_closed.sql
 ```
 
 **Nota**: Todas as migrations usam `CREATE TABLE IF NOT EXISTS` / `ALTER TABLE ... ADD COLUMN` e `INSERT ... ON CONFLICT(version) DO NOTHING` para serem idempotentes e seguras para reaplicação. Não é necessário configurar `migrations_dir` no `wrangler.toml`.

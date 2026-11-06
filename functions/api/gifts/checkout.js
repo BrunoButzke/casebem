@@ -32,6 +32,21 @@ export async function onRequestPost(context) {
     return errorResponse403(originValidation.error);
   }
 
+  // Verificar D1 disponível (crítico para idempotência)
+  if (!env.DB) {
+    const headers = getCorsHeaders(request);
+    headers.set('Content-Type', 'application/json');
+    
+    return new Response(
+      JSON.stringify({
+        ok: false,
+        error: 'DATABASE_UNAVAILABLE',
+        message: 'Serviço temporariamente indisponível',
+      }),
+      { status: 503, headers }
+    );
+  }
+
   // Parse request body
   let body = {};
   try {
@@ -40,9 +55,14 @@ export async function onRequestPost(context) {
     return errorResponse400('JSON inválido');
   }
 
+  // Get client IP address
+  const ipAddress = request.headers.get('CF-Connecting-IP') || 
+                    request.headers.get('X-Forwarded-For')?.split(',')[0] ||
+                    '0.0.0.0';
+
   try {
-    // Processar checkout
-    const result = await createCheckoutPayment(body, env);
+    // Processar checkout (com DB e IP para idempotência e rate limit)
+    const result = await createCheckoutPayment(body, env, env.DB, ipAddress);
 
     // Se o result tem status (ex: 503), usar esse status
     const statusCode = result.ok ? 200 : (result.status || 400);

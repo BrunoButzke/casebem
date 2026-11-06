@@ -37,6 +37,12 @@ def execute_sql_query(sql):
         except:
             pass
         
+        try:
+            migration_0004 = Path('migrations/0004_checkout_intents.sql').read_text()
+            cursor.executescript(migration_0004)
+        except:
+            pass
+        
         # Check if it looks like a migration script (CREATE, INSERT, multiple statements)
         is_script = ('CREATE TABLE' in sql.upper() or 
                      'CREATE INDEX' in sql.upper() or 
@@ -190,6 +196,18 @@ def execute_batch(commands):
         try:
             migration_0003 = Path('migrations/0003_messages.sql').read_text()
             cursor.executescript(migration_0003)
+        except:
+            pass
+        
+        try:
+            migration_0004 = Path('migrations/0004_checkout_intents.sql').read_text()
+            cursor.executescript(migration_0004)
+        except:
+            pass
+        
+        try:
+            migration_0004 = Path('migrations/0004_checkout_intents.sql').read_text()
+            cursor.executescript(migration_0004)
         except:
             pass
         

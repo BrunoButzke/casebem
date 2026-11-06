@@ -10,12 +10,17 @@ let cart = null;
 /**
  * Inicializa o carrinho
  */
-export function initCart() {
-  cart = new CartStorage(sessionStorage);
+export function initCart(windowObj) {
+  // Accept window object for testing
+  const win = windowObj || window;
+  const doc = win.document;
+  const storage = win.sessionStorage;
+  
+  cart = new CartStorage(storage);
 
   setupCartBadge();
   setupGiftCards();
-  setupCartModal();
+  // setupCartModal(); // Comentado: modal já existe no HTML
   updateCartBadge();
 }
 
@@ -58,6 +63,7 @@ function setupGiftCards() {
 
       // Adicionar ao carrinho
       cart.addItem(giftId, 1);
+      resetIntentKey();  // Reset intent quando carrinho muda
       updateCartBadge();
       
       // Feedback visual
@@ -104,6 +110,59 @@ function showCartFeedback(message) {
 }
 
 let previousActiveElement = null;
+let currentIntentKey = null;
+
+/**
+ * Gera ou recupera intent key do sessionStorage
+ * Reseta apenas quando cart muda deliberadamente
+ * @private
+ */
+function getOrCreateIntentKey() {
+  try {
+    // Tentar recuperar intent key existente
+    const stored = sessionStorage.getItem('casebem_intent_key');
+    if (stored) {
+      currentIntentKey = stored;
+      return stored;
+    }
+  } catch (e) {
+    // Storage denied, usar memória
+  }
+
+  // Gerar novo intent key (UUID v4)
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    currentIntentKey = crypto.randomUUID();
+  } else {
+    // Fallback para Node.js tests
+    currentIntentKey = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+      const r = Math.random() * 16 | 0;
+      const v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  }
+
+  // Salvar no sessionStorage
+  try {
+    sessionStorage.setItem('casebem_intent_key', currentIntentKey);
+  } catch (e) {
+    // Storage denied, continuar com memória
+  }
+
+  return currentIntentKey;
+}
+
+/**
+ * Reseta intent key (quando usuário edita cart deliberadamente)
+ * @private
+ */
+function resetIntentKey() {
+  currentIntentKey = null;
+  try {
+    sessionStorage.removeItem('casebem_intent_key');
+  } catch (e) {
+    // Storage denied
+  }
+}
 
 /**
  * Focus trap para modal
@@ -448,6 +507,8 @@ function handleQuantityChange(e) {
   } else {
     cart.updateQuantity(giftId, newQuantity);
   }
+  
+  resetIntentKey();  // Reset intent quando carrinho muda
 
   updateCartBadge();
   renderCartItems();
@@ -461,6 +522,7 @@ function handleRemoveItem(e) {
   const giftId = btn.dataset.giftId;
 
   cart.removeItem(giftId);
+  resetIntentKey();  // Reset intent quando carrinho muda
   updateCartBadge();
   renderCartItems();
 }
@@ -505,6 +567,9 @@ async function handleCheckout() {
   checkoutBtn.textContent = 'Processando...';
   cartError.hidden = true;
 
+  // Obter ou criar intent key
+  const intentKey = getOrCreateIntentKey();
+
   try {
     const response = await fetch('/api/gifts/checkout', {
       method: 'POST',
@@ -515,6 +580,7 @@ async function handleCheckout() {
         paymentMethod,
         gifterName,
         items,
+        intentKey,
       }),
     });
 
@@ -523,8 +589,10 @@ async function handleCheckout() {
     if (data.ok) {
       // Pagamento criado com sucesso (Pix)
       showPaymentResult(data);
-      cart.clear();
-      updateCartBadge();
+      // NÃO limpar carrinho - usuário precisa do QR até confirmação manual
+      // Desabilitar checkout para evitar duplicatas
+      checkoutBtn.disabled = true;
+      checkoutBtn.textContent = 'Pagamento Pendente';
     } else {
       // Erro (ex: cartão/boleto não disponível)
       if (data.status === 503) {
@@ -619,10 +687,10 @@ function showPaymentResult(data) {
   copyBtn.textContent = 'Copiar código';
   container.appendChild(copyBtn);
 
-  // Nota sobre confirmação (corrigida: não promete automático)
+  // Nota sobre confirmação manual (honesta)
   const note = document.createElement('p');
   note.className = 'payment-note';
-  note.textContent = 'Aguarde a confirmação do pagamento. Isso pode levar alguns minutos.';
+  note.textContent = 'Pedido Pix criado e pendente. Não há confirmação automática neste MVP. Guarde este código até a confirmação manual pelos noivos.';
   container.appendChild(note);
 
   // Botão fechar

@@ -79,11 +79,14 @@ export const GIFTS_CATALOG = [
 {
   paymentMethod: 'pix' | 'card' | 'boleto',
   gifterName: 'João Silva',  // nome do presenteador
+  intentKey: '550e8400-e29b-41d4-a716-446655440000',  // UUID v4 gerado pelo cliente
   items: [
     { giftId: 'danca', quantity: 2 }
   ]
 }
 ```
+
+**Idempotência**: O `intentKey` é gerado uma vez pelo cliente (crypto.randomUUID) e persistido em sessionStorage. Retries com o mesmo `intentKey` e mesmo payload retornam o pagamento existente sem criar cobrança duplicada. Se o `intentKey` já foi usado com payload diferente, o servidor retorna 409 CONFLICT.
 
 ### Checkout Response
 

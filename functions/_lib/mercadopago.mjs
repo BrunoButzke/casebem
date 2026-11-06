@@ -17,6 +17,7 @@ export async function createPixPayment({
   message = '',
   giftId = '',
   payerName = '',
+  idempotencyKey = null,
 }) {
   if (!accessToken) {
     return jsonError(500, 'MP_ACCESS_TOKEN não configurado no servidor.');
@@ -35,7 +36,8 @@ export async function createPixPayment({
   }
 
   const description = String(title || 'Presente CaseBem').slice(0, 200);
-  const idempotencyKey = crypto.randomUUID();
+  // Usar idempotencyKey fornecido ou gerar novo (backward compatible)
+  const finalIdempotencyKey = idempotencyKey || crypto.randomUUID();
 
   const body = {
     transaction_amount: Math.round(value * 100) / 100,
@@ -58,7 +60,7 @@ export async function createPixPayment({
     headers: {
       Authorization: `Bearer ${accessToken}`,
       'Content-Type': 'application/json',
-      'X-Idempotency-Key': idempotencyKey,
+      'X-Idempotency-Key': finalIdempotencyKey,
       Accept: 'application/json',
     },
     body: JSON.stringify(body),

@@ -9,7 +9,7 @@ const ALLOWED_PAYMENT_METHODS = ['pix', 'card', 'boleto'];
 
 /**
  * Valida requisição de checkout
- * @param {object} request - Requisição { paymentMethod, gifterName, items }
+ * @param {object} request - Requisição { paymentMethod, gifterName, items, intentKey }
  * @returns {{valid: boolean, error?: string}}
  */
 export function validateCheckoutRequest(request) {
@@ -17,7 +17,12 @@ export function validateCheckoutRequest(request) {
     return { valid: false, error: 'Requisição inválida' };
   }
 
-  const { paymentMethod, gifterName, items } = request;
+  const { paymentMethod, gifterName, items, intentKey } = request;
+
+  // Validar intentKey (opcional aqui, validação detalhada no service)
+  if (intentKey !== undefined && typeof intentKey !== 'string') {
+    return { valid: false, error: 'Intent key inválido' };
+  }
 
   // Validar método de pagamento
   if (!paymentMethod || typeof paymentMethod !== 'string') {
@@ -91,19 +96,46 @@ function normalizeCartItems(items) {
 }
 
 /**
- * Cria pagamento via adapter
+ * Cria pagamento via adapter (com idempotência)
  * @param {object} request - Requisição validada
  * @param {object} env - Environment variables
+ * @param {D1Database} db - D1 database (requerido para idempotência)
+ * @param {string} ipAddress - Client IP (para rate limit)
  * @returns {Promise<object>} Resultado do pagamento
  */
-export async function createCheckoutPayment(request, env) {
+export async function createCheckoutPayment(request, env, db, ipAddress) {
+  // Validar D1 disponível (crítico para idempotência)
+  if (!db) {
+    return {
+      ok: false,
+      status: 503,
+      error: 'DATABASE_UNAVAILABLE',
+      message: 'Serviço temporariamente indisponível',
+    };
+  }
+
+  // Validar RSVP_SECRET (necessário para HMAC)
+  if (!env.RSVP_SECRET) {
+    return {
+      ok: false,
+      status: 503,
+      error: 'SECRET_NOT_CONFIGURED',
+      message: 'Serviço temporariamente indisponível',
+    };
+  }
+
   // Validar requisição
   const validation = validateCheckoutRequest(request);
   if (!validation.valid) {
     throw new Error(validation.error);
   }
 
-  const { paymentMethod, gifterName } = request;
+  const { paymentMethod, gifterName, intentKey } = request;
+
+  // Validar intent_key presente
+  if (!intentKey || typeof intentKey !== 'string') {
+    throw new Error('Intent key obrigatório');
+  }
 
   // Normalizar items (merge duplicatas)
   const normalizedItems = normalizeCartItems(request.items);
@@ -111,13 +143,8 @@ export async function createCheckoutPayment(request, env) {
   // Recalcular total no servidor (não confiar no cliente)
   const totalInCents = calculateTotal(normalizedItems);
 
-  // Processar pagamento conforme método
-  if (paymentMethod === 'pix') {
-    return await createPixCheckout({ gifterName, items: normalizedItems, totalInCents, env });
-  }
-
+  // Verificar método de pagamento antes de criar intent
   if (paymentMethod === 'card' || paymentMethod === 'boleto') {
-    // Gateway não configurado
     return {
       ok: false,
       status: 503,
@@ -127,16 +154,106 @@ export async function createCheckoutPayment(request, env) {
     };
   }
 
-  throw new Error('Método de pagamento inválido');
+  if (paymentMethod !== 'pix') {
+    throw new Error('Método de pagamento inválido');
+  }
+
+  // Rate limit (antes de criar intent)
+  const { checkCheckoutRateLimit } = await import('./checkout-idempotency.mjs');
+  const rateLimit = await checkCheckoutRateLimit(db, ipAddress, env.RSVP_SECRET, 5);
+  
+  if (!rateLimit.allowed) {
+    return {
+      ok: false,
+      status: 429,
+      error: 'RATE_LIMIT_EXCEEDED',
+      message: 'Muitas requisições. Aguarde antes de tentar novamente.',
+    };
+  }
+
+  // Criar fingerprint do payload
+  const { createCheckoutFingerprint, getOrCreateIntent, updateIntentWithPayment } = 
+    await import('./checkout-idempotency.mjs');
+  
+  const fingerprint = await createCheckoutFingerprint({
+    gifterName,
+    items: normalizedItems,
+    paymentMethod,
+    amountCents: totalInCents,
+  });
+
+  // Get ou criar intent (idempotente)
+  const intentResult = await getOrCreateIntent(db, {
+    intentKey,
+    fingerprint,
+    gifterName,
+    items: normalizedItems,
+    paymentMethod,
+    amountCents: totalInCents,
+  }, env.RSVP_SECRET);
+
+  // Conflito: mesmo intent_key, payload diferente
+  if (intentResult.conflict) {
+    return {
+      ok: false,
+      status: 409,
+      error: 'INTENT_CONFLICT',
+      message: 'Intent key já usado com dados diferentes. Use um novo intent key.',
+    };
+  }
+
+  // Intent já existe com mesmo payload
+  if (intentResult.status === 'existing') {
+    const intent = intentResult.intent;
+    
+    // Se já tem pagamento pendente, retornar
+    if (intent.status === 'pending' && intent.qrCode) {
+      return {
+        ok: true,
+        method: 'pix',
+        status: 'pending',
+        payment: {
+          id: intent.providerReference,
+          qrCode: intent.qrCode,
+          qrCodeBase64: intent.qrCodeBase64 || '',
+        },
+        fromCache: true,
+      };
+    }
+
+    // Se está 'creating', outro worker está processando
+    if (intent.status === 'creating') {
+      return {
+        ok: false,
+        status: 409,
+        error: 'INTENT_PROCESSING',
+        message: 'Pagamento já está sendo processado. Aguarde.',
+      };
+    }
+  }
+
+  // Novo intent criado, processar pagamento
+  return await createPixCheckout({
+    gifterName,
+    items: normalizedItems,
+    totalInCents,
+    intentKey,
+    env,
+    db,
+  });
 }
 
 /**
- * Cria checkout Pix via Mercado Pago
+ * Cria checkout Pix via Mercado Pago (com idempotência)
  * @private
  */
-async function createPixCheckout({ gifterName, items, totalInCents, env }) {
+async function createPixCheckout({ gifterName, items, totalInCents, intentKey, env, db }) {
   // Verificar token MP configurado
   if (!env.MP_ACCESS_TOKEN) {
+    // Atualizar intent como failed
+    const { updateIntentWithPayment } = await import('./checkout-idempotency.mjs');
+    await updateIntentWithPayment(db, intentKey, {}, 'failed');
+    
     return {
       ok: false,
       status: 503,
@@ -145,15 +262,25 @@ async function createPixCheckout({ gifterName, items, totalInCents, env }) {
     };
   }
 
-  // Mock para testes unitários (se globalThis.__testCreatePixPayment definido)
+  // Gerar MP idempotency key (estável baseado em intent_key)
+  const { generateMPIdempotencyKey } = await import('./checkout-idempotency.mjs');
+  const mpIdempotencyKey = await generateMPIdempotencyKey(intentKey, env.RSVP_SECRET);
+
+  // Mock para testes unitários
   if (typeof globalThis.__testCreatePixPayment === 'function') {
     const mockResult = await globalThis.__testCreatePixPayment({
       gifterName,
       items,
-      amount: totalInCents / 100,  // MP espera em reais
+      amount: totalInCents / 100,
+      mpIdempotencyKey,
+      intentKey,
     });
 
     if (!mockResult.ok) {
+      // Salvar falha no D1
+      const { updateIntentWithPayment } = await import('./checkout-idempotency.mjs');
+      await updateIntentWithPayment(db, intentKey, {}, 'failed');
+      
       return {
         ok: false,
         status: mockResult.status || 503,
@@ -162,15 +289,21 @@ async function createPixCheckout({ gifterName, items, totalInCents, env }) {
       };
     }
 
+    const payment = {
+      id: mockResult.payment?.id || 'test_payment',
+      qrCode: mockResult.payment?.qrCode || 'test_qr_code',
+      qrCodeBase64: mockResult.payment?.qrCodeBase64 || '',
+    };
+
+    // Salvar no D1
+    const { updateIntentWithPayment } = await import('./checkout-idempotency.mjs');
+    await updateIntentWithPayment(db, intentKey, payment, 'pending');
+
     return {
       ok: true,
       method: 'pix',
       status: 'pending',
-      payment: {
-        id: mockResult.payment?.id || 'test_payment',
-        qrCode: mockResult.payment?.qrCode || 'test_qr_code',
-        qrCodeBase64: mockResult.payment?.qrCodeBase64 || '',
-      },
+      payment,
     };
   }
 
@@ -185,18 +318,23 @@ async function createPixCheckout({ gifterName, items, totalInCents, env }) {
     })
     .join(', ');
 
+  // Chamar MP com idempotency key
   const result = await createPixPayment({
     accessToken: env.MP_ACCESS_TOKEN,
-    amount: totalInCents / 100,  // Converter centavos para reais
+    amount: totalInCents / 100,
     title: `Presentes - ${gifterName}`,
-    email: 'noreply@casebem.com',  // E-mail fictício (não coletamos)
+    email: 'noreply@casebem.com',
     message: description,
-    giftId: 'multi-gifts',
+    giftId: `intent:${intentKey}`,
     payerName: gifterName,
+    idempotencyKey: mpIdempotencyKey,  // MP idempotency
   });
 
   if (!result.ok) {
-    // Erro do provedor (Mercado Pago)
+    // Salvar falha no D1
+    const { updateIntentWithPayment } = await import('./checkout-idempotency.mjs');
+    await updateIntentWithPayment(db, intentKey, {}, 'failed');
+    
     return {
       ok: false,
       status: 503,
@@ -208,6 +346,9 @@ async function createPixCheckout({ gifterName, items, totalInCents, env }) {
   // Validar resposta do MP
   const payment = result.payment;
   if (!payment || !payment.id) {
+    const { updateIntentWithPayment } = await import('./checkout-idempotency.mjs');
+    await updateIntentWithPayment(db, intentKey, {}, 'failed');
+    
     return {
       ok: false,
       status: 502,
@@ -219,6 +360,9 @@ async function createPixCheckout({ gifterName, items, totalInCents, env }) {
   // Validar dados Pix
   const hasQrCode = payment.qrCode && typeof payment.qrCode === 'string';
   if (!hasQrCode) {
+    const { updateIntentWithPayment } = await import('./checkout-idempotency.mjs');
+    await updateIntentWithPayment(db, intentKey, payment, 'failed');
+    
     return {
       ok: false,
       status: 502,
@@ -226,6 +370,10 @@ async function createPixCheckout({ gifterName, items, totalInCents, env }) {
       message: 'Dados Pix incompletos na resposta',
     };
   }
+
+  // Salvar sucesso no D1
+  const { updateIntentWithPayment } = await import('./checkout-idempotency.mjs');
+  await updateIntentWithPayment(db, intentKey, payment, 'pending');
 
   return {
     ok: true,

@@ -7,8 +7,90 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { onRequestPost, onRequestOptions } from '../functions/api/gifts/checkout.js';
 
+// Mock D1 Database
+class MockD1Database {
+  constructor() {
+    this.intents = new Map();
+    this.rateLimits = new Map();
+  }
+
+  prepare(sql) {
+    return new MockD1Statement(this, sql);
+  }
+}
+
+class MockD1Statement {
+  constructor(db, sql) {
+    this.db = db;
+    this.sql = sql;
+    this.params = [];
+  }
+  
+  bind(...params) {
+    this.params = params;
+    return this;
+  }
+
+  async first() {
+    if (this.sql.includes('SELECT') && this.sql.includes('checkout_intents')) {
+      const [intentKey] = this.params;
+      return this.db.intents.get(intentKey) || null;
+    }
+    
+    // Rate limit RETURNING
+    if (this.sql.includes('RETURNING request_count')) {
+      return { request_count: 1 };
+    }
+    
+    return null;
+  }
+
+  async run() {
+    if (this.sql.includes('INSERT INTO checkout_intents')) {
+      const [intentKey, fingerprint] = this.params;
+      
+      if (this.db.intents.has(intentKey)) {
+        throw new Error('UNIQUE constraint failed: checkout_intents.intent_key');
+      }
+      
+      this.db.intents.set(intentKey, {
+        intent_key: intentKey,
+        fingerprint,
+        status: 'creating',
+      });
+      
+      return { success: true };
+    }
+    
+    if (this.sql.includes('UPDATE checkout_intents')) {
+      const [providerRef, status, qrCode, qrCodeBase64, updatedAt, intentKey] = this.params;
+      const existing = this.db.intents.get(intentKey);
+      
+      if (existing) {
+        existing.provider_reference = providerRef;
+        existing.status = status;
+        existing.qr_code = qrCode;
+        existing.qr_code_base64 = qrCodeBase64;
+        existing.updated_at = updatedAt;
+      }
+      
+      return { success: true };
+    }
+
+    if (this.sql.includes('DELETE FROM rate_limits')) {
+      return { success: true };
+    }
+    
+    return { success: true };
+  }
+}
+
 // Mock environment
-const mockEnv = { MP_ACCESS_TOKEN: 'TEST_TOKEN' };
+const mockEnv = {
+  MP_ACCESS_TOKEN: 'TEST_TOKEN',
+  RSVP_SECRET: Buffer.from('a'.repeat(32)).toString('base64'),
+  DB: new MockD1Database(),
+};
 
 // Mock Mercado Pago
 globalThis.__testCreatePixPayment = async ({ amount }) => {
@@ -62,6 +144,7 @@ test('POST com origin válido retorna 200', async () => {
       paymentMethod: 'pix',
       gifterName: 'João Silva',
       items: [{ giftId: 'danca', quantity: 1 }],
+      intentKey: '550e8400-e29b-41d4-a716-446655440000',
     },
   });
   const context = { request, env: mockEnv };
@@ -80,6 +163,7 @@ test('POST sem origin retorna 403', async () => {
       paymentMethod: 'pix',
       gifterName: 'João Silva',
       items: [{ giftId: 'danca', quantity: 1 }],
+      intentKey: '550e8400-e29b-41d4-a716-446655440000',
     },
   });
   const context = { request, env: mockEnv };
@@ -98,6 +182,7 @@ test('POST com origin não autorizado retorna 403', async () => {
       paymentMethod: 'pix',
       gifterName: 'João Silva',
       items: [{ giftId: 'danca', quantity: 1 }],
+      intentKey: '550e8400-e29b-41d4-a716-446655440000',
     },
   });
   const context = { request, env: mockEnv };
@@ -139,9 +224,16 @@ test('POST sem MP_ACCESS_TOKEN retorna 503', async () => {
       paymentMethod: 'pix',
       gifterName: 'João Silva',
       items: [{ giftId: 'danca', quantity: 1 }],
+      intentKey: '550e8400-e29b-41d4-a716-446655440000',
     },
   });
-  const context = { request, env: {} }; // Sem token
+  const context = {
+    request,
+    env: {
+      RSVP_SECRET: Buffer.from('a'.repeat(32)).toString('base64'),
+      DB: new MockD1Database(),
+    }
+  }; // Sem token
   
   const response = await onRequestPost(context);
   
@@ -158,6 +250,7 @@ test('POST com cartão retorna 503 provider não configurado', async () => {
       paymentMethod: 'card',
       gifterName: 'João Silva',
       items: [{ giftId: 'danca', quantity: 1 }],
+      intentKey: '550e8400-e29b-41d4-a716-446655440001',
     },
   });
   const context = { request, env: mockEnv };

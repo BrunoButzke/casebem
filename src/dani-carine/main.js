@@ -635,7 +635,16 @@ function setupRsvp() {
 
   function toggleFieldsDisabled(disabled) {
     const inputs = form.querySelectorAll('input, textarea, button[type="submit"]');
-    inputs.forEach((input) => (input.disabled = disabled));
+    inputs.forEach((input) => {
+      // Never re-enable name or consent after they've been locked
+      if (input === nameInput && nameInput.disabled && !disabled) {
+        return; // Keep disabled
+      }
+      if (input === consentCheckbox && consentCheckbox.disabled && !disabled) {
+        return; // Keep disabled
+      }
+      input.disabled = disabled;
+    });
   }
 
   function toggleGuestCountsDisabled(disabled) {
@@ -677,12 +686,24 @@ function setupRsvp() {
         );
         submitBtn.textContent = 'Atualizar resposta';
         isEditMode = true;
-      } else if (response.status === 404 || response.status === 401) {
+      } else if (response.status === 401) {
+        // Invalid token
         localStorage.removeItem(TOKEN_KEY);
         manageToken = null;
+      } else if (response.status === 503) {
+        // Service unavailable
+        showStatus(
+          '⚠️ Serviço temporariamente indisponível. Tente novamente em alguns minutos.',
+          'error'
+        );
+        toggleFieldsDisabled(true);
       }
     } catch (error) {
       console.error('Failed to load RSVP:', error);
+      showStatus(
+        '⚠️ Erro de conexão. Verifique sua internet e recarregue a página.',
+        'error'
+      );
     }
   }
 
@@ -705,6 +726,16 @@ function setupRsvp() {
     consentCheckbox.checked = true;
     consentCheckbox.disabled = true;
   }
+
+  // Edit button handler (currently unused, for future enhancement)
+  editBtn.addEventListener('click', () => {
+    // Future: could implement a flow to allow name change with verification
+    // For MVP, just show that editing is via the form itself
+    showStatus(
+      'Para alterar sua resposta, modifique os campos abaixo e clique em "Atualizar resposta".',
+      'info'
+    );
+  });
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -737,6 +768,10 @@ function setupRsvp() {
 
       if (isEditMode && manageToken) {
         headers.Authorization = `Bearer ${manageToken}`;
+      } else {
+        // POST: Generate client-side idempotency key
+        const idempotencyKey = crypto.randomUUID();
+        headers['Idempotency-Key'] = idempotencyKey;
       }
 
       const response = await fetch(API_URL, {
@@ -745,7 +780,18 @@ function setupRsvp() {
         body: JSON.stringify(payload),
       });
 
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+      } catch {
+        // Non-JSON response (e.g., proxy error, 503 HTML)
+        if (response.status === 503) {
+          showStatus('⚠️ Serviço temporariamente indisponível. Tente novamente em alguns minutos.', 'error');
+          return;
+        }
+        showStatus('Erro inesperado. Tente novamente.', 'error');
+        return;
+      }
 
       if (response.ok) {
         if (!isEditMode && data.manageToken) {

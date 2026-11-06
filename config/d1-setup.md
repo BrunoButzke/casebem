@@ -2,11 +2,22 @@
 
 Este guia explica como configurar o Cloudflare D1 para o sistema de RSVP do site de casamento.
 
+## ⚠️ IMPORTANTE
+
+**O sistema RSVP NÃO funcionará em produção sem:**
+1. Database D1 criado e vinculado (binding `DB`)
+2. Secret `RSVP_TOKEN_KEY` configurado (AES-GCM encryption)
+3. Secret `RSVP_HASH_KEY` configurado (HMAC para IPs)
+4. Migrations aplicadas (0001 + 0002)
+
+**Nunca exponha os secrets em código, logs ou documentação pública.**
+
 ## Pré-requisitos
 
 - Conta Cloudflare com Pages configurado
 - Wrangler CLI instalado (opcional, mas recomendado)
 - Acesso ao dashboard do Cloudflare
+- Node.js (para gerar secrets aleatórios)
 
 ## Opção 1: Configuração via Dashboard (Recomendado para Produção)
 
@@ -43,9 +54,40 @@ Este guia explica como configurar o Cloudflare D1 para o sistema de RSVP do site
    - **D1 database:** `casebem-rsvps-production`
 7. Clique em **Save**
 
-### Passo 4: Verificar Configuração
+### Passo 4: Configurar Secrets de Criptografia
 
-1. Faça um novo deploy ou force redeploy
+O sistema RSVP requer dois secrets para segurança:
+
+1. **RSVP_TOKEN_KEY** (32 bytes para AES-GCM)
+   ```bash
+   # Gerar chave aleatória
+   node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+   ```
+
+2. **RSVP_HASH_KEY** (string secreta para HMAC)
+   ```bash
+   # Gerar secret aleatório
+   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+   ```
+
+**Adicionar no Cloudflare Pages:**
+- Settings → Environment Variables
+- Adicionar ambas variáveis (Production + Preview)
+- **Nunca** commitar esses valores no repositório
+
+### Passo 5: Aplicar Migrations
+
+```bash
+# Migration inicial (0001)
+wrangler d1 migrations apply casebem-rsvps-production --remote
+
+# Migration de idempotência (0002)
+wrangler d1 migrations apply casebem-rsvps-production --remote
+```
+
+### Passo 6: Verificar Configuração
+
+1. Force redeploy para carregar novas env vars
 2. Acesse a página do casamento
 3. Teste o formulário RSVP
 4. No dashboard D1, verifique os dados:

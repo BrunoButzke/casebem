@@ -13,7 +13,36 @@ export const LIMITS = {
   CHILDREN_MIN: 0,
   CHILDREN_MAX: 10,
   OBSERVATIONS_MAX: 500,
+  IDEMPOTENCY_KEY_MAX: 128,
+  BODY_SIZE_MAX: 8192, // 8KB
 };
+
+/**
+ * Validate idempotency key format
+ * Safe opaque string, no special chars that could cause issues
+ */
+export function validateIdempotencyKey(key) {
+  if (!key || typeof key !== 'string') {
+    return { valid: false, error: 'Idempotency-Key deve ser uma string' };
+  }
+
+  if (key.length > LIMITS.IDEMPOTENCY_KEY_MAX) {
+    return { 
+      valid: false, 
+      error: `Idempotency-Key não pode exceder ${LIMITS.IDEMPOTENCY_KEY_MAX} caracteres` 
+    };
+  }
+
+  // Safe opaque format: alphanumeric, hyphens, underscores
+  if (!/^[a-zA-Z0-9_-]+$/.test(key)) {
+    return { 
+      valid: false, 
+      error: 'Idempotency-Key deve conter apenas letras, números, hífens e underscores' 
+    };
+  }
+
+  return { valid: true, value: key };
+}
 
 /**
  * Normalize guest name: trim and collapse multiple spaces
@@ -122,6 +151,14 @@ export function validateConsent(consent) {
  * Validate complete RSVP create payload
  */
 export function validateRsvpCreate(data) {
+  // Guard against null/undefined/non-object input
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    return { 
+      valid: false, 
+      errors: { _: 'Dados inválidos: esperado objeto JSON' } 
+    };
+  }
+
   const errors = {};
   const validated = {};
   
@@ -178,6 +215,14 @@ export function validateRsvpCreate(data) {
  * Validate RSVP update payload (partial fields)
  */
 export function validateRsvpUpdate(data) {
+  // Guard against null/undefined/non-object input
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    return { 
+      valid: false, 
+      errors: { _: 'Dados inválidos: esperado objeto JSON' } 
+    };
+  }
+
   const errors = {};
   const validated = {};
   

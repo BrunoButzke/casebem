@@ -74,6 +74,7 @@ interface RSVP {
 POST /api/rsvp
 Content-Type: application/json
 Origin: https://casebem.pages.dev
+Idempotency-Key: 8a7b9c3d-4e5f-6a7b-8c9d-0e1f2a3b4c5d
 
 {
   "guestName": "Maria Silva",
@@ -84,6 +85,10 @@ Origin: https://casebem.pages.dev
   "consentGiven": true
 }
 ```
+
+**Headers obrigatórios:**
+- `Content-Type: application/json`
+- `Idempotency-Key`: UUID ou string aleatória (até 128 chars, `[a-zA-Z0-9_-]+`)
 
 #### Response Success (201 Created)
 
@@ -120,8 +125,11 @@ Origin: https://casebem.pages.dev
   }
 }
 
-// 409 Conflict - Duplicate (se implementar unique por nome+wedding)
-{ "error": "Já existe uma resposta para este nome" }
+// 409 Conflict - Idempotency key conflict (mesma chave, dados diferentes)
+{ "error": "Conflito: mesma chave de idempotência com dados diferentes" }
+
+// 413 Payload Too Large - Body > 8KB
+{ "error": "Request body muito grande" }
 
 // 429 Too Many Requests
 { "error": "Muitas requisições. Tente novamente em alguns minutos." }
@@ -158,12 +166,11 @@ Authorization: Bearer 8xK9mP3qR7sT2vW6yZ4aC5bN1dF0hJ8
 #### Response Errors
 
 ```json
-// 401 Unauthorized - Token ausente ou inválido
+// 401 Unauthorized - Token ausente, inválido ou RSVP não encontrado
 { "error": "Token de autorização inválido" }
-
-// 404 Not Found - RSVP não encontrado para este token
-{ "error": "RSVP não encontrado" }
 ```
+
+**Nota:** 401 é retornado tanto para token malformado quanto para token válido mas sem RSVP correspondente (segurança por obscuridade).
 
 ### PUT /api/rsvp
 **Atualizar própria resposta**
@@ -221,11 +228,11 @@ Content-Type: application/json
   }
 }
 
-// 401 Unauthorized
+// 401 Unauthorized - Token inválido ou RSVP não encontrado
 { "error": "Token de autorização inválido" }
 
-// 404 Not Found
-{ "error": "RSVP não encontrado" }
+// 429 Too Many Requests - Rate limit
+{ "error": "Muitas requisições. Tente novamente em alguns minutos." }
 ```
 
 ### Métodos Não Suportados
@@ -238,27 +245,46 @@ DELETE /api/rsvp
 
 ## Segurança
 
-### CORS
-- Aceitar apenas Origin: `https://casebem.pages.dev` e domínios do Cloudflare Pages
-- Também permitir `http://localhost:*` para desenvolvimento
-- Headers CORS apropriados em todas as respostas
+### CORS (Same-Origin)
+- Validar Origin exato da requisição
+- Produção: `https://casebem.pages.dev`, `https://www.casebem.pages.dev`, `https://casebem.com`
+- Desenvolvimento: `http://localhost:*`
+- **Nunca usar wildcard `*`**
+- Rejeitar Origins não permitidos com 403
+- OPTIONS preflight valida Origin ANTES de checar DB
 
 ### CSRF
 - Validar Content-Type: `application/json`
-- Rejeitar Origins não permitidos
-- Não aceitar `text/plain` ou outros tipos
+- Validar Origin header
+- Rejeitar Origins não permitidos (403)
 
-### Rate Limiting (D1)
-- Estratégia: contador por `(weddingKey, IP, window)` em tabela separada
+### Rate Limiting (D1 UPSERT)
+- Estratégia: HMAC-SHA256 de IP com secret `env.RSVP_HASH_KEY`
 - Limite: 10 requisições POST/PUT por IP por hora
-- GET não limitado (autenticado por token)
-- Cleanup automático de janelas antigas (TTL ou cron)
+- Atomic UPSERT: `INSERT ... ON CONFLICT DO UPDATE WHERE count < limit`
+- Cleanup automático de janelas antigas (>26 horas) em cada request
+- IP source: `CF-Connecting-IP` (production, não pode ser spoofed)
+- Fallback `X-Forwarded-For` apenas para dev local (best effort)
 
 ### Tokens
-- Geração: `crypto.randomBytes(32).toString('base64url')`
-- Hash: bcrypt rounds=10
+- Geração: 32 bytes crypto-random, base64url encoded
+- Storage: SHA-256 hash (para lookup rápido) + AES-GCM encrypted (para recuperação idempotente)
 - Bearer format: `Authorization: Bearer <token>`
-- Não logar tokens completos (apenas primeiros 8 chars)
+- Não logar tokens completos
+
+### Idempotência
+- Header obrigatório: `Idempotency-Key` (até 128 chars, alphanumeric + `-_`)
+- Único por wedding + key
+- Mesma key + body retorna mesmo `manageToken` (decrypted from DB)
+- Mesma key + body diferente retorna 409 Conflict
+- Token encrypted com AES-GCM usando `env.RSVP_TOKEN_KEY`
+
+### Environment Secrets
+**Obrigatórios para produção:**
+- `RSVP_TOKEN_KEY`: 32 bytes random, base64 encoded (AES-GCM encryption)
+- `RSVP_HASH_KEY`: Secret string (HMAC pepper for IP hashing)
+
+**Nota:** Use derivação separada (HKDF) para diferentes domínios criptográficos, ou secrets independentes. Nunca commitar secrets no repositório.
 
 ## Privacidade (LGPD)
 

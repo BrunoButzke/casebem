@@ -454,6 +454,16 @@ function createCartItemElement(item, gift, subtotal) {
   decBtn.dataset.giftId = item.giftId;
   decBtn.setAttribute('aria-label', 'Diminuir quantidade');
   decBtn.textContent = '−';
+  decBtn.addEventListener('click', () => {
+    if (item.quantity > 1) {
+      cart.updateQuantity(item.giftId, item.quantity - 1);
+    } else {
+      cart.removeItem(item.giftId);
+    }
+    resetIntentKey();
+    updateCartBadge();
+    renderCartItems();
+  });
   actions.appendChild(decBtn);
   
   const qty = _document.createElement('span');
@@ -469,6 +479,12 @@ function createCartItemElement(item, gift, subtotal) {
   incBtn.dataset.giftId = item.giftId;
   incBtn.setAttribute('aria-label', 'Aumentar quantidade');
   incBtn.textContent = '+';
+  incBtn.addEventListener('click', () => {
+    cart.updateQuantity(item.giftId, item.quantity + 1);
+    resetIntentKey();
+    updateCartBadge();
+    renderCartItems();
+  });
   actions.appendChild(incBtn);
   
   article.appendChild(actions);
@@ -486,6 +502,12 @@ function createCartItemElement(item, gift, subtotal) {
   removeBtn.dataset.giftId = item.giftId;
   removeBtn.setAttribute('aria-label', `Remover ${gift.name}`);
   removeBtn.textContent = '×';
+  removeBtn.addEventListener('click', () => {
+    cart.removeItem(item.giftId);
+    resetIntentKey();
+    updateCartBadge();
+    renderCartItems();
+  });
   article.appendChild(removeBtn);
 
   // Event listeners

@@ -246,12 +246,14 @@ test('Cart XSS: rejeita QR code base64 com script tags', async () => {
 
   // Abrir modal e fazer checkout
   openCartModal();
+  await new Promise(resolve => setTimeout(resolve, 10));
+  
   document.getElementById('gifter-name').value = 'João Silva';
-  document.getElementById('cart-checkout').click();
+  document.getElementById('cart-checkout-btn').click();
 
   await new Promise(resolve => setTimeout(resolve, 100));
 
-  const paymentResult = document.getElementById('payment-result');
+  const paymentResult = document.getElementById('cart-payment-result');
   
   // Verificar que não há <script> no DOM
   assert.equal(paymentResult.querySelector('script'), null, 'Não deve haver tag script');
@@ -291,12 +293,14 @@ test('Cart XSS: valida base64 estritamente', async () => {
     addToCart('danca', 1);
 
     openCartModal();
+    await new Promise(resolve => setTimeout(resolve, 10));
+    
     document.getElementById('gifter-name').value = 'João Silva';
-    document.getElementById('cart-checkout').click();
+    document.getElementById('cart-checkout-btn').click();
 
     await new Promise(resolve => setTimeout(resolve, 100));
 
-    const paymentResult = document.getElementById('payment-result');
+    const paymentResult = document.getElementById('cart-payment-result');
     const hasImage = paymentResult.querySelector('img') !== null;
 
     if (testCase.valid) {
@@ -351,23 +355,26 @@ test('Cart: ajuste de quantidade via botões + e -', async () => {
 
   // Abrir modal
   openCartModal();
+  await new Promise(resolve => setTimeout(resolve, 10));
 
   const cartItems = document.getElementById('cart-items');
-  const plusButton = cartItems.querySelector('[data-action="increase"]');
-  const minusButton = cartItems.querySelector('[data-action="decrease"]');
-  const quantitySpan = cartItems.querySelector('.item-quantity');
+  const plusButton = cartItems.querySelector('[data-action="inc"]');
+  const minusButton = cartItems.querySelector('[data-action="dec"]');
+  const quantityDisplay = cartItems.querySelector('.cart-qty');
 
   assert.ok(plusButton, 'Botão + deve existir');
   assert.ok(minusButton, 'Botão - deve existir');
-  assert.equal(quantitySpan.textContent, '1', 'Quantidade inicial deve ser 1');
+  assert.equal(quantityDisplay.textContent, '1', 'Quantidade inicial deve ser 1');
 
   // Aumentar quantidade
   plusButton.click();
-  assert.equal(quantitySpan.textContent, '2', 'Quantidade deve aumentar para 2');
+  await new Promise(resolve => setTimeout(resolve, 10));
+  assert.equal(quantityDisplay.textContent, '2', 'Quantidade deve aumentar para 2');
 
   // Diminuir quantidade
   minusButton.click();
-  assert.equal(quantitySpan.textContent, '1', 'Quantidade deve voltar para 1');
+  await new Promise(resolve => setTimeout(resolve, 10));
+  assert.equal(quantityDisplay.textContent, '1', 'Quantidade deve voltar para 1');
 
   cleanupDOM();
 });
@@ -395,12 +402,14 @@ test('Cart: verdadeira mensagem sobre confirmação pendente/manual', async () =
   addToCart('danca', 1);
 
   openCartModal();
+  await new Promise(resolve => setTimeout(resolve, 10));
+  
   document.getElementById('gifter-name').value = 'João Silva';
-  document.getElementById('cart-checkout').click();
+  document.getElementById('cart-checkout-btn').click();
 
   await new Promise(resolve => setTimeout(resolve, 100));
 
-  const paymentResult = document.getElementById('payment-result');
+  const paymentResult = document.getElementById('cart-payment-result');
   const noteText = paymentResult.textContent.toLowerCase();
 
   // Não deve prometer confirmação automática ou "alguns minutos"

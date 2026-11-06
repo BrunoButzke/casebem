@@ -32,6 +32,7 @@ Abre em `/landing-page-animada/`.
 7. Webhook Pix: configure no MP `https://seu-dominio/api/webhooks/mercadopago`
 8. Migration `0005_admin_and_paid.sql` no D1 após deploy
 9. Migration `0006_rsvp_closed.sql` — RSVP aberto/fechado + lista no painel
+10. Migration `0007_gifts_catalog.sql` — catálogo editável no painel (`/api/gifts/catalog`)
 
 **Custo:** mantenha **Workers/Pages Free**. Não ative Workers Paid. E-mail é opcional e externo.
 

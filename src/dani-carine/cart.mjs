@@ -3,7 +3,7 @@
  */
 
 import { CartStorage } from './cart-storage.mjs';
-import { GIFTS_CATALOG, getGiftById, formatPrice } from '../../data/gifts-catalog.mjs';
+import { GIFTS_CATALOG, getGiftById as getStaticGiftById, formatPrice } from '../../data/gifts-catalog.mjs';
 
 let cart = null;
 let _window = null;
@@ -11,6 +11,25 @@ let _document = null;
 let _sessionStorage = null;
 let _crypto = null;
 let _fetch = null;
+/** Catálogo vivo (API); fallback = seed estático */
+let liveCatalog = GIFTS_CATALOG.map((g) => ({ ...g }));
+
+function getGiftById(giftId) {
+  return liveCatalog.find((g) => g.id === giftId) || getStaticGiftById(giftId);
+}
+
+async function refreshCatalogFromApi() {
+  if (!_fetch) return;
+  try {
+    const res = await _fetch('/api/gifts/catalog');
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data?.ok && Array.isArray(data.gifts) && data.gifts.length > 0) {
+      liveCatalog = data.gifts;
+    }
+  } catch {
+    /* keep static fallback */
+  }
+}
 
 /**
  * Adiciona item ao carrinho (API pública para testes)
@@ -47,6 +66,11 @@ export function initCart(windowObj) {
   setupGiftCards();
   setupModalEvents();
   updateCartBadge();
+
+  // Atualiza preços/nomes do D1 sem rebuild (Free-tier)
+  refreshCatalogFromApi().then(() => {
+    updateCartBadge();
+  });
 }
 
 /**

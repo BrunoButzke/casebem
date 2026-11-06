@@ -112,6 +112,9 @@ wrangler d1 execute casebem-rsvps-production --remote --file=migrations/0005_adm
 
 # Migration 0006: RSVP fechado (lista de convidados)
 wrangler d1 execute casebem-rsvps-production --remote --file=migrations/0006_rsvp_closed.sql
+
+# Migration 0007: catálogo de presentes editável
+wrangler d1 execute casebem-rsvps-production --remote --file=migrations/0007_gifts_catalog.sql
 ```
 
 **Nota**: Todas as migrations usam `CREATE TABLE IF NOT EXISTS` / `ALTER TABLE ... ADD COLUMN` e `INSERT ... ON CONFLICT(version) DO NOTHING` para serem idempotentes e seguras para reaplicação. Não é necessário configurar `migrations_dir` no `wrangler.toml`.

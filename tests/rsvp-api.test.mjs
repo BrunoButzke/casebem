@@ -348,7 +348,7 @@ describe('RSVP API - GET /api/rsvp', () => {
     const response = await onRequest(context);
     const parsed = await parseResponse(response);
 
-    assert.equal(parsed.status, 404);
+    assert.equal(parsed.status, 401);
   });
 });
 
@@ -434,7 +434,7 @@ describe('RSVP API - OPTIONS /api/rsvp', () => {
 describe('RSVP API - Unsupported methods', () => {
   it('should reject DELETE', async () => {
     const request = createMockRequest('DELETE');
-    const context = { request, env: { DB: new MockD1() } };
+    const context = { request, env: { DB: new MockD1(), RSVP_SECRET: TEST_SECRET } };
 
     const response = await onRequest(context);
     const parsed = await parseResponse(response);

@@ -455,8 +455,43 @@ wrangler d1 execute DB --file=migrations/0001_rsvps.sql --local
 wrangler pages dev --d1=DB
 ```
 
+## Segurança
+
+### RSVP_SECRET
+
+A API usa uma única variável de ambiente `RSVP_SECRET` (32 bytes, base64) com derivação HKDF para:
+- **Token Encryption**: AES-256-GCM (info: `token-encryption-v1`)
+- **IP Rate Limiting**: HMAC-SHA256 (info: `rate-limit-ip-hmac-v1`)
+
+**Setup**:
+```bash
+# Gerar secret (32 bytes)
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+
+# Configurar no Cloudflare Pages
+wrangler pages secret put RSVP_SECRET
+```
+
+### Idempotency Security
+
+Replay de requisições idempotentes requer:
+1. `Idempotency-Key` header (mesmo valor)
+2. `Authorization: Bearer <manageToken>` (token ownership)
+3. Request fingerprint SHA-256 match (canonical payload)
+
+Sem bearer token, replay retorna `409 Conflict` (previne extração de tokens).
+
+### CORS
+
+Allowed origins:
+- `https://casebem.pages.dev`
+- `https://*.casebem.pages.dev`
+- `https://casebem.com`
+- `https://www.casebem.com`
+- `http://localhost:*` (dev)
+
 ## Dependências
 
 - **Cloudflare D1**: storage SQL
-- **Web Crypto API**: geração de tokens
+- **Web Crypto API**: geração de tokens, HKDF, AES-GCM, HMAC-SHA256
 - Sem dependências npm adicionais para API

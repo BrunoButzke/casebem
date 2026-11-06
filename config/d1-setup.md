@@ -222,7 +222,7 @@ WHERE window_start < datetime('now', '-24 hours');
 
 ### Dados Sensíveis
 
-- **Tokens**: Apenas hashes bcrypt são armazenados
+- **Tokens**: Apenas hashes SHA-256 são armazenados, tokens encriptados com AES-256-GCM
 - **IPs**: Apenas hashes SHA-256 são armazenados
 - **Observações**: Nunca expostas em listagens públicas
 

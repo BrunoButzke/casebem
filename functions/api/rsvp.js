@@ -25,11 +25,13 @@ function getAllowedOrigins(request) {
   const requestUrl = new URL(request.url);
   const origin = requestUrl.origin; // e.g., https://casebem.pages.dev
   
-  // Also allow common production domains if they exist
+  // Also allow common production domains
   const allowedOrigins = [
     origin,
     'https://casebem.pages.dev',
     'https://www.casebem.pages.dev',
+    'https://casebem.com',
+    'https://www.casebem.com',
   ];
   
   // Development: allow localhost
@@ -162,7 +164,7 @@ async function handlePost(request, env) {
   try {
     // Rate limit with HMAC
     const ip = getClientIp(request);
-    const rateLimit = await checkRateLimit(env.DB, ip, env.RSVP_HASH_KEY, 10);
+    const rateLimit = await checkRateLimit(env.DB, ip, env.RSVP_SECRET, 10);
     
     if (!rateLimit.allowed) {
       return errorResponse(

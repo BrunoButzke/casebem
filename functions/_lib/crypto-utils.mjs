@@ -9,7 +9,7 @@
  * @returns {Promise<{encryptionKey: CryptoKey, hmacKey: CryptoKey}>}
  */
 export async function deriveRsvpKeys(base64Secret) {
-  if (!base64Secret) {
+  if (!base64Secret || typeof base64Secret !== 'string') {
     throw new Error('RSVP_SECRET environment variable not configured');
   }
 

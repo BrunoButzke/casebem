@@ -785,8 +785,8 @@ function isValidBase64(str) {
   // Se é data URI, extrair apenas a parte base64
   let base64String = str;
   if (str.startsWith('data:')) {
-    const match = str.match(/^data:image\/(png|jpeg|jpg|gif|webp);base64,(.+)$/);
-    if (!match) return false; // data URI mas formato inválido
+    const match = str.match(/^data:image\/(png|jpeg|jpg);base64,(.+)$/);
+    if (!match) return false; // data URI mas formato inválido (apenas PNG/JPEG permitidos)
     base64String = match[2];
   }
   

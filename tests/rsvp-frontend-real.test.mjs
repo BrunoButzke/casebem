@@ -3,6 +3,16 @@ import { describe, it } from 'node:test';
 import { Window } from 'happy-dom';
 
 describe('Frontend RSVP - Real DOM Tests', () => {
+  async function waitFor(condition, timeout = 3000, errorMsg = 'condition not met') {
+    const deadline = Date.now() + timeout;
+    while (!condition()) {
+      if (Date.now() > deadline) {
+        throw new Error(`waitFor timeout after ${timeout}ms: ${errorMsg}`);
+      }
+      await new Promise(resolve => setTimeout(resolve, 10));
+    }
+  }
+
   async function setupWindow() {
     const window = new Window({ url: 'https://casebem.pages.dev/dani-carine/' });
     const { document } = window;
@@ -56,7 +66,7 @@ describe('Frontend RSVP - Real DOM Tests', () => {
   }
 
   it('POST 201 success: token stored, fields locked, edit button visible', async () => {
-    const { document, fetchCalls, mockFetch } = await setupWindow();
+    const { window, document, fetchCalls, mockFetch } = await setupWindow();
     
     global.fetch = mockFetch([{
       status: 201,
@@ -92,8 +102,18 @@ describe('Frontend RSVP - Real DOM Tests', () => {
 
     form.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
     
-    // Wait for all async operations (fetch + json + setViewMode)
-    await new Promise(resolve => setTimeout(resolve, 100));
+    // Wait for fetch to complete
+    await waitFor(() => fetchCalls.length === 1, 3000, 'fetch not called');
+    
+    // Wait for all async tasks and DOM updates to settle
+    await window.happyDOM.waitUntilComplete();
+    await new Promise(resolve => setTimeout(resolve, 50));
+    
+    // Verify state is stable
+    await waitFor(() => {
+      return submitBtn.hidden === true && 
+             localStorage.getItem('rsvp_manage_token') === 'token-success';
+    }, 3000, `submitBtn.hidden=${submitBtn.hidden}, token=${localStorage.getItem('rsvp_manage_token')}`);
 
     assert.equal(fetchCalls.length, 1);
     assert.equal(fetchCalls[0].options.method, 'POST');
@@ -410,7 +430,7 @@ describe('Frontend RSVP - Real DOM Tests', () => {
   });
 
   it('PUT success locks all fields again', async () => {
-    const { document, mockFetch } = await setupWindow();
+    const { window, document, mockFetch, fetchCalls } = await setupWindow();
     localStorage.setItem('rsvp_manage_token', 'put-token');
     
     global.fetch = mockFetch([
@@ -448,9 +468,11 @@ describe('Frontend RSVP - Real DOM Tests', () => {
     setupRsvp();
     
     // Wait for GET from fetchRsvp() to complete
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await window.happyDOM.waitUntilComplete();
+    await waitFor(() => fetchCalls.length === 1);
 
     const editBtn = document.getElementById('rsvp-edit');
+    const submitBtn = document.getElementById('rsvp-submit');
     editBtn.click();
 
     const adultsInput = document.getElementById('rsvp-adults');
@@ -459,11 +481,20 @@ describe('Frontend RSVP - Real DOM Tests', () => {
     const form = document.getElementById('rsvp-form');
     form.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
     
-    // Wait for all async operations (fetch + json + setViewMode)
-    await new Promise(resolve => setTimeout(resolve, 100));
-
-    const submitBtn = document.getElementById('rsvp-submit');
+    // Wait for PUT to complete
+    await waitFor(() => fetchCalls.length === 2, 3000, 'PUT not called');
     
+    // Wait for all async tasks and DOM updates to settle
+    await window.happyDOM.waitUntilComplete();
+    await new Promise(resolve => setTimeout(resolve, 50));
+    
+    // Verify state is stable
+    await waitFor(() => {
+      return submitBtn.hidden === true && adultsInput.disabled === true;
+    }, 3000, `submitBtn.hidden=${submitBtn.hidden}, adultsInput.disabled=${adultsInput.disabled}`);
+    
+    assert.equal(fetchCalls.length, 2);
+    assert.equal(fetchCalls[1].options.method, 'PUT');
     assert.equal(adultsInput.disabled, true); // Locked again
     assert.equal(submitBtn.hidden, true);
     assert.equal(editBtn.hidden, false);

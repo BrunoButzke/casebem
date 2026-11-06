@@ -291,11 +291,18 @@ export function setupRsvp() {
       console.error('Failed to submit RSVP:', error);
       showStatus(error.message || 'Erro de conexão. Verifique sua internet e tente novamente.', 'error');
     } finally {
-      setBusyState(false);
       // Restore button text
       if (submitBtn) submitBtn.textContent = savedViewMode === 'edit' ? 'Atualizar Confirmação' : 'Confirmar Presença';
-      // Restore view mode if not success (unless viewMode was explicitly changed, e.g. 401 -> 'create')
-      if (!success && viewMode === savedViewMode) {
+      
+      if (success) {
+        // Success: viewMode already set to 'view'
+        // setViewMode('view') already disabled all inputs, don't call setBusyState(false)
+      } else if (viewMode !== savedViewMode) {
+        // Error with explicit mode change (e.g. 401 -> 'create')
+        // New mode already set, just clear busy state
+        setBusyState(false);
+      } else {
+        // Error without mode change: restore previous mode
         setViewMode(savedViewMode);
       }
     }

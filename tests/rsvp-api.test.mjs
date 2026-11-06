@@ -7,12 +7,24 @@ import { strict as assert } from 'node:assert';
 import { describe, it, beforeEach } from 'node:test';
 import { onRequest } from '../functions/api/rsvp.js';
 
+// Test fixture: valid base64 secret
+const TEST_SECRET = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
+
 class MockD1 {
   constructor() {
     this.data = {
       rsvps: [],
       rate_limits: [],
     };
+  }
+
+  async batch(statements) {
+    const results = [];
+    for (const stmt of statements) {
+      const result = await stmt.run();
+      results.push(result);
+    }
+    return results;
   }
 
   prepare(sql) {
@@ -28,7 +40,7 @@ class MockD1 {
         const bindings = this.bindings;
 
         if (sql.includes('INSERT INTO rsvps')) {
-          const [id, weddingKey, guestName, attending, adultsCount, childrenCount, observations, consentGiven, tokenHash, createdAt, updatedAt] = bindings;
+          const [id, weddingKey, guestName, attending, adultsCount, childrenCount, observations, consentGiven, tokenHash, tokenEncrypted, idemKey, idemFingerprint, createdAt, updatedAt] = bindings;
           mock.data.rsvps.push({
             id,
             wedding_key: weddingKey,
@@ -39,6 +51,9 @@ class MockD1 {
             observations,
             consent_given: consentGiven,
             manage_token_hash: tokenHash,
+            manage_token_encrypted: tokenEncrypted,
+            idempotency_key: idemKey,
+            idempotency_fingerprint: idemFingerprint,
             created_at: createdAt,
             updated_at: updatedAt,
           });
@@ -64,29 +79,33 @@ class MockD1 {
         }
 
         if (sql.includes('INSERT INTO rate_limits')) {
-          const [id, weddingKey, ipHash, windowStart, createdAt, updatedAt] = bindings;
-          mock.data.rate_limits.push({
-            id,
-            wedding_key: weddingKey,
-            ip_hash: ipHash,
-            window_start: windowStart,
-            request_count: 1,
-            created_at: createdAt,
-            updated_at: updatedAt,
-          });
-          return { success: true };
-        }
-
-        if (sql.includes('UPDATE rate_limits')) {
-          const id = bindings[bindings.length - 1];
-          const updatedAt = bindings[0];
-          const limit = mock.data.rate_limits.find(l => l.id === id);
-          if (limit) {
-            limit.request_count = Number(limit.request_count) + 1;
-            limit.updated_at = updatedAt;
+          // UPSERT with RETURNING
+          const [id, weddingKey, ipHash, windowStart, timestamp1, timestamp2, timestamp3, limit] = bindings;
+          
+          const existing = mock.data.rate_limits.find(l => l.id === id);
+          
+          if (existing) {
+            // ON CONFLICT - check if under limit
+            if (Number(existing.request_count) >= limit) {
+              // Hit limit, no update
+              return { success: false };
+            }
+            existing.request_count = Number(existing.request_count) + 1;
+            existing.updated_at = timestamp3;
+            return { success: true };
+          } else {
+            // New insert
+            mock.data.rate_limits.push({
+              id,
+              wedding_key: weddingKey,
+              ip_hash: ipHash,
+              window_start: windowStart,
+              request_count: 1,
+              created_at: timestamp1,
+              updated_at: timestamp2,
+            });
             return { success: true };
           }
-          return { success: false };
         }
 
         return { success: false };
@@ -96,10 +115,30 @@ class MockD1 {
         const bindings = this.bindings;
 
         if (sql.includes('FROM rsvps')) {
-          const [tokenHash, weddingKey] = bindings;
-          return mock.data.rsvps.find(
-            r => r.manage_token_hash === tokenHash && r.wedding_key === weddingKey
-          ) || null;
+          // Check if it's idempotency lookup or token lookup
+          if (bindings.length === 2 && sql.includes('idempotency_key')) {
+            const [weddingKey, idemKey] = bindings;
+            return mock.data.rsvps.find(
+              r => r.wedding_key === weddingKey && r.idempotency_key === idemKey
+            ) || null;
+          } else {
+            const [tokenHash, weddingKey] = bindings;
+            return mock.data.rsvps.find(
+              r => r.manage_token_hash === tokenHash && r.wedding_key === weddingKey
+            ) || null;
+          }
+        }
+
+        if (sql.includes('RETURNING request_count')) {
+          // Rate limit UPSERT with RETURNING
+          const runResult = await this.run();
+          if (!runResult.success) {
+            return null; // Hit limit
+          }
+          // Return the count from the upserted/updated row
+          const [id] = bindings;
+          const limit = mock.data.rate_limits.find(l => l.id === id);
+          return limit ? { request_count: limit.request_count } : null;
         }
 
         if (sql.includes('FROM rate_limits')) {
@@ -118,23 +157,23 @@ function createMockRequest(method, body = null, headers = {}) {
   const defaultHeaders = {
     'Content-Type': 'application/json',
     'CF-Connecting-IP': '192.168.1.1',
+    'Idempotency-Key': 'test-idem-' + Math.random().toString(36).slice(2),
     ...headers,
   };
 
-  return {
+  const url = 'https://casebem.pages.dev/api/rsvp';
+
+  // Use real Request constructor from Node
+  const init = {
     method,
-    headers: {
-      get(name) {
-        return defaultHeaders[name] || null;
-      },
-    },
-    async json() {
-      if (body === null) {
-        throw new Error('Invalid JSON');
-      }
-      return body;
-    },
+    headers: defaultHeaders,
   };
+
+  if (body !== null) {
+    init.body = JSON.stringify(body);
+  }
+
+  return new Request(url, init);
 }
 
 async function parseResponse(response) {
@@ -164,7 +203,7 @@ describe('RSVP API - POST /api/rsvp', () => {
     };
 
     const request = createMockRequest('POST', payload);
-    const context = { request, env: { DB: db } };
+    const context = { request, env: { DB: db, RSVP_SECRET: TEST_SECRET } };
 
     const response = await onRequest(context);
     const parsed = await parseResponse(response);
@@ -178,7 +217,7 @@ describe('RSVP API - POST /api/rsvp', () => {
 
   it('should reject invalid JSON', async () => {
     const request = createMockRequest('POST', null);
-    const context = { request, env: { DB: db } };
+    const context = { request, env: { DB: db, RSVP_SECRET: TEST_SECRET } };
 
     const response = await onRequest(context);
     const parsed = await parseResponse(response);
@@ -197,7 +236,7 @@ describe('RSVP API - POST /api/rsvp', () => {
     };
 
     const request = createMockRequest('POST', payload);
-    const context = { request, env: { DB: db } };
+    const context = { request, env: { DB: db, RSVP_SECRET: TEST_SECRET } };
 
     const response = await onRequest(context);
     const parsed = await parseResponse(response);
@@ -216,7 +255,7 @@ describe('RSVP API - POST /api/rsvp', () => {
     };
 
     const request = createMockRequest('POST', payload);
-    const context = { request, env: { DB: db } };
+    const context = { request, env: { DB: db, RSVP_SECRET: TEST_SECRET } };
 
     const response = await onRequest(context);
     const parsed = await parseResponse(response);
@@ -227,7 +266,7 @@ describe('RSVP API - POST /api/rsvp', () => {
 
   it('should reject invalid Content-Type', async () => {
     const request = createMockRequest('POST', {}, { 'Content-Type': 'text/plain' });
-    const context = { request, env: { DB: db } };
+    const context = { request, env: { DB: db, RSVP_SECRET: TEST_SECRET } };
 
     const response = await onRequest(context);
     const parsed = await parseResponse(response);
@@ -246,7 +285,7 @@ describe('RSVP API - POST /api/rsvp', () => {
     };
 
     const request = createMockRequest('POST', payload);
-    const context = { request, env: { DB: db } };
+    const context = { request, env: { DB: db, RSVP_SECRET: TEST_SECRET } };
 
     const response = await onRequest(context);
 
@@ -270,7 +309,7 @@ describe('RSVP API - GET /api/rsvp', () => {
     };
 
     const createRequest = createMockRequest('POST', createPayload);
-    const createContext = { request: createRequest, env: { DB: db } };
+    const createContext = { request: createRequest, env: { DB: db, RSVP_SECRET: TEST_SECRET } };
     const createResponse = await onRequest(createContext);
     const createParsed = await parseResponse(createResponse);
     token = createParsed.body.manageToken;
@@ -280,7 +319,7 @@ describe('RSVP API - GET /api/rsvp', () => {
     const request = createMockRequest('GET', null, {
       'Authorization': `Bearer ${token}`,
     });
-    const context = { request, env: { DB: db } };
+    const context = { request, env: { DB: db, RSVP_SECRET: TEST_SECRET } };
 
     const response = await onRequest(context);
     const parsed = await parseResponse(response);
@@ -292,7 +331,7 @@ describe('RSVP API - GET /api/rsvp', () => {
 
   it('should reject without token', async () => {
     const request = createMockRequest('GET', null);
-    const context = { request, env: { DB: db } };
+    const context = { request, env: { DB: db, RSVP_SECRET: TEST_SECRET } };
 
     const response = await onRequest(context);
     const parsed = await parseResponse(response);
@@ -304,7 +343,7 @@ describe('RSVP API - GET /api/rsvp', () => {
     const request = createMockRequest('GET', null, {
       'Authorization': 'Bearer invalid-token-xyz',
     });
-    const context = { request, env: { DB: db } };
+    const context = { request, env: { DB: db, RSVP_SECRET: TEST_SECRET } };
 
     const response = await onRequest(context);
     const parsed = await parseResponse(response);
@@ -329,7 +368,7 @@ describe('RSVP API - PUT /api/rsvp', () => {
     };
 
     const createRequest = createMockRequest('POST', createPayload);
-    const createContext = { request: createRequest, env: { DB: db } };
+    const createContext = { request: createRequest, env: { DB: db, RSVP_SECRET: TEST_SECRET } };
     const createResponse = await onRequest(createContext);
     const createParsed = await parseResponse(createResponse);
     token = createParsed.body.manageToken;
@@ -346,7 +385,7 @@ describe('RSVP API - PUT /api/rsvp', () => {
     const request = createMockRequest('PUT', updatePayload, {
       'Authorization': `Bearer ${token}`,
     });
-    const context = { request, env: { DB: db } };
+    const context = { request, env: { DB: db, RSVP_SECRET: TEST_SECRET } };
 
     const response = await onRequest(context);
     const parsed = await parseResponse(response);
@@ -359,7 +398,7 @@ describe('RSVP API - PUT /api/rsvp', () => {
 
   it('should reject without token', async () => {
     const request = createMockRequest('PUT', { attending: false });
-    const context = { request, env: { DB: db } };
+    const context = { request, env: { DB: db, RSVP_SECRET: TEST_SECRET } };
 
     const response = await onRequest(context);
     const parsed = await parseResponse(response);
@@ -371,7 +410,7 @@ describe('RSVP API - PUT /api/rsvp', () => {
     const request = createMockRequest('PUT', { adultsCount: -1 }, {
       'Authorization': `Bearer ${token}`,
     });
-    const context = { request, env: { DB: db } };
+    const context = { request, env: { DB: db, RSVP_SECRET: TEST_SECRET } };
 
     const response = await onRequest(context);
     const parsed = await parseResponse(response);

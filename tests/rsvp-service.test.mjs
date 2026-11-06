@@ -17,6 +17,9 @@ import {
 } from '../functions/_lib/rsvp-service.mjs';
 import { WEDDING_KEY } from '../functions/_lib/rsvp-validators.mjs';
 
+// Test fixture: valid base64 secret (32 bytes)
+const TEST_SECRET = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
+
 /**
  * Simple in-memory D1 mock
  */
@@ -26,6 +29,15 @@ class MockD1 {
       rsvps: [],
       rate_limits: [],
     };
+  }
+
+  async batch(statements) {
+    const results = [];
+    for (const stmt of statements) {
+      const result = await stmt.run();
+      results.push(result);
+    }
+    return results;
   }
 
   prepare(sql) {
@@ -41,7 +53,7 @@ class MockD1 {
         const bindings = this.bindings;
 
         if (sql.includes('INSERT INTO rsvps')) {
-          const [id, weddingKey, guestName, attending, adultsCount, childrenCount, observations, consentGiven, tokenHash, createdAt, updatedAt] = bindings;
+          const [id, weddingKey, guestName, attending, adultsCount, childrenCount, observations, consentGiven, tokenHash, tokenEncrypted, idemKey, idemFingerprint, createdAt, updatedAt] = bindings;
           mock.data.rsvps.push({
             id,
             wedding_key: weddingKey,
@@ -52,6 +64,9 @@ class MockD1 {
             observations,
             consent_given: consentGiven,
             manage_token_hash: tokenHash,
+            manage_token_encrypted: tokenEncrypted,
+            idempotency_key: idemKey,
+            idempotency_fingerprint: idemFingerprint,
             created_at: createdAt,
             updated_at: updatedAt,
           });
@@ -87,29 +102,33 @@ class MockD1 {
         }
 
         if (sql.includes('INSERT INTO rate_limits')) {
-          const [id, weddingKey, ipHash, windowStart, createdAt, updatedAt] = bindings;
-          mock.data.rate_limits.push({
-            id,
-            wedding_key: weddingKey,
-            ip_hash: ipHash,
-            window_start: windowStart,
-            request_count: 1,
-            created_at: createdAt,
-            updated_at: updatedAt,
-          });
-          return { success: true };
-        }
-
-        if (sql.includes('UPDATE rate_limits')) {
-          const id = bindings[bindings.length - 1];
-          const updatedAt = bindings[0];
-          const limit = mock.data.rate_limits.find(l => l.id === id);
-          if (limit) {
-            limit.request_count = Number(limit.request_count) + 1;
-            limit.updated_at = updatedAt;
+          // UPSERT with RETURNING
+          const [id, weddingKey, ipHash, windowStart, timestamp1, timestamp2, timestamp3, limit] = bindings;
+          
+          const existing = mock.data.rate_limits.find(l => l.id === id);
+          
+          if (existing) {
+            // ON CONFLICT - check if under limit
+            if (Number(existing.request_count) >= limit) {
+              // Hit limit, no update
+              return { success: false };
+            }
+            existing.request_count = Number(existing.request_count) + 1;
+            existing.updated_at = timestamp3;
+            return { success: true };
+          } else {
+            // New insert
+            mock.data.rate_limits.push({
+              id,
+              wedding_key: weddingKey,
+              ip_hash: ipHash,
+              window_start: windowStart,
+              request_count: 1,
+              created_at: timestamp1,
+              updated_at: timestamp2,
+            });
             return { success: true };
           }
-          return { success: false };
         }
 
         return { success: false };
@@ -119,10 +138,30 @@ class MockD1 {
         const bindings = this.bindings;
 
         if (sql.includes('FROM rsvps')) {
-          const [tokenHash, weddingKey] = bindings;
-          return mock.data.rsvps.find(
-            r => r.manage_token_hash === tokenHash && r.wedding_key === weddingKey
-          ) || null;
+          // Check if it's idempotency lookup or token lookup
+          if (bindings.length === 2 && sql.includes('idempotency_key')) {
+            const [weddingKey, idemKey] = bindings;
+            return mock.data.rsvps.find(
+              r => r.wedding_key === weddingKey && r.idempotency_key === idemKey
+            ) || null;
+          } else {
+            const [tokenHash, weddingKey] = bindings;
+            return mock.data.rsvps.find(
+              r => r.manage_token_hash === tokenHash && r.wedding_key === weddingKey
+            ) || null;
+          }
+        }
+
+        if (sql.includes('RETURNING request_count')) {
+          // Rate limit UPSERT with RETURNING
+          const runResult = await this.run();
+          if (!runResult.success) {
+            return null; // Hit limit
+          }
+          // Return the count from the upserted/updated row
+          const [id] = bindings;
+          const limit = mock.data.rate_limits.find(l => l.id === id);
+          return limit ? { request_count: limit.request_count } : null;
         }
 
         if (sql.includes('FROM rate_limits')) {
@@ -194,9 +233,11 @@ describe('createRsvp', () => {
       adultsCount: 2,
       childrenCount: 1,
       observations: 'Alergia a frutos do mar',
+      consentGiven: true,
     };
 
-    const result = await createRsvp(db, data);
+    const idemKey = 'test-idem-key-123';
+    const result = await createRsvp(db, data, idemKey, TEST_SECRET, null);
 
     assert.ok(result.id);
     assert.equal(result.weddingKey, WEDDING_KEY);
@@ -211,37 +252,47 @@ describe('createRsvp', () => {
 
     assert.equal(db.data.rsvps.length, 1);
     assert.equal(db.data.rsvps[0].guest_name, 'Maria Silva');
+    assert.ok(db.data.rsvps[0].idempotency_fingerprint);
   });
 
-  it('should create RSVP with attending=false', async () => {
+  it('should create RSVP with attending=false and normalize counts to 0', async () => {
     const data = {
       guestName: 'João Pedro',
       attending: false,
-      adultsCount: 0,
-      childrenCount: 0,
+      adultsCount: 2, // Should be normalized to 0
+      childrenCount: 1, // Should be normalized to 0
       observations: null,
+      consentGiven: true,
     };
 
-    const result = await createRsvp(db, data);
+    const result = await createRsvp(db, data, 'idem-key-2', TEST_SECRET, null);
 
     assert.equal(result.attending, false);
+    assert.equal(result.adultsCount, 0); // Normalized
+    assert.equal(result.childrenCount, 0); // Normalized
     assert.equal(db.data.rsvps[0].attending, 0);
+    assert.equal(db.data.rsvps[0].adults_count, 0);
+    assert.equal(db.data.rsvps[0].children_count, 0);
   });
 
-  it('should store token as hash', async () => {
+  it('should store token as hash and encrypted', async () => {
     const data = {
       guestName: 'Test User',
       attending: true,
       adultsCount: 0,
       childrenCount: 0,
       observations: null,
+      consentGiven: true,
     };
 
-    const result = await createRsvp(db, data);
+    const result = await createRsvp(db, data, 'idem-key-3', TEST_SECRET, null);
     const storedTokenHash = db.data.rsvps[0].manage_token_hash;
+    const storedTokenEncrypted = db.data.rsvps[0].manage_token_encrypted;
 
     assert.notEqual(storedTokenHash, result.manageToken);
     assert.equal(storedTokenHash.length, 64);
+    assert.ok(storedTokenEncrypted); // Encrypted token stored
+    assert.notEqual(storedTokenEncrypted, result.manageToken);
   });
 
   it('should generate unique IDs', async () => {
@@ -251,13 +302,57 @@ describe('createRsvp', () => {
       adultsCount: 0,
       childrenCount: 0,
       observations: null,
+      consentGiven: true,
     };
 
-    const result1 = await createRsvp(db, data);
-    const result2 = await createRsvp(db, { ...data, guestName: 'User 2' });
+    const result1 = await createRsvp(db, data, 'idem-key-4', TEST_SECRET, null);
+    const result2 = await createRsvp(db, { ...data, guestName: 'User 2' }, 'idem-key-5', TEST_SECRET, null);
 
     assert.notEqual(result1.id, result2.id);
     assert.notEqual(result1.manageToken, result2.manageToken);
+  });
+  
+  it('should enforce idempotency with bearer token', async () => {
+    const data = {
+      guestName: 'Idempotent User',
+      attending: true,
+      adultsCount: 1,
+      childrenCount: 0,
+      observations: 'Test',
+      consentGiven: true,
+    };
+
+    const idemKey = 'stable-idem-key';
+    const result1 = await createRsvp(db, data, idemKey, TEST_SECRET, null);
+    
+    // Replay with bearer token should return same token
+    const result2 = await createRsvp(db, data, idemKey, TEST_SECRET, result1.manageToken);
+    
+    assert.equal(result2.id, result1.id);
+    assert.equal(result2.manageToken, result1.manageToken);
+    assert.equal(db.data.rsvps.length, 1); // Only one record
+  });
+  
+  it('should reject idempotency replay without bearer', async () => {
+    const data = {
+      guestName: 'Test',
+      attending: true,
+      adultsCount: 0,
+      childrenCount: 0,
+      observations: null,
+      consentGiven: true,
+    };
+
+    const idemKey = 'idem-no-bearer';
+    await createRsvp(db, data, idemKey, TEST_SECRET, null);
+    
+    // Replay without bearer should fail
+    try {
+      await createRsvp(db, data, idemKey, TEST_SECRET, null);
+      assert.fail('Should have thrown IDEMPOTENCY_CONFLICT');
+    } catch (error) {
+      assert.equal(error.message, 'IDEMPOTENCY_CONFLICT');
+    }
   });
 });
 
@@ -272,8 +367,9 @@ describe('getRsvpByToken', () => {
       adultsCount: 2,
       childrenCount: 1,
       observations: 'Test observation',
+      consentGiven: true,
     };
-    rsvp = await createRsvp(db, data);
+    rsvp = await createRsvp(db, data, 'get-test-idem', TEST_SECRET, null);
     token = rsvp.manageToken;
   });
 
@@ -316,8 +412,9 @@ describe('updateRsvpByToken', () => {
       adultsCount: 2,
       childrenCount: 1,
       observations: 'Original observation',
+      consentGiven: true,
     };
-    rsvp = await createRsvp(db, data);
+    rsvp = await createRsvp(db, data, 'update-test-idem', TEST_SECRET, null);
     token = rsvp.manageToken;
   });
 
@@ -385,7 +482,7 @@ describe('checkRateLimit', () => {
   });
 
   it('should allow first request', async () => {
-    const result = await checkRateLimit(db, '192.168.1.1', 10);
+    const result = await checkRateLimit(db, '192.168.1.1', TEST_SECRET, 10);
     assert.equal(result.allowed, true);
     assert.equal(result.remaining, 9);
     
@@ -393,7 +490,7 @@ describe('checkRateLimit', () => {
   });
 
   it('should create rate limit record', async () => {
-    await checkRateLimit(db, '192.168.1.1', 10);
+    await checkRateLimit(db, '192.168.1.1', TEST_SECRET, 10);
     
     const stored = db.data.rate_limits[0];
     assert.ok(stored.id);
@@ -402,18 +499,36 @@ describe('checkRateLimit', () => {
   });
 
   it('should track IPs separately', async () => {
-    await checkRateLimit(db, '192.168.1.1', 10);
-    await checkRateLimit(db, '192.168.1.2', 10);
+    await checkRateLimit(db, '192.168.1.1', TEST_SECRET, 10);
+    await checkRateLimit(db, '192.168.1.2', TEST_SECRET, 10);
 
     assert.equal(db.data.rate_limits.length, 2);
   });
 
-  it('should not store IP in plain text', async () => {
-    await checkRateLimit(db, '192.168.1.100', 10);
+  it('should not store IP in plain text (HMAC)', async () => {
+    await checkRateLimit(db, '192.168.1.100', TEST_SECRET, 10);
 
     const stored = db.data.rate_limits[0];
     assert.notEqual(stored.ip_hash, '192.168.1.100');
     assert.equal(stored.ip_hash.length, 64);
     assert.ok(/^[a-f0-9]+$/.test(stored.ip_hash));
+  });
+  
+  it('should enforce rate limit', async () => {
+    const ip = '192.168.1.50';
+    const limit = 3;
+    
+    const r1 = await checkRateLimit(db, ip, TEST_SECRET, limit);
+    const r2 = await checkRateLimit(db, ip, TEST_SECRET, limit);
+    const r3 = await checkRateLimit(db, ip, TEST_SECRET, limit);
+    
+    assert.equal(r1.allowed, true);
+    assert.equal(r2.allowed, true);
+    assert.equal(r3.allowed, true);
+    
+    // Fourth request should be blocked
+    const r4 = await checkRateLimit(db, ip, TEST_SECRET, limit);
+    assert.equal(r4.allowed, false);
+    assert.equal(r4.remaining, 0);
   });
 });

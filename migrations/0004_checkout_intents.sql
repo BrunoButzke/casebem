@@ -15,17 +15,19 @@ CREATE TABLE IF NOT EXISTS checkout_intents (
   qr_code TEXT,
   qr_code_base64 TEXT,
   created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
+  updated_at TEXT NOT NULL,
+  lease_until TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_checkout_intents_fingerprint ON checkout_intents(fingerprint);
 CREATE INDEX IF NOT EXISTS idx_checkout_intents_status ON checkout_intents(status);
 CREATE INDEX IF NOT EXISTS idx_checkout_intents_created_at ON checkout_intents(created_at);
+CREATE INDEX IF NOT EXISTS idx_checkout_intents_lease ON checkout_intents(lease_until) WHERE lease_until IS NOT NULL;
 
 -- Rate limiting reuses existing rate_limits table with namespace 'checkout:'
 -- No schema changes to rate_limits
 
 -- Track schema version
 INSERT INTO schema_migrations (version, applied_at) 
-VALUES (4, datetime('now'))
+VALUES ('0004', datetime('now'))
 ON CONFLICT(version) DO NOTHING;

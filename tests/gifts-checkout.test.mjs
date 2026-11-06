@@ -469,13 +469,13 @@ test('createCheckoutPayment normaliza items duplicados (merge quantidade)', asyn
   assert.ok(capturedItems);
 });
 
-test('createCheckoutPayment normaliza items duplicados respeitando max 99', async () => {
+test('createCheckoutPayment rejeita items duplicados quando merged qty > 99', async () => {
   const request = {
     paymentMethod: 'pix',
     gifterName: 'João Silva',
     items: [
       { giftId: 'danca', quantity: 60 },
-      { giftId: 'danca', quantity: 50 },  // Total seria 110, deve limitar a 99
+      { giftId: 'danca', quantity: 50 },  // Total 110 > 99, deve rejeitar
     ],
     intentKey: '550e8400-e29b-41d4-a716-446655440000',
   };
@@ -486,9 +486,10 @@ test('createCheckoutPayment normaliza items duplicados respeitando max 99', asyn
   };
   const mockDB = new MockD1Database();
   
-  const result = await createCheckoutPayment(request, mockEnv, mockDB, '127.0.0.1');
-  
-  assert.equal(result.ok, true);
+  await assert.rejects(
+    async () => await createCheckoutPayment(request, mockEnv, mockDB, '127.0.0.1'),
+    { message: /quantidade.*99/i }
+  );
 });
 
 // ========== Testes de Idempotência ==========

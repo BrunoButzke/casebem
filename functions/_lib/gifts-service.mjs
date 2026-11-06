@@ -123,7 +123,7 @@ export function normalizeCartItems(items, catalog = GIFTS_CATALOG) {
  * @param {string} ipAddress - Client IP (para rate limit)
  * @returns {Promise<object>} Resultado do pagamento
  */
-export async function createCheckoutPayment(request, env, db, ipAddress) {
+export async function createCheckoutPayment(request, env, db, ipAddress, options = {}) {
   // Validar D1 disponível (crítico para idempotência)
   if (!db) {
     return {
@@ -176,18 +176,7 @@ export async function createCheckoutPayment(request, env, db, ipAddress) {
   // Recalcular total no servidor (não confiar no cliente)
   const totalInCents = calculateTotalFromCatalog(normalizedItems, catalog);
 
-  // Verificar método de pagamento antes de criar intent
-  if (paymentMethod === 'card' || paymentMethod === 'boleto') {
-    return {
-      ok: false,
-      status: 503,
-      error: 'PAYMENT_PROVIDER_NOT_CONFIGURED',
-      message: 'Pagamento com cartão/boleto ainda não disponível. Use Pix.',
-      availableMethods: ['pix'],
-    };
-  }
-
-  if (paymentMethod !== 'pix') {
+  if (paymentMethod !== 'pix' && paymentMethod !== 'card' && paymentMethod !== 'boleto') {
     throw new Error('Método de pagamento inválido');
   }
 
@@ -239,8 +228,18 @@ export async function createCheckoutPayment(request, env, db, ipAddress) {
   if (intentResult.status === 'existing') {
     const intent = intentResult.intent;
     
-    // Se já tem pagamento pendente, retornar
+    // Se já tem pagamento pendente, retornar (Pix QR ou redirect Checkout Pro)
     if (intent.status === 'pending' && intent.qrCode) {
+      if (String(intent.qrCode).startsWith('http')) {
+        return {
+          ok: true,
+          method: paymentMethod,
+          status: 'pending',
+          redirectUrl: intent.qrCode,
+          payment: { id: intent.providerReference },
+          fromCache: true,
+        };
+      }
       return {
         ok: true,
         method: 'pix',
@@ -298,22 +297,150 @@ export async function createCheckoutPayment(request, env, db, ipAddress) {
       name: getGiftFromCatalog(catalog, item.giftId)?.name || item.giftId,
     }));
 
-    const result = await createPixCheckout({
+    if (paymentMethod === 'pix') {
+      return await createPixCheckout({
+        gifterName,
+        items: pricedItems,
+        totalInCents,
+        intentKey,
+        env,
+        db,
+      });
+    }
+
+    return await createRedirectCheckout({
       gifterName,
       items: pricedItems,
       totalInCents,
       intentKey,
+      paymentMethod,
       env,
       db,
+      origin: options.origin || null,
     });
-    
-    return result;
   } catch (error) {
     // Em caso de erro, release lease para permitir retry
     const { releaseLease } = await import('./checkout-idempotency.mjs');
     await releaseLease(db, intentKey).catch(() => {}); // Best effort
     throw error;
   }
+}
+
+/**
+ * Cartão/boleto via Checkout Pro (redirect MP) — Free-tier CF
+ * @private
+ */
+async function createRedirectCheckout({
+  gifterName,
+  items,
+  totalInCents,
+  intentKey,
+  paymentMethod,
+  env,
+  db,
+  origin,
+}) {
+  if (!env.MP_ACCESS_TOKEN) {
+    const { updateIntentWithPayment } = await import('./checkout-idempotency.mjs');
+    await updateIntentWithPayment(db, intentKey, {}, 'failed');
+    return {
+      ok: false,
+      status: 503,
+      error: 'PAYMENT_SERVICE_NOT_CONFIGURED',
+      message: 'Serviço de pagamento não configurado. Contate o suporte.',
+    };
+  }
+
+  const base = origin || 'https://casebem.com';
+  const returnBase = `${base}/dani-carine/`;
+  const { createGiftPreference } = await import('./mercadopago.mjs');
+
+  // Mock de testes
+  if (typeof globalThis.__testCreateGiftPreference === 'function') {
+    const mockResult = await globalThis.__testCreateGiftPreference({
+      intentKey,
+      paymentMethod,
+      totalInCents,
+      items,
+    });
+    if (!mockResult.ok) {
+      const { updateIntentWithPayment } = await import('./checkout-idempotency.mjs');
+      await updateIntentWithPayment(db, intentKey, {}, 'failed');
+      return {
+        ok: false,
+        status: mockResult.status || 503,
+        error: mockResult.error || 'PAYMENT_SERVICE_ERROR',
+        message: mockResult.message || 'Erro ao criar checkout',
+      };
+    }
+    const redirectUrl = mockResult.preference?.initPoint || 'https://mp.test/checkout';
+    const payment = {
+      id: mockResult.preference?.id || 'pref_test',
+      qrCode: redirectUrl, // reusa coluna qr_code para URL de redirect
+      qrCodeBase64: '',
+    };
+    const { updateIntentWithPayment } = await import('./checkout-idempotency.mjs');
+    await updateIntentWithPayment(db, intentKey, payment, 'pending');
+    return {
+      ok: true,
+      method: paymentMethod,
+      status: 'pending',
+      redirectUrl,
+      payment: { id: payment.id },
+    };
+  }
+
+  const result = await createGiftPreference({
+    accessToken: env.MP_ACCESS_TOKEN,
+    intentKey,
+    gifterName,
+    items,
+    totalInCents,
+    paymentMethod,
+    payerEmail: env.MP_PAYER_EMAIL || 'noreply@casebem.com',
+    successUrl: `${returnBase}?pago=ok&metodo=${paymentMethod}`,
+    failureUrl: `${returnBase}?pago=erro&metodo=${paymentMethod}`,
+    pendingUrl: `${returnBase}?pago=pendente&metodo=${paymentMethod}`,
+  });
+
+  if (!result.ok) {
+    const { updateIntentWithPayment } = await import('./checkout-idempotency.mjs');
+    await updateIntentWithPayment(db, intentKey, {}, 'failed');
+    return {
+      ok: false,
+      status: 503,
+      error: 'PAYMENT_SERVICE_ERROR',
+      message: 'Erro ao criar checkout. Tente novamente ou use Pix.',
+    };
+  }
+
+  const redirectUrl = result.preference.initPoint || result.preference.sandboxInitPoint;
+  if (!redirectUrl) {
+    const { updateIntentWithPayment } = await import('./checkout-idempotency.mjs');
+    await updateIntentWithPayment(db, intentKey, {}, 'failed');
+    return {
+      ok: false,
+      status: 502,
+      error: 'INVALID_PREFERENCE_RESPONSE',
+      message: 'Checkout sem URL de redirecionamento',
+    };
+  }
+
+  const payment = {
+    id: result.preference.id,
+    qrCode: redirectUrl,
+    qrCodeBase64: '',
+  };
+  const { updateIntentWithPayment } = await import('./checkout-idempotency.mjs');
+  await updateIntentWithPayment(db, intentKey, payment, 'pending');
+
+  return {
+    ok: true,
+    method: paymentMethod,
+    status: 'pending',
+    redirectUrl,
+    payment: { id: payment.id },
+  };
 }
 
 /**

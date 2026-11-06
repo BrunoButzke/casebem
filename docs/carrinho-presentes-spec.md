@@ -104,16 +104,19 @@ export const GIFTS_CATALOG = [
 }
 ```
 
-#### Cartão/Boleto (indisponível - MVP)
+#### Cartão/Boleto (Checkout Pro — redirect Mercado Pago)
 ```javascript
 {
-  ok: false,
-  status: 503,
-  error: 'PAYMENT_PROVIDER_NOT_CONFIGURED',
-  message: 'Pagamento com cartão/boleto ainda não disponível. Use Pix.',
-  availableMethods: ['pix']
+  ok: true,
+  method: 'card' | 'boleto',
+  status: 'pending',
+  redirectUrl: 'https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=...',
+  payment: { id: 'pref_...' }
 }
 ```
+
+O frontend redireciona para `redirectUrl`. Confirmação de pagamento via webhook MP
+(`external_reference = casebem:gift:{intentKey}`).
 
 ## Comportamento Esperado
 
@@ -128,7 +131,7 @@ export const GIFTS_CATALOG = [
 7. **Escolher pagamento**: Pix/Cartão/Boleto
 8. **Finalizar**: 
    - Pix: gera QR code
-   - Cartão/Boleto: mensagem de indisponível
+   - Cartão/Boleto: redirect Checkout Pro (Mercado Pago)
 
 ### Validações
 
@@ -142,8 +145,8 @@ export const GIFTS_CATALOG = [
 - Quantidade: inteiro positivo, máximo 99 por item
 - GiftId: existe no catálogo server-side
 - Total: recalcula do zero (não confia no cliente)
-- Método de pagamento: apenas 'pix' retorna sucesso
-- Cartão/Boleto: retorna 503 PAYMENT_PROVIDER_NOT_CONFIGURED
+- Método de pagamento: `pix` | `card` | `boleto`
+- Cartão/Boleto: cria Preference MP e retorna `redirectUrl`
 
 ### Idempotência
 
@@ -187,8 +190,8 @@ export const GIFTS_CATALOG = [
 ### Checkout (tests/gifts-checkout.test.mjs)
 ```javascript
 ✓ Pix: gera pagamento válido
-✓ Cartão: retorna 503 PAYMENT_PROVIDER_NOT_CONFIGURED
-✓ Boleto: retorna 503 PAYMENT_PROVIDER_NOT_CONFIGURED
+✓ Cartão: retorna redirectUrl Checkout Pro
+✓ Boleto: retorna redirectUrl Checkout Pro
 ✓ Método desconhecido: erro 400
 ✓ Items vazios: erro 400
 ✓ GiftId inexistente: erro 400
@@ -210,7 +213,7 @@ export const GIFTS_CATALOG = [
 ✓ Formulário checkout com nome
 ✓ Escolha de método de pagamento
 ✓ Submit desabilitado durante processamento
-✓ Mensagem erro cartão/boleto indisponível
+✓ Cartão/Boleto: redirect Checkout Pro
 ✓ Pix: exibe QR code
 ```
 
@@ -251,35 +254,11 @@ public/
   images/gifts/            # Imagens (já existem)
 ```
 
-### Adaptadores de Pagamento
+### Pagamento (Mercado Pago)
 
-```javascript
-// functions/_lib/payment-adapter.mjs
-export async function createPayment({ method, amount, items, gifterName, env }) {
-  if (method === 'pix') {
-    // Usa Mercado Pago existente
-    return createPixPayment({ ... });
-  }
-  
-  if (method === 'card' || method === 'boleto') {
-    // Provedor não configurado (MVP)
-    return {
-      ok: false,
-      status: 503,
-      error: 'PAYMENT_PROVIDER_NOT_CONFIGURED',
-      message: 'Pagamento com cartão/boleto ainda não disponível. Use Pix.',
-      availableMethods: ['pix']
-    };
-  }
-  
-  return {
-    ok: false,
-    status: 400,
-    error: 'INVALID_PAYMENT_METHOD',
-    message: 'Método de pagamento inválido.'
-  };
-}
-```
+- **Pix**: payment API + QR; webhook marca `paid` via `provider_reference`
+- **Cartão/Boleto**: Checkout Pro Preference + redirect; `external_reference = casebem:gift:{intentKey}`;
+  webhook marca `paid` via `markIntentPaidByExternalRef` quando preference id ≠ payment id
 
 ## Configuração
 
@@ -288,27 +267,21 @@ export async function createPayment({ method, amount, items, gifterName, env }) 
 ```bash
 # .env.example
 MP_ACCESS_TOKEN=APP_USR-xxxxxxxx  # Mercado Pago (já existe)
-
-# Futuro (quando contratar gateway):
-# PAYMENT_PROVIDER=stripe|pagarme|...
-# PAYMENT_PROVIDER_KEY=...
+# Webhook URL: /api/webhooks/mercadopago (já existente)
 ```
 
 ## Limitações Conhecidas
 
-1. **Pix não é confirmado automaticamente**: requer consulta manual ou webhook
-2. **Cartão/Boleto**: não implementado (gateway ausente)
-3. **Sem persistência de pedidos**: não há tabela D1 para orders
-4. **Sem e-mail/SMS**: não há notificação automática
-5. **Sem histórico**: não rastreia quem deu o quê
+1. Confirmação depende do webhook MP (ou consulta manual no painel)
+2. URL de redirect Checkout Pro é cacheada na coluna `qr_code` (reuso Free-tier)
+3. Sem tabela D1 dedicada `gift_orders` (usa `checkout_intents`)
+4. Sem e-mail ao presenteador (só notificação opcional Resend aos noivos)
 
 ## Próximos Passos (fora desta PR)
 
-1. Contratar gateway de pagamento (Stripe, PagarMe, etc.)
-2. Implementar adapter real para cartão/boleto
-3. Criar tabela D1 `gift_orders` para histórico
-4. Webhook Mercado Pago para confirmação Pix
-5. Painel administrativo para noivos verem presentes
+1. Criar tabela D1 `gift_orders` para histórico rico
+2. UX pós-redirect (`?pago=ok|erro|pendente`)
+3. Relatórios / export CSV de presentes pagos
 
 ---
 

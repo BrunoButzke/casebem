@@ -278,23 +278,34 @@ test('POST sem MP_ACCESS_TOKEN retorna 503', async () => {
   assert.equal(data.error, 'PAYMENT_SERVICE_NOT_CONFIGURED');
 });
 
-test('POST com cartão retorna 503 provider não configurado', async () => {
-  const request = createMockRequest({
-    origin: 'https://casebem.pages.dev',
-    body: {
-      paymentMethod: 'card',
-      gifterName: 'João Silva',
-      items: [{ giftId: 'danca', quantity: 1 }],
-      intentKey: '550e8400-e29b-41d4-a716-446655440001',
+test('POST com cartão retorna redirectUrl Checkout Pro', async () => {
+  globalThis.__testCreateGiftPreference = async () => ({
+    ok: true,
+    preference: {
+      id: 'pref_api_card',
+      initPoint: 'https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=api',
     },
   });
-  const context = { request, env: mockEnv };
-  
-  const response = await onRequestPost(context);
-  
-  assert.equal(response.status, 503);
-  const data = await response.json();
-  assert.equal(data.ok, false);
-  assert.equal(data.error, 'PAYMENT_PROVIDER_NOT_CONFIGURED');
-  assert.ok(data.availableMethods.includes('pix'));
+
+  try {
+    const request = createMockRequest({
+      origin: 'https://casebem.pages.dev',
+      body: {
+        paymentMethod: 'card',
+        gifterName: 'João Silva',
+        items: [{ giftId: 'danca', quantity: 1 }],
+        intentKey: '550e8400-e29b-41d4-a716-446655440001',
+      },
+    });
+    const context = { request, env: mockEnv };
+
+    const response = await onRequestPost(context);
+    assert.equal(response.status, 200);
+    const data = await response.json();
+    assert.equal(data.ok, true);
+    assert.equal(data.method, 'card');
+    assert.match(data.redirectUrl, /^https:\/\//);
+  } finally {
+    delete globalThis.__testCreateGiftPreference;
+  }
 });

@@ -4,7 +4,10 @@
  */
 
 import { getPaymentStatus } from './mercadopago.mjs';
-import { markIntentPaidByProviderRef } from './admin-service.mjs';
+import {
+  markIntentPaidByProviderRef,
+  markIntentPaidByExternalRef,
+} from './admin-service.mjs';
 import { sendAdminNotification } from './notify-email.mjs';
 
 /**
@@ -56,12 +59,22 @@ export async function processMercadoPagoWebhook({ db, env, payload }) {
   }
 
   const now = new Date().toISOString();
-  const mark = await markIntentPaidByProviderRef(db, payment.id, now);
+
+  // Pix: provider_reference = payment id. Card/boleto: preference id ≠ payment id → external_reference
+  let mark = await markIntentPaidByProviderRef(db, payment.id, now);
+  if (!mark.updated && payment.externalReference) {
+    mark = await markIntentPaidByExternalRef(
+      db,
+      payment.externalReference,
+      payment.id,
+      now
+    );
+  }
 
   if (mark.updated) {
     await sendAdminNotification(env, {
-      subject: `[CaseBem] Pix aprovado — #${payment.id}`,
-      text: `Pagamento Mercado Pago aprovado.\nID: ${payment.id}\nValor: R$ ${Number(payment.amount || 0).toFixed(2)}\nHorário: ${now}`,
+      subject: `[CaseBem] Pagamento aprovado — #${payment.id}`,
+      text: `Pagamento Mercado Pago aprovado.\nID: ${payment.id}\nValor: R$ ${Number(payment.amount || 0).toFixed(2)}\nRef: ${payment.externalReference || '-'}\nHorário: ${now}`,
     });
   }
 

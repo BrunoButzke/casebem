@@ -766,17 +766,21 @@ async function handleCheckout() {
     const data = await response.json();
 
     if (data.ok) {
-      // Pagamento criado com sucesso (Pix)
       paymentSuccess = true;
+      // Cartão/boleto: redirect Checkout Pro (Mercado Pago)
+      if (data.redirectUrl && typeof data.redirectUrl === 'string') {
+        checkoutBtn.disabled = true;
+        checkoutBtn.textContent = 'Redirecionando…';
+        _window.location.href = data.redirectUrl;
+        return;
+      }
+      // Pix: QR na modal
       showPaymentResult(data);
-      // NÃO limpar carrinho - usuário precisa do QR até confirmação manual
-      // Desabilitar checkout para evitar duplicatas
       checkoutBtn.disabled = true;
       checkoutBtn.textContent = 'Pagamento Pendente';
     } else {
-      // Erro (ex: cartão/boleto não disponível, 409 INTENT_PROCESSING)
       if (data.status === 503) {
-        cartError.textContent = data.message || 'Método de pagamento não disponível. Use Pix.';
+        cartError.textContent = data.message || 'Serviço de pagamento indisponível. Tente Pix ou mais tarde.';
       } else if (data.error === 'INTENT_PROCESSING') {
         cartError.textContent = data.message || 'Pagamento já está sendo processado. Aguarde alguns segundos e tente novamente.';
       } else {

@@ -61,8 +61,9 @@ export async function onRequestPost(context) {
                     '0.0.0.0';
 
   try {
+    const origin = request.headers.get('Origin') || new URL(request.url).origin;
     // Processar checkout (com DB e IP para idempotência e rate limit)
-    const result = await createCheckoutPayment(body, env, env.DB, ipAddress);
+    const result = await createCheckoutPayment(body, env, env.DB, ipAddress, { origin });
 
     // Se o result tem status (ex: 503), usar esse status
     const statusCode = result.ok ? 200 : (result.status || 400);

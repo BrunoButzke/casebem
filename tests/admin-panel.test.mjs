@@ -135,6 +135,53 @@ test('processMercadoPagoWebhook: marca paid quando approved', async () => {
   }
 });
 
+test('processMercadoPagoWebhook: card/boleto marca paid via external_reference', async () => {
+  const sqls = [];
+  const binds = [];
+  const db = {
+    prepare(sql) {
+      sqls.push(sql);
+      return {
+        bind(...args) {
+          binds.push(args);
+          return this;
+        },
+        async run() {
+          // 1ª tentativa (provider_reference) = 0; 2ª (external_ref) = 1
+          const changes = sqls.length === 1 ? 0 : 1;
+          return { success: true, meta: { changes } };
+        },
+      };
+    },
+  };
+
+  const intentKey = '550e8400-e29b-41d4-a716-446655440099';
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => ({
+    ok: true,
+    json: async () => ({
+      id: 888,
+      status: 'approved',
+      transaction_amount: 200,
+      external_reference: `casebem:gift:${intentKey}`,
+    }),
+  });
+
+  try {
+    const result = await processMercadoPagoWebhook({
+      db,
+      env: { MP_ACCESS_TOKEN: 'TEST' },
+      payload: { type: 'payment', data: { id: 888 } },
+    });
+    assert.equal(result.ok, true);
+    assert.equal(result.paid, true);
+    assert.ok(sqls.some((s) => /intent_key/.test(s)));
+    assert.ok(binds.some((b) => b.includes(intentKey)));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('processMercadoPagoWebhook: pending não marca paid', async () => {
   const db = {
     prepare() {

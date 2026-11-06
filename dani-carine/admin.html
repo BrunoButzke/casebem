@@ -102,6 +102,10 @@
       <p class="sub">Alterações no D1 — convidados veem via /api/gifts/catalog (sem rebuild).</p>
       <div id="catalog-table"></div>
 
+      <h2>Papelaria (WhatsApp)</h2>
+      <p class="sub">Placeholders: {{names}} {{date}} {{place}} {{url}} · /api/stationery (migration 0009).</p>
+      <div id="stationery-table"></div>
+
       <h2>Hospedagem / dicas</h2>
       <p class="sub">Lista em /dani-carine/#hospedagem · API /api/lodging (migration 0008).</p>
       <div class="toolbar" style="flex-direction:column;align-items:stretch;gap:0.5rem;max-width:640px">
@@ -195,6 +199,7 @@
       $('gifts-table').innerHTML = renderGifts(data.gifts || []);
       $('messages-table').innerHTML = renderMessages(data.messages || []);
       await loadCatalogEditor();
+      await loadStationeryEditor();
       await loadLodgingEditor();
     }
 
@@ -206,6 +211,33 @@
         return;
       }
       $('catalog-table').innerHTML = renderCatalog(data.gifts || []);
+    }
+
+    async function loadStationeryEditor() {
+      const res = await fetch('/api/admin/stationery', { headers: authHeaders() });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        $('stationery-table').innerHTML = `<p class="err">${escapeHtml(data.message || data.error || 'Falha ao carregar papelaria (rode migration 0009?)')}</p>`;
+        return;
+      }
+      $('stationery-table').innerHTML = renderStationery(data.templates || []);
+    }
+
+    function renderStationery(rows) {
+      if (!rows.length) return '<p class="sub">Nenhum template.</p>';
+      return `<table><thead><tr>
+        <th>Título</th><th>Texto (placeholders ok)</th><th>Ativo</th><th></th>
+      </tr></thead><tbody>
+      ${rows.map((t) => `<tr class="${t.active ? '' : 'hidden'}">
+        <td><input data-st-title="${escapeHtml(t.id)}" value="${escapeHtml(t.title)}" style="width:100%;max-width:140px;padding:0.35rem" /></td>
+        <td><textarea data-st-body="${escapeHtml(t.id)}" style="width:100%;min-height:72px;padding:0.35rem">${escapeHtml(t.body)}</textarea></td>
+        <td><input data-st-active="${escapeHtml(t.id)}" type="checkbox" ${t.active ? 'checked' : ''} /></td>
+        <td class="row-actions">
+          <button type="button" class="secondary" data-st-save="${escapeHtml(t.id)}">Salvar</button>
+          ${t.shareUrl ? `<a class="secondary" style="display:inline-block;margin-top:0.75rem;padding:0.55rem 1rem;border:1px solid var(--accent);border-radius:8px;color:var(--accent);text-decoration:none" href="${escapeHtml(t.shareUrl)}" target="_blank" rel="noopener noreferrer">WhatsApp</a>` : ''}
+        </td>
+      </tr>`).join('')}
+      </tbody></table>`;
     }
 
     async function loadLodgingEditor() {
@@ -427,6 +459,32 @@
         return;
       }
       await loadCatalogEditor();
+    });
+
+    $('stationery-table').addEventListener('click', async (ev) => {
+      const btn = ev.target.closest('button[data-st-save]');
+      if (!btn) return;
+      const id = btn.getAttribute('data-st-save');
+      const titleEl = $('stationery-table').querySelector(`input[data-st-title="${CSS.escape(id)}"]`);
+      const bodyEl = $('stationery-table').querySelector(`textarea[data-st-body="${CSS.escape(id)}"]`);
+      const activeEl = $('stationery-table').querySelector(`input[data-st-active="${CSS.escape(id)}"]`);
+      const res = await fetch('/api/admin/stationery', {
+        method: 'PATCH',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id,
+          title: titleEl?.value,
+          body: bodyEl?.value,
+          active: Boolean(activeEl?.checked),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        $('panel-err').hidden = false;
+        $('panel-err').textContent = (data.details && data.details.join(', ')) || data.message || data.error || 'Falha ao salvar template';
+        return;
+      }
+      await loadStationeryEditor();
     });
 
     $('lodge-add-btn').addEventListener('click', async () => {

@@ -5,6 +5,7 @@ import { setupRsvp } from './rsvp.mjs';
 import { initMessages } from './messages.mjs';
 import { initCart } from './cart.mjs';
 import { initLodging } from './lodging.mjs';
+import { initStationery } from './stationery.mjs';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -607,6 +608,7 @@ function boot() {
   initMessages();
   initCart();
   initLodging();
+  initStationery();
   setupReveals();
   ScrollTrigger.sort();
   window.addEventListener('load', () => ScrollTrigger.refresh());

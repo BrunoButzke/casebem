@@ -83,13 +83,36 @@ class MockD1Statement {
 
   async all() {
     if (this.sql.includes('SELECT') && this.sql.includes('wedding_messages')) {
-      const [weddingKey, limitParam] = this.params;
+      // Support both formats: with cursor and without
+      const weddingKey = this.params[0];
+      let limit;
+      let cursorCreatedAt = null;
+      let cursorId = null;
+      
+      if (this.params.length === 2) {
+        // No cursor: [weddingKey, limit]
+        limit = this.params[1];
+      } else if (this.params.length === 5) {
+        // With cursor: [weddingKey, createdAt, createdAt, id, limit]
+        cursorCreatedAt = this.params[1];
+        cursorId = this.params[3];
+        limit = this.params[4];
+      }
+      
       const results = [];
       
       // Convert Map to array and filter
       for (const [id, record] of this.db.data.entries()) {
         if (record.wedding_key === weddingKey) {
-          results.push(record);
+          // Apply cursor filter if present
+          if (cursorCreatedAt && cursorId) {
+            if (record.created_at < cursorCreatedAt || 
+               (record.created_at === cursorCreatedAt && record.id < cursorId)) {
+              results.push(record);
+            }
+          } else {
+            results.push(record);
+          }
         }
       }
       
@@ -102,7 +125,7 @@ class MockD1Statement {
       });
       
       // Apply limit
-      const limited = results.slice(0, limitParam);
+      const limited = results.slice(0, limit);
       return { results: limited };
     }
     
@@ -430,12 +453,72 @@ test('getMessages handles pagination cursor correctly', async () => {
     { id: 'id-4', wedding_key: WEDDING_KEY, guest_name: 'D', message: 'M4', consent_given: 1, created_at: '2026-11-06T13:00:00.000Z', idempotency_key: null, idempotency_fingerprint: 'f4' },
   ]);
   
-  // First page
+  // First page (2 messages)
   const page1 = await getMessages(db, 2, null);
   assert.equal(page1.messages.length, 2);
-  assert.equal(page1.messages[0].id, 'id-4'); // Newest
+  assert.equal(page1.messages[0].id, 'id-4'); // Newest first
+  assert.equal(page1.messages[1].id, 'id-3');
   assert.ok(page1.nextCursor); // Has more
+  assert.notEqual(page1.nextCursor, 'has-more'); // Real cursor, not stub
   
-  // Note: In real implementation, cursor would be used to fetch next page
-  // For this test, we verify the logic exists
+  // Second page using cursor
+  const page2 = await getMessages(db, 2, page1.nextCursor);
+  assert.equal(page2.messages.length, 2);
+  assert.equal(page2.messages[0].id, 'id-2');
+  assert.equal(page2.messages[1].id, 'id-1');
+  assert.equal(page2.nextCursor, null); // No more messages
+  
+  // Verify no duplicates between pages
+  const page1Ids = page1.messages.map(m => m.id);
+  const page2Ids = page2.messages.map(m => m.id);
+  const intersection = page1Ids.filter(id => page2Ids.includes(id));
+  assert.equal(intersection.length, 0, 'Pages should not contain duplicate IDs');
+});
+
+test('getMessages rejects malformed cursor', async () => {
+  const db = createMockDb();
+  
+  // Invalid base64
+  await assert.rejects(
+    async () => await getMessages(db, 10, 'not-valid-base64!@#'),
+    { message: /INVALID_CURSOR/ }
+  );
+  
+  // Valid base64 but invalid JSON
+  await assert.rejects(
+    async () => await getMessages(db, 10, Buffer.from('not json').toString('base64')),
+    { message: /INVALID_CURSOR/ }
+  );
+  
+  // Valid JSON but wrong structure
+  await assert.rejects(
+    async () => await getMessages(db, 10, Buffer.from('{"wrong":"fields"}').toString('base64')),
+    { message: /INVALID_CURSOR/ }
+  );
+  
+  // Wrong types
+  await assert.rejects(
+    async () => await getMessages(db, 10, Buffer.from('{"createdAt":123,"id":"abc"}').toString('base64')),
+    { message: /INVALID_CURSOR/ }
+  );
+});
+
+test('getMessages handles boundary: identical created_at distinct id', async () => {
+  const db = createMockDb([
+    { id: 'id-a', wedding_key: WEDDING_KEY, guest_name: 'A', message: 'M1', consent_given: 1, created_at: '2026-11-06T10:00:00.000Z', idempotency_key: null, idempotency_fingerprint: 'f1' },
+    { id: 'id-b', wedding_key: WEDDING_KEY, guest_name: 'B', message: 'M2', consent_given: 1, created_at: '2026-11-06T10:00:00.000Z', idempotency_key: null, idempotency_fingerprint: 'f2' },
+    { id: 'id-c', wedding_key: WEDDING_KEY, guest_name: 'C', message: 'M3', consent_given: 1, created_at: '2026-11-06T10:00:00.000Z', idempotency_key: null, idempotency_fingerprint: 'f3' },
+  ]);
+  
+  // All messages have same created_at, sorted by id DESC
+  const page1 = await getMessages(db, 2, null);
+  assert.equal(page1.messages.length, 2);
+  assert.equal(page1.messages[0].id, 'id-c');
+  assert.equal(page1.messages[1].id, 'id-b');
+  assert.ok(page1.nextCursor);
+  
+  const page2 = await getMessages(db, 2, page1.nextCursor);
+  assert.equal(page2.messages.length, 1);
+  assert.equal(page2.messages[0].id, 'id-a');
+  assert.equal(page2.nextCursor, null);
 });

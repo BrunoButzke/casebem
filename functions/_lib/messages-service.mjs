@@ -154,6 +154,72 @@ export async function createMessage(db, data, idempotencyKey, secret) {
 }
 
 /**
+ * Encode cursor for pagination (Workers-compatible)
+ * @param {object} lastMessage - Last message {createdAt, id}
+ * @returns {string} Base64 URL-safe cursor
+ */
+function encodeCursor(lastMessage) {
+  const payload = {
+    createdAt: lastMessage.createdAt,
+    id: lastMessage.id,
+  };
+  const json = JSON.stringify(payload);
+  
+  // Use btoa (available in Workers and browsers)
+  const base64 = btoa(json)
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=/g, '');
+  
+  return base64;
+}
+
+/**
+ * Decode cursor for pagination (Workers-compatible)
+ * @param {string} cursor - Base64 URL-safe cursor
+ * @returns {object|null} {createdAt, id} or null if invalid
+ */
+function decodeCursor(cursor) {
+  try {
+    // Restore base64 padding
+    const base64 = cursor
+      .replace(/-/g, '+')
+      .replace(/_/g, '/');
+    const padded = base64 + '='.repeat((4 - base64.length % 4) % 4);
+    
+    // Use atob (available in Workers and browsers)
+    const json = atob(padded);
+    const payload = JSON.parse(json);
+    
+    // Validate payload structure
+    if (!payload || typeof payload !== 'object') {
+      return null;
+    }
+    
+    const { createdAt, id } = payload;
+    
+    // Validate types and lengths
+    if (typeof createdAt !== 'string' || typeof id !== 'string') {
+      return null;
+    }
+    
+    // Validate createdAt is ISO 8601 format
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(createdAt)) {
+      return null;
+    }
+    
+    // Validate id length (reasonable bounds)
+    if (id.length < 1 || id.length > 100) {
+      return null;
+    }
+    
+    return { createdAt, id };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Get messages with pagination
  * @param {D1Database} db - Cloudflare D1 database
  * @param {number} limit - Number of messages to return (3-50)
@@ -161,37 +227,56 @@ export async function createMessage(db, data, idempotencyKey, secret) {
  * @returns {Promise<{messages: Array, nextCursor: string|null}>}
  */
 export async function getMessages(db, limit, cursor) {
-  // For MVP, simple limit-based pagination without cursor implementation
-  // Full cursor pagination would decode cursor to createdAt+id for WHERE clause
+  let query;
+  let params;
   
-  const result = await db
-    .prepare(
-      `SELECT id, guest_name, message, created_at
-       FROM wedding_messages
-       WHERE wedding_key = ?
-       ORDER BY created_at DESC, id DESC
-       LIMIT ?`
-    )
-    .bind(WEDDING_KEY, limit)
-    .all();
-
-  const messages = result.results.map(row => ({
+  if (cursor) {
+    // Decode cursor
+    const decoded = decodeCursor(cursor);
+    if (!decoded) {
+      throw new Error('INVALID_CURSOR');
+    }
+    
+    // Query messages after cursor position
+    query = `SELECT id, guest_name, message, created_at
+             FROM wedding_messages
+             WHERE wedding_key = ?
+               AND (created_at < ? OR (created_at = ? AND id < ?))
+             ORDER BY created_at DESC, id DESC
+             LIMIT ?`;
+    params = [WEDDING_KEY, decoded.createdAt, decoded.createdAt, decoded.id, limit + 1];
+  } else {
+    // First page
+    query = `SELECT id, guest_name, message, created_at
+             FROM wedding_messages
+             WHERE wedding_key = ?
+             ORDER BY created_at DESC, id DESC
+             LIMIT ?`;
+    params = [WEDDING_KEY, limit + 1];
+  }
+  
+  const result = await db.prepare(query).bind(...params).all();
+  
+  // Check if there are more messages
+  const hasMore = result.results.length > limit;
+  const messages = result.results.slice(0, limit).map(row => ({
     id: row.id,
     guestName: row.guest_name,
     message: row.message,
     createdAt: row.created_at,
   }));
-
-  // Determine if there are more messages (simplified for MVP)
-  // Full implementation would check if there are more rows after the last cursor
-  const nextCursor = messages.length === limit ? 'has-more' : null;
+  
+  // Generate next cursor if there are more messages
+  const nextCursor = hasMore && messages.length > 0
+    ? encodeCursor(messages[messages.length - 1])
+    : null;
 
   return { messages, nextCursor };
 }
 
 /**
  * Check rate limit for IP address
- * Reuses RSVP rate_limits table
+ * Reuses RSVP rate_limits table with namespace
  * @param {D1Database} db - Cloudflare D1 database
  * @param {string} ipAddress - Client IP address
  * @param {string} secret - Base64 secret for HMAC
@@ -202,7 +287,8 @@ export async function checkRateLimit(db, ipAddress, secret, limit = 5) {
   const keys = await deriveRsvpKeys(secret);
   const ipHash = await hmacHash(ipAddress, keys.hmacKey);
   const windowStart = getHourWindow();
-  const rateLimitId = `${WEDDING_KEY}:${ipHash}:${windowStart}`;
+  // Use 'messages:' namespace to separate from RSVP rate limits
+  const rateLimitId = `messages:${WEDDING_KEY}:${ipHash}:${windowStart}`;
   const timestamp = now();
 
   // Atomic UPSERT with RETURNING

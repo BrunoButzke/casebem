@@ -86,7 +86,7 @@ export function initMessages(windowContext = window) {
 
       if (response.ok) {
         // Success - add message to top of list
-        prependMessage(messagesListEl, data);
+        prependMessage(windowContext, messagesListEl, data);
         
         // Clear form
         nameInput.value = '';
@@ -141,10 +141,10 @@ async function loadMessages(windowContext, messagesListEl, statusEl, loadMoreBtn
         showStatus(statusEl, '', 'success');
       } else {
         if (isLoadMore) {
-          data.messages.forEach(msg => appendMessage(messagesListEl, msg));
+          data.messages.forEach(msg => appendMessage(windowContext, messagesListEl, msg));
         } else {
           messagesListEl.innerHTML = '';
-          data.messages.forEach(msg => appendMessage(messagesListEl, msg));
+          data.messages.forEach(msg => appendMessage(windowContext, messagesListEl, msg));
         }
         showStatus(statusEl, '', 'success');
       }
@@ -170,8 +170,16 @@ async function loadMessages(windowContext, messagesListEl, statusEl, loadMoreBtn
 /**
  * Prepend message to list (for newly created)
  */
-function prependMessage(listEl, messageData) {
-  const messageEl = createMessageElement(messageData);
+function prependMessage(windowContext, listEl, messageData) {
+  // Check for duplicates by data-message-id
+  const existingIds = Array.from(listEl.querySelectorAll('[data-message-id]'))
+    .map(el => el.getAttribute('data-message-id'));
+  
+  if (existingIds.includes(messageData.id)) {
+    return; // Already exists, skip
+  }
+  
+  const messageEl = createMessageElement(windowContext, messageData);
   if (listEl.querySelector('.messages__empty')) {
     listEl.innerHTML = '';
   }
@@ -181,27 +189,37 @@ function prependMessage(listEl, messageData) {
 /**
  * Append message to list (for loaded)
  */
-function appendMessage(listEl, messageData) {
-  const messageEl = createMessageElement(messageData);
+function appendMessage(windowContext, listEl, messageData) {
+  // Check for duplicates by data-message-id
+  const existingIds = Array.from(listEl.querySelectorAll('[data-message-id]'))
+    .map(el => el.getAttribute('data-message-id'));
+  
+  if (existingIds.includes(messageData.id)) {
+    return; // Already exists, skip
+  }
+  
+  const messageEl = createMessageElement(windowContext, messageData);
   listEl.appendChild(messageEl);
 }
 
 /**
  * Create message DOM element
  */
-function createMessageElement(messageData) {
-  const article = document.createElement('article');
+function createMessageElement(windowContext, messageData) {
+  const doc = windowContext.document;
+  
+  const article = doc.createElement('article');
   article.className = 'message-item';
   article.setAttribute('data-message-id', messageData.id);
 
-  const header = document.createElement('div');
+  const header = doc.createElement('div');
   header.className = 'message-item__header';
 
-  const name = document.createElement('strong');
+  const name = doc.createElement('strong');
   name.className = 'message-item__name';
   name.textContent = messageData.guestName;
 
-  const date = document.createElement('time');
+  const date = doc.createElement('time');
   date.className = 'message-item__date';
   date.setAttribute('datetime', messageData.createdAt);
   date.textContent = formatDate(messageData.createdAt);
@@ -209,7 +227,7 @@ function createMessageElement(messageData) {
   header.appendChild(name);
   header.appendChild(date);
 
-  const content = document.createElement('p');
+  const content = doc.createElement('p');
   content.className = 'message-content';
   content.textContent = messageData.message; // XSS safe: textContent, not innerHTML
 

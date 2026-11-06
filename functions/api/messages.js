@@ -220,6 +220,11 @@ async function handleGet(request, env) {
     return jsonResponse(request, result, 200);
   } catch (error) {
     console.error('Failed to get messages:', error);
+    
+    if (error.message === 'INVALID_CURSOR') {
+      return errorResponse(request, 'Cursor inválido', 400);
+    }
+    
     return errorResponse(request, 'Erro ao buscar mensagens', 500);
   }
 }

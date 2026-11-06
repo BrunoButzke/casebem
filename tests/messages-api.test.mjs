@@ -70,12 +70,35 @@ class MockD1Statement {
 
   async all() {
     if (this.sql.includes('SELECT') && this.sql.includes('wedding_messages')) {
-      const [weddingKey, limitParam] = this.params;
+      // Support both formats: with cursor and without
+      const weddingKey = this.params[0];
+      let limit;
+      let cursorCreatedAt = null;
+      let cursorId = null;
+      
+      if (this.params.length === 2) {
+        // No cursor: [weddingKey, limit]
+        limit = this.params[1];
+      } else if (this.params.length === 5) {
+        // With cursor: [weddingKey, createdAt, createdAt, id, limit]
+        cursorCreatedAt = this.params[1];
+        cursorId = this.params[3];
+        limit = this.params[4];
+      }
+      
       const results = [];
       
       for (const record of this.db.data.values()) {
         if (record.wedding_key === weddingKey) {
-          results.push(record);
+          // Apply cursor filter if present
+          if (cursorCreatedAt && cursorId) {
+            if (record.created_at < cursorCreatedAt || 
+               (record.created_at === cursorCreatedAt && record.id < cursorId)) {
+              results.push(record);
+            }
+          } else {
+            results.push(record);
+          }
         }
       }
       
@@ -86,7 +109,7 @@ class MockD1Statement {
         return b.id.localeCompare(a.id);
       });
       
-      return { results: results.slice(0, limitParam) };
+      return { results: results.slice(0, limit) };
     }
     
     return { results: [] };
@@ -531,32 +554,44 @@ test('GET respects limit parameter', async () => {
     { id: 'id-1', wedding_key: 'dani-carine', guest_name: 'A', message: 'M', consent_given: 1, created_at: '2026-11-06T10:00:00.000Z', idempotency_key: null, idempotency_fingerprint: 'f1' },
     { id: 'id-2', wedding_key: 'dani-carine', guest_name: 'B', message: 'M', consent_given: 1, created_at: '2026-11-06T11:00:00.000Z', idempotency_key: null, idempotency_fingerprint: 'f2' },
     { id: 'id-3', wedding_key: 'dani-carine', guest_name: 'C', message: 'M', consent_given: 1, created_at: '2026-11-06T12:00:00.000Z', idempotency_key: null, idempotency_fingerprint: 'f3' },
+    { id: 'id-4', wedding_key: 'dani-carine', guest_name: 'D', message: 'M', consent_given: 1, created_at: '2026-11-06T13:00:00.000Z', idempotency_key: null, idempotency_fingerprint: 'f4' },
   ]);
-  const request = new Request('https://casebem.pages.dev/api/messages?limit=2', {
+  const request = new Request('https://casebem.pages.dev/api/messages?limit=3', {
     headers: { 'Origin': 'https://casebem.pages.dev' },
   });
   
   const response = await onRequest({ request, env });
   const data = await response.json();
-  assert.equal(data.messages.length, 2);
+  assert.equal(data.messages.length, 3);
 });
 
 test('GET validates limit parameter', async () => {
   const env = createMockEnv();
   
-  // Limit too low
+  // Limit too low (below 3)
   const requestLow = new Request('https://casebem.pages.dev/api/messages?limit=2', {
     headers: { 'Origin': 'https://casebem.pages.dev' },
   });
   const responseLow = await onRequest({ request: requestLow, env });
   assert.equal(responseLow.status, 400);
+  const dataLow = await responseLow.json();
+  assert.match(dataLow.error, /3-50/);
   
-  // Limit too high
+  // Limit too high (above 50)
   const requestHigh = new Request('https://casebem.pages.dev/api/messages?limit=51', {
     headers: { 'Origin': 'https://casebem.pages.dev' },
   });
   const responseHigh = await onRequest({ request: requestHigh, env });
   assert.equal(responseHigh.status, 400);
+  const dataHigh = await responseHigh.json();
+  assert.match(dataHigh.error, /3-50/);
+  
+  // Limit = 3 should be valid
+  const requestValid = new Request('https://casebem.pages.dev/api/messages?limit=3', {
+    headers: { 'Origin': 'https://casebem.pages.dev' },
+  });
+  const responseValid = await onRequest({ request: requestValid, env });
+  assert.equal(responseValid.status, 200);
 });
 
 test('GET returns 503 when DB not configured', async () => {

@@ -182,6 +182,17 @@ async function handlePost(request, env) {
       idempotencyKey,
       env.RSVP_SECRET
     );
+
+    // Best-effort e-mail (Resend free). Sem key = no-op, zero custo Cloudflare.
+    try {
+      const { sendAdminNotification } = await import('../_lib/notify-email.mjs');
+      await sendAdminNotification(env, {
+        subject: `[CaseBem] Novo recado de ${message.guestName}`,
+        text: `${message.guestName} escreveu:\n\n${message.message}`,
+      });
+    } catch {
+      /* ignore */
+    }
     
     return jsonResponse(request, message, 201);
   } catch (error) {

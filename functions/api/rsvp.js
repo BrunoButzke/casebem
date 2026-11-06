@@ -207,6 +207,18 @@ async function handlePost(request, env) {
       env.RSVP_SECRET,
       bearerToken
     );
+
+    // Best-effort e-mail (Resend free). Sem key = no-op.
+    try {
+      const { sendAdminNotification } = await import('../_lib/notify-email.mjs');
+      await sendAdminNotification(env, {
+        subject: `[CaseBem] RSVP — ${rsvp.guestName || validation.data.guestName}`,
+        text: `Presença: ${(rsvp.attending ?? validation.data.attending) ? 'sim' : 'não'}\nAdultos: ${rsvp.adultsCount ?? validation.data.adultsCount}\nCrianças: ${rsvp.childrenCount ?? validation.data.childrenCount}`,
+      });
+    } catch {
+      /* ignore */
+    }
+
     return jsonResponse(request, rsvp, 201);
   } catch (error) {
     console.error('Failed to create RSVP:', error);

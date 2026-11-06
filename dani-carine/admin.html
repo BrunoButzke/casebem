@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex,nofollow" />
+  <title>Painel — Dani &amp; Carine</title>
+  <style>
+    :root {
+      --bg: #f7f3ee;
+      --ink: #1c1917;
+      --muted: #78716c;
+      --card: #fffdf9;
+      --line: #e7e0d6;
+      --accent: #0f766e;
+      --danger: #b91c1c;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      line-height: 1.45;
+    }
+    main { max-width: 960px; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+    h1 { font-size: 1.5rem; margin: 0 0 0.25rem; }
+    .sub { color: var(--muted); margin-bottom: 1.25rem; font-size: 0.95rem; }
+    .login, .panel { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 1rem 1.1rem; }
+    label { display: block; font-size: 0.85rem; margin-bottom: 0.35rem; }
+    input[type="password"] {
+      width: 100%; max-width: 420px; padding: 0.65rem 0.75rem;
+      border: 1px solid var(--line); border-radius: 8px; font-size: 1rem;
+    }
+    button {
+      margin-top: 0.75rem; background: var(--accent); color: #fff;
+      border: 0; border-radius: 8px; padding: 0.55rem 1rem; cursor: pointer; font-size: 0.95rem;
+    }
+    button.secondary { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+    button.danger { background: var(--danger); }
+    .err { color: var(--danger); margin-top: 0.5rem; font-size: 0.9rem; }
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.75rem; margin: 1rem 0; }
+    .stat { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 0.75rem; }
+    .stat b { display: block; font-size: 1.35rem; }
+    .stat span { color: var(--muted); font-size: 0.8rem; }
+    h2 { font-size: 1.1rem; margin: 1.5rem 0 0.6rem; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.88rem; background: var(--card); }
+    th, td { border-bottom: 1px solid var(--line); padding: 0.45rem 0.4rem; text-align: left; vertical-align: top; }
+    th { color: var(--muted); font-weight: 600; }
+    .row-actions { display: flex; gap: 0.35rem; flex-wrap: wrap; }
+    .toolbar { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; margin-bottom: 0.75rem; }
+    .pill { display: inline-block; font-size: 0.75rem; padding: 0.15rem 0.45rem; border-radius: 999px; background: #ecfdf5; color: #065f46; }
+    .pill.warn { background: #fff7ed; color: #9a3412; }
+    .hidden { opacity: 0.55; }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Painel dos noivos</h1>
+    <p class="sub">Dani &amp; Carine · Cloudflare Free (token local, sem Access pago)</p>
+
+    <section class="login" id="login-box">
+      <label for="token">ADMIN_PANEL_SECRET</label>
+      <input id="token" type="password" autocomplete="current-password" placeholder="Cole o secret do Pages" />
+      <button type="button" id="login-btn">Entrar</button>
+      <p class="err" id="login-err" hidden></p>
+    </section>
+
+    <section class="panel" id="panel" hidden>
+      <div class="toolbar">
+        <button type="button" class="secondary" id="refresh-btn">Atualizar</button>
+        <button type="button" class="secondary" id="csv-btn">Exportar RSVPs (CSV)</button>
+        <button type="button" class="secondary" id="logout-btn">Sair</button>
+      </div>
+      <div class="stats" id="stats"></div>
+      <p class="err" id="panel-err" hidden></p>
+
+      <h2>RSVPs</h2>
+      <div id="rsvp-table"></div>
+
+      <h2>Presentes</h2>
+      <div id="gifts-table"></div>
+
+      <h2>Mural</h2>
+      <div id="messages-table"></div>
+    </section>
+  </main>
+
+  <script type="module">
+    const STORAGE_KEY = 'casebem_admin_token';
+    const $ = (id) => document.getElementById(id);
+
+    function getToken() {
+      return sessionStorage.getItem(STORAGE_KEY) || '';
+    }
+
+    function setToken(t) {
+      sessionStorage.setItem(STORAGE_KEY, t);
+    }
+
+    function clearToken() {
+      sessionStorage.removeItem(STORAGE_KEY);
+    }
+
+    function authHeaders() {
+      return { Authorization: `Bearer ${getToken()}` };
+    }
+
+    function money(cents) {
+      return (Number(cents || 0) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    }
+
+    function showLogin(err) {
+      $('panel').hidden = true;
+      $('login-box').hidden = false;
+      if (err) {
+        $('login-err').hidden = false;
+        $('login-err').textContent = err;
+      }
+    }
+
+    function showPanel() {
+      $('login-box').hidden = true;
+      $('panel').hidden = false;
+      $('login-err').hidden = true;
+    }
+
+    async function load() {
+      $('panel-err').hidden = true;
+      const res = await fetch('/api/admin/summary', { headers: authHeaders() });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        if (res.status === 401) {
+          clearToken();
+          showLogin(data.message || 'Não autorizado');
+          return;
+        }
+        $('panel-err').hidden = false;
+        $('panel-err').textContent = data.message || data.error || 'Falha ao carregar';
+        return;
+      }
+
+      showPanel();
+      const s = data.summary;
+      $('stats').innerHTML = `
+        <div class="stat"><b>${s.attendingCount}</b><span>confirmados</span></div>
+        <div class="stat"><b>${s.adults + s.children}</b><span>pessoas (${s.adults}A/${s.children}C)</span></div>
+        <div class="stat"><b>${s.messagesVisible}</b><span>recados visíveis</span></div>
+        <div class="stat"><b>${s.giftsPaid}</b><span>presentes pagos</span></div>
+        <div class="stat"><b>${money(s.giftsPaidCents)}</b><span>arrecadado (pago)</span></div>
+        <div class="stat"><b>${s.giftsPending}</b><span>pix pendentes</span></div>
+      `;
+
+      $('rsvp-table').innerHTML = renderRsvps(data.rsvps || []);
+      $('gifts-table').innerHTML = renderGifts(data.gifts || []);
+      $('messages-table').innerHTML = renderMessages(data.messages || []);
+    }
+
+    function renderRsvps(rows) {
+      if (!rows.length) return '<p class="sub">Nenhum RSVP ainda.</p>';
+      return `<table><thead><tr>
+        <th>Nome</th><th>Vai?</th><th>Adultos</th><th>Crianças</th><th>Obs</th><th>Quando</th>
+      </tr></thead><tbody>
+      ${rows.map((r) => `<tr>
+        <td>${escapeHtml(r.guestName)}</td>
+        <td>${r.attending ? 'Sim' : 'Não'}</td>
+        <td>${r.adultsCount}</td>
+        <td>${r.childrenCount}</td>
+        <td>${escapeHtml(r.observations || '')}</td>
+        <td>${escapeHtml((r.createdAt || '').slice(0, 16).replace('T', ' '))}</td>
+      </tr>`).join('')}
+      </tbody></table>`;
+    }
+
+    function renderGifts(rows) {
+      if (!rows.length) return '<p class="sub">Nenhum checkout ainda.</p>';
+      return `<table><thead><tr>
+        <th>Presenteador</th><th>Valor</th><th>Status</th><th>Pago</th><th>Quando</th>
+      </tr></thead><tbody>
+      ${rows.map((g) => `<tr>
+        <td>${escapeHtml(g.gifterName)}</td>
+        <td>${money(g.amountCents)}</td>
+        <td>${escapeHtml(g.status)}</td>
+        <td>${g.paid ? '<span class="pill">pago</span>' : '<span class="pill warn">pendente</span>'}</td>
+        <td>${escapeHtml((g.createdAt || '').slice(0, 16).replace('T', ' '))}</td>
+      </tr>`).join('')}
+      </tbody></table>`;
+    }
+
+    function renderMessages(rows) {
+      if (!rows.length) return '<p class="sub">Nenhum recado.</p>';
+      return `<table><thead><tr>
+        <th>Nome</th><th>Recado</th><th></th>
+      </tr></thead><tbody>
+      ${rows.map((m) => `<tr class="${m.hidden ? 'hidden' : ''}">
+        <td>${escapeHtml(m.guestName)}</td>
+        <td>${escapeHtml(m.message)}</td>
+        <td class="row-actions">
+          <button type="button" class="secondary" data-msg="${escapeHtml(m.id)}" data-hidden="${m.hidden ? '0' : '1'}">
+            ${m.hidden ? 'Restaurar' : 'Ocultar'}
+          </button>
+        </td>
+      </tr>`).join('')}
+      </tbody></table>`;
+    }
+
+    function escapeHtml(s) {
+      return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    $('login-btn').addEventListener('click', async () => {
+      const token = $('token').value.trim();
+      if (token.length < 16) {
+        showLogin('Secret deve ter pelo menos 16 caracteres');
+        return;
+      }
+      setToken(token);
+      await load();
+    });
+
+    $('refresh-btn').addEventListener('click', () => load());
+    $('logout-btn').addEventListener('click', () => {
+      clearToken();
+      $('token').value = '';
+      showLogin();
+    });
+
+    $('csv-btn').addEventListener('click', async () => {
+      const res = await fetch('/api/admin/rsvps.csv', { headers: authHeaders() });
+      if (!res.ok) {
+        $('panel-err').hidden = false;
+        $('panel-err').textContent = 'Falha ao exportar CSV';
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'rsvps-dani-carine.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    $('messages-table').addEventListener('click', async (ev) => {
+      const btn = ev.target.closest('button[data-msg]');
+      if (!btn) return;
+      const id = btn.getAttribute('data-msg');
+      const hidden = btn.getAttribute('data-hidden') === '1';
+      const res = await fetch('/api/admin/messages', {
+        method: 'PATCH',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, hidden }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        $('panel-err').hidden = false;
+        $('panel-err').textContent = data.message || data.error || 'Falha ao moderar';
+        return;
+      }
+      await load();
+    });
+
+    if (getToken()) load();
+  </script>
+</body>
+</html>

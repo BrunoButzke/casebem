@@ -27,6 +27,12 @@ Abre em `/landing-page-animada/`.
 2. Copie o **Access Token** (teste → produção depois).
 3. No `.env` local: `MP_ACCESS_TOKEN=APP_USR-...`
 4. No Cloudflare Pages: Settings → Environment variables → `MP_ACCESS_TOKEN` (produção).
+5. Painel noivos (Free): `ADMIN_PANEL_SECRET` (≥16 chars) → `/dani-carine/admin.html`
+6. Opcional e-mail (Resend free, fora da CF): `RESEND_API_KEY` + `ADMIN_NOTIFY_EMAIL`
+7. Webhook Pix: configure no MP `https://seu-dominio/api/webhooks/mercadopago`
+8. Migration `0005_admin_and_paid.sql` no D1 após deploy
+
+**Custo:** mantenha **Workers/Pages Free**. Não ative Workers Paid. E-mail é opcional e externo.
 
 ### O que está integrado
 

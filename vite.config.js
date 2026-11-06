@@ -92,6 +92,7 @@ export default defineConfig(({ mode }) => {
         input: {
           landing: resolve(rootDir, 'landing-page-animada/index.html'),
           daniCarine: resolve(rootDir, 'dani-carine/index.html'),
+          daniCarineAdmin: resolve(rootDir, 'dani-carine/admin.html'),
         },
       },
     },

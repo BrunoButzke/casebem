@@ -237,19 +237,21 @@ export async function getMessages(db, limit, cursor) {
       throw new Error('INVALID_CURSOR');
     }
     
-    // Query messages after cursor position
+    // Query messages after cursor position (exclude moderated/hidden)
     query = `SELECT id, guest_name, message, created_at
              FROM wedding_messages
              WHERE wedding_key = ?
+               AND COALESCE(hidden, 0) = 0
                AND (created_at < ? OR (created_at = ? AND id < ?))
              ORDER BY created_at DESC, id DESC
              LIMIT ?`;
     params = [WEDDING_KEY, decoded.createdAt, decoded.createdAt, decoded.id, limit + 1];
   } else {
-    // First page
+    // First page (exclude moderated/hidden)
     query = `SELECT id, guest_name, message, created_at
              FROM wedding_messages
              WHERE wedding_key = ?
+               AND COALESCE(hidden, 0) = 0
              ORDER BY created_at DESC, id DESC
              LIMIT ?`;
     params = [WEDDING_KEY, limit + 1];

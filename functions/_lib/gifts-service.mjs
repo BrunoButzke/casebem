@@ -248,26 +248,59 @@ export async function createCheckoutPayment(request, env, db, ipAddress) {
       };
     }
 
-    // Se está 'creating', outro worker está processando
+    // Se está 'creating', tentar adquirir lease (pode estar expirado)
     if (intent.status === 'creating') {
+      const { acquireLease } = await import('./checkout-idempotency.mjs');
+      const leaseAcquired = await acquireLease(db, intentKey, 120);
+      
+      if (!leaseAcquired) {
+        // Outro worker tem lease ativo
+        return {
+          ok: false,
+          status: 409,
+          error: 'INTENT_PROCESSING',
+          message: 'Pagamento já está sendo processado. Tente novamente em alguns segundos.',
+        };
+      }
+      
+      // Lease adquirido, prosseguir com pagamento
+    }
+  }
+
+  // Novo intent criado ou lease adquirido: tentar adquirir lease
+  if (intentResult.status === 'created') {
+    const { acquireLease } = await import('./checkout-idempotency.mjs');
+    const leaseAcquired = await acquireLease(db, intentKey, 120);
+    
+    if (!leaseAcquired) {
+      // Race condition: outro worker inseriu e adquiriu lease primeiro
       return {
         ok: false,
         status: 409,
         error: 'INTENT_PROCESSING',
-        message: 'Pagamento já está sendo processado. Aguarde.',
+        message: 'Pagamento já está sendo processado. Tente novamente em alguns segundos.',
       };
     }
   }
 
-  // Novo intent criado, processar pagamento
-  return await createPixCheckout({
-    gifterName,
-    items: normalizedItems,
-    totalInCents,
-    intentKey,
-    env,
-    db,
-  });
+  // Lease adquirido, processar pagamento
+  try {
+    const result = await createPixCheckout({
+      gifterName,
+      items: normalizedItems,
+      totalInCents,
+      intentKey,
+      env,
+      db,
+    });
+    
+    return result;
+  } catch (error) {
+    // Em caso de erro, release lease para permitir retry
+    const { releaseLease } = await import('./checkout-idempotency.mjs');
+    await releaseLease(db, intentKey).catch(() => {}); // Best effort
+    throw error;
+  }
 }
 
 /**

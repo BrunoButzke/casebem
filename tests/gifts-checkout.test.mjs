@@ -49,8 +49,9 @@ class MockD1Statement {
   }
 
   async run() {
+    // INSERT checkout_intents (8 params: intentKey, fingerprint, amountCents, gifterName, canonicalItems, paymentMethod, created_at, updated_at)
     if (this.sql.includes('INSERT INTO checkout_intents')) {
-      const [intentKey, fingerprint, provider, providerRef, amountCents, gifterName, canonicalItems, paymentMethod, status, createdAt, updatedAt] = this.params;
+      const [intentKey, fingerprint, amountCents, gifterName, canonicalItems, paymentMethod, createdAt, updatedAt] = this.params;
       
       if (this.db.intents.has(intentKey)) {
         throw new Error('UNIQUE constraint failed: checkout_intents.intent_key');
@@ -59,23 +60,47 @@ class MockD1Statement {
       this.db.intents.set(intentKey, {
         intent_key: intentKey,
         fingerprint,
-        provider,
-        provider_reference: providerRef,
+        provider: 'mercadopago',
+        provider_reference: null,
         amount_cents: amountCents,
         gifter_name: gifterName,
         canonical_items: canonicalItems,
         payment_method: paymentMethod,
-        status,
+        status: 'creating',
         qr_code: null,
         qr_code_base64: null,
         created_at: createdAt,
         updated_at: updatedAt,
+        lease_until: null,
       });
       
       return { success: true };
     }
     
-    if (this.sql.includes('UPDATE checkout_intents')) {
+    // UPDATE lease_until (acquire lease)
+    if (this.sql.includes('UPDATE checkout_intents') && this.sql.includes('SET lease_until = ?')) {
+      const [leaseUntil, updatedAt, intentKey, now] = this.params;
+      const existing = this.db.intents.get(intentKey);
+      
+      if (!existing) {
+        return { success: true, changes: 0 };
+      }
+      
+      // WHERE status = 'creating' AND (lease_until IS NULL OR lease_until < now)
+      const canAcquire = existing.status === 'creating' && 
+        (existing.lease_until === null || existing.lease_until < now);
+      
+      if (canAcquire) {
+        existing.lease_until = leaseUntil;
+        existing.updated_at = updatedAt;
+        return { success: true, changes: 1 };
+      }
+      
+      return { success: true, changes: 0 };
+    }
+    
+    // UPDATE intent with payment result
+    if (this.sql.includes('UPDATE checkout_intents') && this.sql.includes('provider_reference')) {
       const [providerRef, status, qrCode, qrCodeBase64, updatedAt, intentKey] = this.params;
       const existing = this.db.intents.get(intentKey);
       
@@ -84,6 +109,7 @@ class MockD1Statement {
         existing.status = status;
         existing.qr_code = qrCode;
         existing.qr_code_base64 = qrCodeBase64;
+        existing.lease_until = null; // Clear lease on completion
         existing.updated_at = updatedAt;
       }
       

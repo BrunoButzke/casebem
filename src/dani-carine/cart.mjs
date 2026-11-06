@@ -723,6 +723,8 @@ async function handleCheckout() {
   // Obter ou criar intent key
   const intentKey = getOrCreateIntentKey();
 
+  let paymentSuccess = false;
+
   try {
     const response = await _fetch('/api/gifts/checkout', {
       method: 'POST',
@@ -741,17 +743,20 @@ async function handleCheckout() {
 
     if (data.ok) {
       // Pagamento criado com sucesso (Pix)
+      paymentSuccess = true;
       showPaymentResult(data);
       // NÃO limpar carrinho - usuário precisa do QR até confirmação manual
       // Desabilitar checkout para evitar duplicatas
       checkoutBtn.disabled = true;
       checkoutBtn.textContent = 'Pagamento Pendente';
     } else {
-      // Erro (ex: cartão/boleto não disponível)
+      // Erro (ex: cartão/boleto não disponível, 409 INTENT_PROCESSING)
       if (data.status === 503) {
         cartError.textContent = data.message || 'Método de pagamento não disponível. Use Pix.';
+      } else if (data.error === 'INTENT_PROCESSING') {
+        cartError.textContent = data.message || 'Pagamento já está sendo processado. Aguarde alguns segundos e tente novamente.';
       } else {
-        cartError.textContent = data.error || 'Erro ao processar pagamento';
+        cartError.textContent = data.message || data.error || 'Erro ao processar pagamento';
       }
       cartError.hidden = false;
     }
@@ -760,8 +765,11 @@ async function handleCheckout() {
     cartError.textContent = 'Erro ao processar pagamento. Tente novamente.';
     cartError.hidden = false;
   } finally {
-    checkoutBtn.disabled = false;
-    checkoutBtn.textContent = 'Finalizar compra';
+    // Só re-habilitar botão em caso de erro, não em pending/success
+    if (!paymentSuccess) {
+      checkoutBtn.disabled = false;
+      checkoutBtn.textContent = 'Finalizar compra';
+    }
   }
 }
 

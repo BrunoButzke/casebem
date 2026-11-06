@@ -184,9 +184,11 @@ export async function getOrCreateIntent(db, params, secret) {
 export async function updateIntentWithPayment(db, intentKey, payment, status) {
   const now = new Date().toISOString();
 
+  // Limpar lease_until quando status final (pending/failed)
   await db.prepare(
     `UPDATE checkout_intents
-     SET provider_reference = ?, status = ?, qr_code = ?, qr_code_base64 = ?, updated_at = ?
+     SET provider_reference = ?, status = ?, qr_code = ?, qr_code_base64 = ?, 
+         lease_until = NULL, updated_at = ?
      WHERE intent_key = ?`
   ).bind(
     payment.id || null,

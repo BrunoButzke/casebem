@@ -243,3 +243,46 @@ function getHourWindow() {
   date.setMinutes(0, 0, 0);
   return date.toISOString();
 }
+
+/**
+ * Adquire lease para processar intent (compare-and-swap atomic)
+ * @param {D1Database} db - D1 database
+ * @param {string} intentKey - Intent UUID
+ * @param {number} ttlSeconds - Lease time-to-live (default 120s)
+ * @param {object} clock - Optional injected clock for testing (default Date)
+ * @returns {Promise<boolean>} true se adquiriu lease, false se já ocupado
+ */
+export async function acquireLease(db, intentKey, ttlSeconds = 120, clock = Date) {
+  const now = clock.now ? clock.now() : new Date().toISOString();
+  const leaseUntil = clock.now 
+    ? new Date(new Date(clock.now()).getTime() + ttlSeconds * 1000).toISOString()
+    : new Date(Date.now() + ttlSeconds * 1000).toISOString();
+  
+  // Compare-and-swap: só atualiza se (lease_until IS NULL OR lease_until < now) AND status = 'creating'
+  const result = await db.prepare(
+    `UPDATE checkout_intents
+     SET lease_until = ?, updated_at = ?
+     WHERE intent_key = ?
+       AND status = 'creating'
+       AND (lease_until IS NULL OR lease_until < ?)`
+  ).bind(leaseUntil, now, intentKey, now).run();
+  
+  // changes > 0 significa que conseguiu adquirir lease
+  return result.changes > 0;
+}
+
+/**
+ * Libera lease de um intent (permite re-tentativa)
+ * @param {D1Database} db - D1 database
+ * @param {string} intentKey - Intent UUID
+ * @returns {Promise<void>}
+ */
+export async function releaseLease(db, intentKey) {
+  const now = new Date().toISOString();
+  
+  await db.prepare(
+    `UPDATE checkout_intents
+     SET lease_until = NULL, updated_at = ?
+     WHERE intent_key = ?`
+  ).bind(now, intentKey).run();
+}

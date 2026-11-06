@@ -484,6 +484,72 @@ h2 {
   color: color-mix(in srgb, var(--cream) 55%, transparent);
 }
 
+/* App Highlight */
+.app-highlight {
+  padding: clamp(3.5rem, 10vw, 6rem) 0;
+  background: linear-gradient(165deg, var(--lagoon), color-mix(in srgb, var(--lagoon) 88%, black));
+  color: var(--cream);
+}
+
+.app-highlight__grid {
+  display: grid;
+  gap: 2.5rem;
+  align-items: center;
+}
+
+@media (min-width: 860px) {
+  .app-highlight__grid {
+    grid-template-columns: 1fr 1.3fr;
+    gap: 4rem;
+  }
+}
+
+.app-highlight__media {
+  display: grid;
+  place-items: center;
+}
+
+.app-highlight__media img {
+  max-width: min(280px, 100%);
+  border-radius: 20px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+}
+
+.app-highlight .eyebrow {
+  color: var(--salmon);
+}
+
+.app-highlight h2 {
+  color: var(--cream);
+}
+
+.app-highlight__desc {
+  margin: 0 0 1.5rem;
+  font-size: 1.05rem;
+  line-height: 1.6;
+  color: color-mix(in srgb, var(--cream) 88%, transparent);
+  max-width: 38rem;
+}
+
+.app-highlight__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.6rem 1rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--cream) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--cream) 18%, transparent);
+  font-size: 0.85rem;
+  line-height: 1.4;
+  color: var(--cream);
+}
+
+.app-highlight__status svg {
+  flex-shrink: 0;
+  color: var(--salmon);
+}
+
 /* How */
 .how {
   background: var(--sand);

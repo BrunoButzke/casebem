@@ -72,6 +72,7 @@
       <div class="toolbar">
         <button type="button" class="secondary" id="refresh-btn">Atualizar</button>
         <button type="button" class="secondary" id="csv-btn">Exportar RSVPs (CSV)</button>
+        <button type="button" class="secondary" id="gifts-csv-btn">Exportar presentes pagos (CSV)</button>
         <button type="button" class="secondary" id="logout-btn">Sair</button>
       </div>
       <div class="stats" id="stats"></div>
@@ -411,6 +412,22 @@
       const a = document.createElement('a');
       a.href = url;
       a.download = 'rsvps-dani-carine.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    $('gifts-csv-btn').addEventListener('click', async () => {
+      const res = await fetch('/api/admin/gifts.csv', { headers: authHeaders() });
+      if (!res.ok) {
+        $('panel-err').hidden = false;
+        $('panel-err').textContent = 'Falha ao exportar presentes (CSV)';
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'presentes-pagos-dani-carine.csv';
       a.click();
       URL.revokeObjectURL(url);
     });

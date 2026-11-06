@@ -28,10 +28,11 @@
     .sub { color: var(--muted); margin-bottom: 1.25rem; font-size: 0.95rem; }
     .login, .panel { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 1rem 1.1rem; }
     label { display: block; font-size: 0.85rem; margin-bottom: 0.35rem; }
-    input[type="password"] {
+    input[type="password"], textarea, select {
       width: 100%; max-width: 420px; padding: 0.65rem 0.75rem;
       border: 1px solid var(--line); border-radius: 8px; font-size: 1rem;
     }
+    textarea { max-width: 100%; min-height: 110px; font-family: inherit; }
     button {
       margin-top: 0.75rem; background: var(--accent); color: #fff;
       border: 0; border-radius: 8px; padding: 0.55rem 1rem; cursor: pointer; font-size: 0.95rem;
@@ -75,6 +76,24 @@
       </div>
       <div class="stats" id="stats"></div>
       <p class="err" id="panel-err" hidden></p>
+
+      <h2>Modo RSVP</h2>
+      <div class="toolbar">
+        <label for="rsvp-mode" style="margin:0">Aberto = qualquer nome · Fechado = só lista</label>
+        <select id="rsvp-mode">
+          <option value="open">Aberto</option>
+          <option value="closed">Fechado</option>
+        </select>
+        <button type="button" class="secondary" id="save-mode-btn">Salvar modo</button>
+      </div>
+
+      <h2>Lista de convidados (RSVP fechado)</h2>
+      <label for="guest-names">Um nome por linha</label>
+      <textarea id="guest-names" placeholder="Maria Silva&#10;João Souza"></textarea>
+      <div class="toolbar">
+        <button type="button" id="add-guests-btn">Adicionar à lista</button>
+      </div>
+      <div id="guest-table"></div>
 
       <h2>RSVPs</h2>
       <div id="rsvp-table"></div>
@@ -150,11 +169,25 @@
         <div class="stat"><b>${s.giftsPaid}</b><span>presentes pagos</span></div>
         <div class="stat"><b>${money(s.giftsPaidCents)}</b><span>arrecadado (pago)</span></div>
         <div class="stat"><b>${s.giftsPending}</b><span>pix pendentes</span></div>
+        <div class="stat"><b>${s.rsvpMode || data.rsvpMode || 'open'}</b><span>modo RSVP</span></div>
+        <div class="stat"><b>${s.guestListCount ?? (data.guestList || []).length}</b><span>na lista fechada</span></div>
       `;
 
+      $('rsvp-mode').value = data.rsvpMode || s.rsvpMode || 'open';
+      $('guest-table').innerHTML = renderGuests(data.guestList || []);
       $('rsvp-table').innerHTML = renderRsvps(data.rsvps || []);
       $('gifts-table').innerHTML = renderGifts(data.gifts || []);
       $('messages-table').innerHTML = renderMessages(data.messages || []);
+    }
+
+    function renderGuests(rows) {
+      if (!rows.length) return '<p class="sub">Lista vazia — no modo fechado ninguém consegue confirmar.</p>';
+      return `<table><thead><tr><th>Nome</th><th></th></tr></thead><tbody>
+      ${rows.map((g) => `<tr>
+        <td>${escapeHtml(g.displayName)}</td>
+        <td><button type="button" class="secondary" data-guest-remove="${escapeHtml(g.id)}">Remover</button></td>
+      </tr>`).join('')}
+      </tbody></table>`;
     }
 
     function renderRsvps(rows) {
@@ -244,6 +277,60 @@
       a.download = 'rsvps-dani-carine.csv';
       a.click();
       URL.revokeObjectURL(url);
+    });
+
+    $('save-mode-btn').addEventListener('click', async () => {
+      const rsvpMode = $('rsvp-mode').value;
+      const res = await fetch('/api/admin/guest-list', {
+        method: 'PATCH',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rsvpMode }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        $('panel-err').hidden = false;
+        $('panel-err').textContent = data.message || data.error || 'Falha ao salvar modo';
+        return;
+      }
+      await load();
+    });
+
+    $('add-guests-btn').addEventListener('click', async () => {
+      const names = $('guest-names').value
+        .split(/\n+/)
+        .map((n) => n.trim())
+        .filter(Boolean);
+      const res = await fetch('/api/admin/guest-list', {
+        method: 'POST',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ names }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        $('panel-err').hidden = false;
+        $('panel-err').textContent = data.message || data.error || 'Falha ao adicionar';
+        return;
+      }
+      $('guest-names').value = '';
+      await load();
+    });
+
+    $('guest-table').addEventListener('click', async (ev) => {
+      const btn = ev.target.closest('button[data-guest-remove]');
+      if (!btn) return;
+      const removeId = btn.getAttribute('data-guest-remove');
+      const res = await fetch('/api/admin/guest-list', {
+        method: 'PATCH',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ removeId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        $('panel-err').hidden = false;
+        $('panel-err').textContent = data.message || data.error || 'Falha ao remover';
+        return;
+      }
+      await load();
     });
 
     $('messages-table').addEventListener('click', async (ev) => {

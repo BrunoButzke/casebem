@@ -31,6 +31,7 @@ Abre em `/landing-page-animada/`.
 6. Opcional e-mail (Resend free, fora da CF): `RESEND_API_KEY` + `ADMIN_NOTIFY_EMAIL`
 7. Webhook Pix: configure no MP `https://seu-dominio/api/webhooks/mercadopago`
 8. Migration `0005_admin_and_paid.sql` no D1 após deploy
+9. Migration `0006_rsvp_closed.sql` — RSVP aberto/fechado + lista no painel
 
 **Custo:** mantenha **Workers/Pages Free**. Não ative Workers Paid. E-mail é opcional e externo.
 

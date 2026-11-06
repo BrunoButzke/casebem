@@ -587,6 +587,213 @@ async function runPreloader() {
     .from('.nav', { y: -40, opacity: 0, duration: 0.9, clearProps: 'transform,opacity' }, 0.7);
 }
 
+function setupRsvp() {
+  const form = document.getElementById('rsvp-form');
+  if (!form) return;
+
+  const nameInput = document.getElementById('rsvp-name');
+  const attendingRadios = document.querySelectorAll('input[name="attending"]');
+  const adultsInput = document.getElementById('rsvp-adults');
+  const childrenInput = document.getElementById('rsvp-children');
+  const observationsTextarea = document.getElementById('rsvp-observations');
+  const observationsCount = document.getElementById('rsvp-observations-count');
+  const consentCheckbox = document.getElementById('rsvp-consent');
+  const submitBtn = document.getElementById('rsvp-submit');
+  const editBtn = document.getElementById('rsvp-edit');
+  const statusDiv = document.getElementById('rsvp-status');
+  const statusMessage = document.getElementById('rsvp-status-message');
+  const fieldsContainer = document.getElementById('rsvp-fields');
+
+  const API_URL = '/api/rsvp';
+  const TOKEN_KEY = 'rsvp_manage_token';
+
+  let manageToken = localStorage.getItem(TOKEN_KEY);
+  let isEditMode = false;
+
+  function showStatus(message, type = 'info') {
+    statusDiv.hidden = false;
+    statusDiv.className = `rsvp__status rsvp__status--${type}`;
+    statusMessage.textContent = message;
+    statusDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function hideStatus() {
+    statusDiv.hidden = true;
+  }
+
+  function showError(fieldId, message) {
+    const errorEl = document.getElementById(`${fieldId}-error`);
+    if (errorEl) {
+      errorEl.textContent = message;
+    }
+  }
+
+  function clearErrors() {
+    const errors = form.querySelectorAll('.form-error');
+    errors.forEach((el) => (el.textContent = ''));
+  }
+
+  function toggleFieldsDisabled(disabled) {
+    const inputs = form.querySelectorAll('input, textarea, button[type="submit"]');
+    inputs.forEach((input) => (input.disabled = disabled));
+  }
+
+  function toggleGuestCountsDisabled(disabled) {
+    adultsInput.disabled = disabled;
+    childrenInput.disabled = disabled;
+    if (disabled) {
+      adultsInput.value = 0;
+      childrenInput.value = 0;
+    }
+  }
+
+  attendingRadios.forEach((radio) => {
+    radio.addEventListener('change', () => {
+      const notAttending = form.querySelector('input[name="attending"][value="no"]').checked;
+      toggleGuestCountsDisabled(notAttending);
+    });
+  });
+
+  observationsTextarea.addEventListener('input', () => {
+    observationsCount.textContent = observationsTextarea.value.length;
+  });
+
+  async function loadExistingRsvp() {
+    if (!manageToken) return;
+
+    try {
+      const response = await fetch(API_URL, {
+        headers: {
+          Authorization: `Bearer ${manageToken}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        populateForm(data);
+        showStatus(
+          `✅ Olá, ${data.guestName}! Sua resposta já foi registrada. Você pode alterá-la abaixo.`,
+          'success',
+        );
+        submitBtn.textContent = 'Atualizar resposta';
+        isEditMode = true;
+      } else if (response.status === 404 || response.status === 401) {
+        localStorage.removeItem(TOKEN_KEY);
+        manageToken = null;
+      }
+    } catch (error) {
+      console.error('Failed to load RSVP:', error);
+    }
+  }
+
+  function populateForm(data) {
+    nameInput.value = data.guestName;
+    nameInput.disabled = true;
+
+    const attendingValue = data.attending ? 'yes' : 'no';
+    const attendingRadio = form.querySelector(`input[name="attending"][value="${attendingValue}"]`);
+    if (attendingRadio) {
+      attendingRadio.checked = true;
+    }
+
+    adultsInput.value = data.adultsCount;
+    childrenInput.value = data.childrenCount;
+    observationsTextarea.value = data.observations || '';
+    observationsCount.textContent = observationsTextarea.value.length;
+
+    toggleGuestCountsDisabled(!data.attending);
+    consentCheckbox.checked = true;
+    consentCheckbox.disabled = true;
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    clearErrors();
+    hideStatus();
+
+    const attending = form.querySelector('input[name="attending"]:checked');
+    if (!attending) {
+      showError('rsvp-attending', 'Por favor, selecione uma opção');
+      return;
+    }
+
+    const payload = {
+      guestName: nameInput.value.trim(),
+      attending: attending.value === 'yes',
+      adultsCount: parseInt(adultsInput.value, 10) || 0,
+      childrenCount: parseInt(childrenInput.value, 10) || 0,
+      observations: observationsTextarea.value.trim() || null,
+      consentGiven: consentCheckbox.checked,
+    };
+
+    toggleFieldsDisabled(true);
+    submitBtn.textContent = 'Enviando...';
+
+    try {
+      const method = isEditMode ? 'PUT' : 'POST';
+      const headers = {
+        'Content-Type': 'application/json',
+      };
+
+      if (isEditMode && manageToken) {
+        headers.Authorization = `Bearer ${manageToken}`;
+      }
+
+      const response = await fetch(API_URL, {
+        method,
+        headers,
+        body: JSON.stringify(payload),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        if (!isEditMode && data.manageToken) {
+          localStorage.setItem(TOKEN_KEY, data.manageToken);
+          manageToken = data.manageToken;
+        }
+
+        const message = payload.attending
+          ? `✅ Obrigado, ${payload.guestName}! Sua presença está confirmada. Aguardamos você no dia 21 de novembro!`
+          : `Obrigado por avisar, ${payload.guestName}. Sentiremos sua falta!`;
+
+        showStatus(message, 'success');
+        nameInput.disabled = true;
+        consentCheckbox.disabled = true;
+        submitBtn.textContent = 'Atualizar resposta';
+        isEditMode = true;
+      } else {
+        let errorMessage = data.error || 'Erro ao processar sua resposta.';
+
+        if (data.details) {
+          Object.entries(data.details).forEach(([field, msg]) => {
+            const fieldMap = {
+              guestName: 'rsvp-name',
+              adultsCount: 'rsvp-adults',
+              childrenCount: 'rsvp-children',
+              observations: 'rsvp-observations',
+              consentGiven: 'rsvp-consent',
+            };
+            if (fieldMap[field]) {
+              showError(fieldMap[field], msg);
+            }
+          });
+        }
+
+        showStatus(errorMessage, 'error');
+      }
+    } catch (error) {
+      console.error('RSVP submission error:', error);
+      showStatus('Erro de conexão. Verifique sua internet e tente novamente.', 'error');
+    } finally {
+      toggleFieldsDisabled(false);
+      submitBtn.textContent = isEditMode ? 'Atualizar resposta' : 'Confirmar presença';
+    }
+  });
+
+  loadExistingRsvp();
+}
+
 function boot() {
   cloneMarquee();
   setupCursor();
@@ -598,6 +805,7 @@ function boot() {
   setupHow();
   setupDressRecolor();
   setupGifts();
+  setupRsvp();
   setupReveals();
   ScrollTrigger.sort();
   window.addEventListener('load', () => ScrollTrigger.refresh());

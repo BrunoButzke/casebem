@@ -1,0 +1,18 @@
+# Wrangler configuration example for Cloudflare D1
+# This file is NOT used for Cloudflare Pages deployments
+# It's provided as reference for D1 local development only
+
+name = "casebem-local-dev"
+compatibility_date = "2024-11-01"
+
+# D1 Database binding
+# Replace the database_id with your actual D1 database ID after creating it
+[[d1_databases]]
+binding = "DB"
+database_name = "casebem-rsvps-local"
+database_id = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"  # Replace with actual UUID
+
+# For production, configure the D1 binding in Cloudflare Pages Dashboard:
+# Settings -> Functions -> D1 database bindings
+# Variable name: DB
+# D1 database: casebem-rsvps-production

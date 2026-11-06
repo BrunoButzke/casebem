@@ -106,6 +106,15 @@
       <p class="sub">Placeholders: {{names}} {{date}} {{place}} {{url}} · /api/stationery (migration 0009).</p>
       <div id="stationery-table"></div>
 
+      <h2>Playlist / vídeo (YouTube)</h2>
+      <p class="sub">Seção #playlist no site · /api/media (migration 0010). O primeiro ativo vira o embed.</p>
+      <div class="toolbar" style="flex-direction:column;align-items:stretch;gap:0.5rem;max-width:640px">
+        <input id="media-title" type="text" placeholder="Título" maxlength="120" style="max-width:100%" />
+        <input id="media-url" type="url" placeholder="https://www.youtube.com/watch?v=..." maxlength="500" style="max-width:100%" />
+        <button type="button" id="media-add-btn">Adicionar vídeo</button>
+      </div>
+      <div id="media-table"></div>
+
       <h2>Hospedagem / dicas</h2>
       <p class="sub">Lista em /dani-carine/#hospedagem · API /api/lodging (migration 0008).</p>
       <div class="toolbar" style="flex-direction:column;align-items:stretch;gap:0.5rem;max-width:640px">
@@ -200,6 +209,7 @@
       $('messages-table').innerHTML = renderMessages(data.messages || []);
       await loadCatalogEditor();
       await loadStationeryEditor();
+      await loadMediaEditor();
       await loadLodgingEditor();
     }
 
@@ -236,6 +246,30 @@
           <button type="button" class="secondary" data-st-save="${escapeHtml(t.id)}">Salvar</button>
           ${t.shareUrl ? `<a class="secondary" style="display:inline-block;margin-top:0.75rem;padding:0.55rem 1rem;border:1px solid var(--accent);border-radius:8px;color:var(--accent);text-decoration:none" href="${escapeHtml(t.shareUrl)}" target="_blank" rel="noopener noreferrer">WhatsApp</a>` : ''}
         </td>
+      </tr>`).join('')}
+      </tbody></table>`;
+    }
+
+    async function loadMediaEditor() {
+      const res = await fetch('/api/admin/media', { headers: authHeaders() });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        $('media-table').innerHTML = `<p class="err">${escapeHtml(data.message || data.error || 'Falha ao carregar mídia (rode migration 0010?)')}</p>`;
+        return;
+      }
+      $('media-table').innerHTML = renderMedia(data.items || []);
+    }
+
+    function renderMedia(rows) {
+      if (!rows.length) return '<p class="sub">Nenhum vídeo — a seção fica oculta no site até você adicionar.</p>';
+      return `<table><thead><tr>
+        <th>Título</th><th>URL</th><th>Ativo</th><th></th>
+      </tr></thead><tbody>
+      ${rows.map((t) => `<tr class="${t.active ? '' : 'hidden'}">
+        <td><input data-media-title="${escapeHtml(t.id)}" value="${escapeHtml(t.title)}" style="width:100%;max-width:140px;padding:0.35rem" /></td>
+        <td><input data-media-url="${escapeHtml(t.id)}" value="${escapeHtml(t.youtubeUrl)}" style="width:100%;min-width:180px;padding:0.35rem" /></td>
+        <td><input data-media-active="${escapeHtml(t.id)}" type="checkbox" ${t.active ? 'checked' : ''} /></td>
+        <td><button type="button" class="secondary" data-media-save="${escapeHtml(t.id)}">Salvar</button></td>
       </tr>`).join('')}
       </tbody></table>`;
     }
@@ -485,6 +519,52 @@
         return;
       }
       await loadStationeryEditor();
+    });
+
+    $('media-add-btn').addEventListener('click', async () => {
+      const res = await fetch('/api/admin/media', {
+        method: 'POST',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: $('media-title').value,
+          youtubeUrl: $('media-url').value,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        $('panel-err').hidden = false;
+        $('panel-err').textContent = (data.details && data.details.join(', ')) || data.message || data.error || 'Falha ao adicionar vídeo';
+        return;
+      }
+      $('media-title').value = '';
+      $('media-url').value = '';
+      await loadMediaEditor();
+    });
+
+    $('media-table').addEventListener('click', async (ev) => {
+      const btn = ev.target.closest('button[data-media-save]');
+      if (!btn) return;
+      const id = btn.getAttribute('data-media-save');
+      const titleEl = $('media-table').querySelector(`input[data-media-title="${CSS.escape(id)}"]`);
+      const urlEl = $('media-table').querySelector(`input[data-media-url="${CSS.escape(id)}"]`);
+      const activeEl = $('media-table').querySelector(`input[data-media-active="${CSS.escape(id)}"]`);
+      const res = await fetch('/api/admin/media', {
+        method: 'PATCH',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id,
+          title: titleEl?.value,
+          youtubeUrl: urlEl?.value,
+          active: Boolean(activeEl?.checked),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        $('panel-err').hidden = false;
+        $('panel-err').textContent = (data.details && data.details.join(', ')) || data.message || data.error || 'Falha ao salvar vídeo';
+        return;
+      }
+      await loadMediaEditor();
     });
 
     $('lodge-add-btn').addEventListener('click', async () => {

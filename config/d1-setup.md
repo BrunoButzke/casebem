@@ -4,12 +4,19 @@ Este guia explica como configurar o Cloudflare D1 para o sistema de RSVP do site
 
 ## ⚠️ IMPORTANTE
 
-**O sistema RSVP NÃO funcionará em produção sem:**
+**O sistema RSVP e Mural de Recados NÃO funcionarão em produção sem:**
 1. Database D1 criado e vinculado (binding `DB`)
 2. Secret `RSVP_SECRET` configurado (32 bytes base64, HKDF derivation para HMAC)
-3. Migrations aplicadas (0001_rsvps.sql + 0002_idempotency_and_encryption.sql)
+3. Migrations aplicadas (0001, 0002, 0003)
 
 **Nunca exponha o secret em código, logs ou documentação pública.**
+
+## Funcionalidades
+
+- **RSVP**: Confirmação de presença com rate limit de 10 requisições/hora por IP
+- **Mural de Recados**: Mensagens públicas dos convidados com rate limit de 5 requisições/hora por IP
+- **Rate Limiting**: Namespaces separados (`rsvp:` e `messages:`) compartilham a tabela `rate_limits` mas contadores independentes
+- **Idempotência**: Suporte via `Idempotency-Key` header com fingerprint SHA-256 do payload
 
 ## Pré-requisitos
 
@@ -29,17 +36,20 @@ Este guia explica como configurar o Cloudflare D1 para o sistema de RSVP do site
 5. Clique em **Create**
 6. **Anote o Database ID** que aparecerá (formato UUID)
 
-### Passo 2: Executar Migration SQL
+### Passo 2: Executar Migrations SQL
 
 1. No dashboard D1, selecione o database recém-criado
 2. Vá para a aba **Console**
-3. Copie e cole o conteúdo completo do arquivo `migrations/0001_rsvps.sql`
-4. Clique em **Execute**
-5. Verifique se as tabelas foram criadas:
+3. Execute as migrations em ordem:
+   - Copie e cole o conteúdo completo do arquivo `migrations/0001_rsvps.sql`
+   - Clique em **Execute**
+   - Repita para `migrations/0002_idempotency_and_encryption.sql`
+   - Repita para `migrations/0003_messages.sql`
+4. Verifique se as tabelas foram criadas:
    ```sql
    SELECT name FROM sqlite_master WHERE type='table';
    ```
-   Deve retornar: `rsvps`, `rate_limits`, `schema_migrations`
+   Deve retornar: `rsvps`, `rate_limits`, `wedding_messages`, `schema_migrations`
 
 ### Passo 3: Configurar Binding no Cloudflare Pages
 
@@ -79,13 +89,23 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 
 ### Passo 5: Aplicar Migrations
 
-```bash
-# Migration inicial (0001)
-wrangler d1 migrations apply casebem-rsvps-production --remote
+**Importante**: Execute cada migration explicitamente na ordem, uma por vez.
 
-# Migration de idempotência (0002)
-wrangler d1 migrations apply casebem-rsvps-production --remote
+```bash
+# Backup recomendado antes de aplicar em produção
+wrangler d1 backup create casebem-rsvps-production --remote
+
+# Migration 0001: Tabela rsvps inicial
+wrangler d1 execute casebem-rsvps-production --remote --file=migrations/0001_rsvps.sql
+
+# Migration 0002: Idempotência e criptografia
+wrangler d1 execute casebem-rsvps-production --remote --file=migrations/0002_idempotency_and_encryption.sql
+
+# Migration 0003: Mural de recados (nova)
+wrangler d1 execute casebem-rsvps-production --remote --file=migrations/0003_messages.sql
 ```
+
+**Nota**: Todas as migrations usam `CREATE TABLE IF NOT EXISTS` e `INSERT ... ON CONFLICT(version) DO NOTHING` para serem idempotentes e seguras para reaplicação. Não é necessário configurar `migrations_dir` no `wrangler.toml`.
 
 ### Passo 6: Verificar Configuração
 

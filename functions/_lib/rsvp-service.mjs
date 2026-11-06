@@ -268,7 +268,8 @@ export async function checkRateLimit(db, ipAddress, secret, limit = 10) {
   const keys = await deriveRsvpKeys(secret);
   const ipHash = await hmacHash(ipAddress, keys.hmacKey);
   const windowStart = getHourWindow();
-  const rateLimitId = `${WEDDING_KEY}:${ipHash}:${windowStart}`;
+  // Use 'rsvp:' namespace to separate from messages rate limits
+  const rateLimitId = `rsvp:${WEDDING_KEY}:${ipHash}:${windowStart}`;
   const timestamp = now();
 
   // Atomic UPSERT with RETURNING

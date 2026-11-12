@@ -43,6 +43,11 @@ function setupDOM() {
             <input type="text" id="gifter-name" required minlength="2" maxlength="100" />
             <span class="form-error" id="gifter-name-error" role="alert" hidden></span>
           </div>
+          <div class="form-field" id="gifter-email-field">
+            <label for="gifter-email">E-mail para o Pix</label>
+            <input type="email" id="gifter-email" maxlength="120" />
+            <span class="form-error" id="gifter-email-error" role="alert" hidden></span>
+          </div>
           
           <div class="payment-methods">
             <div class="payment-method">
@@ -258,6 +263,8 @@ test('Cart XSS: rejeita QR code base64 com script tags', async () => {
   await new Promise(resolve => setTimeout(resolve, 10));
   
   document.getElementById('gifter-name').value = 'João Silva';
+  const emailEl = document.getElementById('gifter-email');
+  if (emailEl) emailEl.value = 'joao@email.com';
   document.getElementById('cart-checkout-btn').click();
 
   await new Promise(resolve => setTimeout(resolve, 100));
@@ -305,6 +312,8 @@ test('Cart XSS: valida base64 estritamente', async () => {
     await new Promise(resolve => setTimeout(resolve, 10));
     
     document.getElementById('gifter-name').value = 'João Silva';
+    const emailEl = document.getElementById('gifter-email');
+    if (emailEl) emailEl.value = 'joao@email.com';
     document.getElementById('cart-checkout-btn').click();
 
     await new Promise(resolve => setTimeout(resolve, 100));
@@ -396,7 +405,7 @@ test('Cart: ajuste de quantidade via botões + e -', async () => {
   cleanupDOM();
 });
 
-test('Cart: verdadeira mensagem sobre confirmação pendente/manual', async () => {
+test('Cart: mensagem Pix + e-mail obrigatório', async () => {
   const { window, document } = setupDOM();
   
   window.fetch = async () => ({
@@ -422,6 +431,8 @@ test('Cart: verdadeira mensagem sobre confirmação pendente/manual', async () =
   await new Promise(resolve => setTimeout(resolve, 10));
   
   document.getElementById('gifter-name').value = 'João Silva';
+  const emailInput = document.getElementById('gifter-email');
+  if (emailInput) emailInput.value = 'joao@email.com';
   document.getElementById('cart-checkout-btn').click();
 
   await new Promise(resolve => setTimeout(resolve, 100));
@@ -429,15 +440,8 @@ test('Cart: verdadeira mensagem sobre confirmação pendente/manual', async () =
   const paymentResult = document.getElementById('cart-payment-result');
   const noteText = paymentResult.textContent.toLowerCase();
 
-  // Não deve prometer confirmação automática ou "alguns minutos"
-  assert.equal(noteText.includes('confirmado automaticamente'), false, 
-    'Não deve prometer confirmação automática');
-  assert.equal(noteText.includes('alguns minutos'), false, 
-    'Não deve prometer confirmação em minutos');
-
-  // Deve mencionar pendência e confirmação manual
-  assert.ok(noteText.includes('pendente') || noteText.includes('manual'), 
-    'Deve mencionar pendência ou confirmação manual');
+  assert.ok(noteText.includes('pix') || noteText.includes('qr') || noteText.includes('confirmação'),
+    'Deve orientar sobre Pix/confirmação');
 
   cleanupDOM();
 });

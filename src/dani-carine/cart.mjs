@@ -390,6 +390,20 @@ function createCartModal() {
           />
           <span class="form-error" id="gifter-name-error" role="alert"></span>
         </div>
+
+        <div class="form-field" id="gifter-email-field">
+          <label for="gifter-email">E-mail para o Pix <span class="required">*</span></label>
+          <input
+            type="email"
+            id="gifter-email"
+            autocomplete="email"
+            maxlength="120"
+            placeholder="seu@email.com"
+            aria-describedby="gifter-email-error"
+          />
+          <span class="form-hint">Usado pelo Mercado Pago para gerar o QR. Não enviamos spam.</span>
+          <span class="form-error" id="gifter-email-error" role="alert"></span>
+        </div>
         
         <fieldset class="form-field">
           <legend>Forma de pagamento <span class="required">*</span></legend>
@@ -426,6 +440,16 @@ function createCartModal() {
   modal.querySelectorAll('[data-close-cart]').forEach(el => {
     el.addEventListener('click', closeCartModal);
   });
+
+  const syncEmailField = () => {
+    const method = modal.querySelector('input[name="paymentMethod"]:checked')?.value;
+    const emailField = modal.querySelector('#gifter-email-field');
+    if (emailField) emailField.hidden = method !== 'pix';
+  };
+  modal.querySelectorAll('input[name="paymentMethod"]').forEach((el) => {
+    el.addEventListener('change', syncEmailField);
+  });
+  syncEmailField();
 
   modal.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') closeCartModal();
@@ -731,6 +755,22 @@ async function handleCheckout() {
   
   const paymentMethod = paymentMethodInput.value;
 
+  const emailInput = _document.getElementById('gifter-email');
+  const emailError = _document.getElementById('gifter-email-error');
+  let payerEmail = '';
+  if (paymentMethod === 'pix') {
+    payerEmail = (emailInput?.value || '').trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(payerEmail)) {
+      if (emailError) {
+        emailError.textContent = 'Informe um e-mail válido para gerar o Pix';
+        emailError.hidden = false;
+      }
+      emailInput?.focus();
+      return;
+    }
+    if (emailError) emailError.hidden = true;
+  }
+
   // Obter itens
   const items = cart.getItems();
   if (items.length === 0) {
@@ -750,20 +790,23 @@ async function handleCheckout() {
   let paymentSuccess = false;
 
   try {
+    const payload = {
+      paymentMethod,
+      gifterName,
+      items,
+      intentKey,
+    };
+    if (paymentMethod === 'pix') payload.payerEmail = payerEmail;
+
     const response = await _fetch('/api/gifts/checkout', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        paymentMethod,
-        gifterName,
-        items,
-        intentKey,
-      }),
+      body: JSON.stringify(payload),
     });
 
-    const data = await response.json();
+    const data = await response.json().catch(() => ({}));
 
     if (data.ok) {
       paymentSuccess = true;
@@ -774,18 +817,19 @@ async function handleCheckout() {
         _window.location.href = data.redirectUrl;
         return;
       }
-      // Pix: QR na modal
+      // Pix: QR na modal + polling de status
       showPaymentResult(data);
       checkoutBtn.disabled = true;
       checkoutBtn.textContent = 'Pagamento Pendente';
+      if (data.payment?.id) startPixStatusPolling(data.payment.id);
     } else {
-      if (data.status === 503) {
-        cartError.textContent = data.message || 'Serviço de pagamento indisponível. Tente Pix ou mais tarde.';
-      } else if (data.error === 'INTENT_PROCESSING') {
-        cartError.textContent = data.message || 'Pagamento já está sendo processado. Aguarde alguns segundos e tente novamente.';
-      } else {
-        cartError.textContent = data.message || data.error || 'Erro ao processar pagamento';
-      }
+      const msg =
+        data.message ||
+        data.error ||
+        (response.status === 403
+          ? 'Origem não autorizada. Abra o site pelo domínio correto.'
+          : 'Erro ao processar pagamento');
+      cartError.textContent = msg;
       cartError.hidden = false;
     }
   } catch (error) {
@@ -798,6 +842,67 @@ async function handleCheckout() {
       checkoutBtn.disabled = false;
       checkoutBtn.textContent = 'Finalizar compra';
     }
+  }
+}
+
+let pixPollTimer = null;
+
+function stopPixStatusPolling() {
+  if (pixPollTimer) {
+    clearInterval(pixPollTimer);
+    pixPollTimer = null;
+  }
+}
+
+/**
+ * Consulta status do Pix (complementa webhook).
+ * @param {string|number} paymentId
+ */
+function startPixStatusPolling(paymentId) {
+  stopPixStatusPolling();
+  if (!_fetch || !paymentId) return;
+
+  let attempts = 0;
+  const maxAttempts = 40; // ~2 min a cada 3s
+
+  pixPollTimer = setInterval(async () => {
+    attempts += 1;
+    if (attempts > maxAttempts) {
+      stopPixStatusPolling();
+      return;
+    }
+    try {
+      const res = await _fetch(`/api/payment-status?id=${encodeURIComponent(paymentId)}`);
+      const payment = await res.json().catch(() => ({}));
+      if (!res.ok) return;
+      if (payment.status === 'approved') {
+        stopPixStatusPolling();
+        markPixPaidInUi();
+      } else if (payment.status === 'cancelled' || payment.status === 'rejected') {
+        stopPixStatusPolling();
+      }
+    } catch {
+      /* ignore transient */
+    }
+  }, 3500);
+}
+
+function markPixPaidInUi() {
+  const resultEl = _document?.getElementById('cart-payment-result');
+  if (!resultEl) return;
+  const note = resultEl.querySelector('.payment-note');
+  if (note) {
+    note.textContent = 'Pagamento Pix confirmado. Obrigado!';
+    note.classList.add('payment-note--ok');
+  }
+  const title = resultEl.querySelector('h4');
+  if (title) title.textContent = 'Pagamento confirmado!';
+  try {
+    cart?.clear();
+    resetIntentKey();
+    updateCartBadge();
+  } catch {
+    /* ignore */
   }
 }
 
@@ -934,10 +1039,11 @@ function showPaymentResult(data) {
   copyBtn.textContent = 'Copiar código';
   container.appendChild(copyBtn);
 
-  // Nota sobre confirmação manual (honesta)
+  // Status: polling + webhook confirmam automaticamente quando possível
   const note = _document.createElement('p');
   note.className = 'payment-note';
-  note.textContent = 'Pedido Pix criado e pendente. Não há confirmação automática neste MVP. Guarde este código até a confirmação manual pelos noivos.';
+  note.textContent =
+    'Pix gerado. Escaneie o QR ou copie o código. A confirmação aparece aqui em alguns segundos após o pagamento.';
   container.appendChild(note);
 
   // Botão fechar

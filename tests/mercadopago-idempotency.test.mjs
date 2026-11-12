@@ -150,10 +150,11 @@ test('createPixPayment: items em ordem canônica consistente', async () => {
   
   global.fetch = originalFetch;
   
-  // Verificar que items estão em ordem alfabética por giftId
-  assert.ok(capturedPayload.items);
-  assert.ok(Array.isArray(capturedPayload.items));
-  const giftIds = capturedPayload.items.map(i => i.title);
+  // Verificar que items (additional_info) estão em ordem alfabética por giftId
+  const items = capturedPayload.additional_info?.items;
+  assert.ok(items);
+  assert.ok(Array.isArray(items));
+  const giftIds = items.map((i) => i.id);
   const sortedIds = [...giftIds].sort();
   assert.deepEqual(giftIds, sortedIds, 'Items devem estar em ordem canônica alfabética');
 });

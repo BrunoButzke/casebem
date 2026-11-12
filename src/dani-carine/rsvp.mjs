@@ -12,7 +12,6 @@ export function setupRsvp() {
   const nameInput = document.getElementById('rsvp-name');
   const attendingRadios = document.querySelectorAll('input[name="attending"]');
   const submitBtn = document.getElementById('rsvp-submit');
-  const editBtn = document.getElementById('rsvp-edit');
   const statusDiv = document.getElementById('rsvp-status');
   const statusMessage = document.getElementById('rsvp-status-message');
   const matchesBlock = document.getElementById('rsvp-matches-block');
@@ -26,7 +25,7 @@ export function setupRsvp() {
   const TOKEN_KEY = 'rsvp_manage_token';
 
   let manageToken = localStorage.getItem(TOKEN_KEY);
-  let viewMode = 'create'; // 'create' | 'view' | 'edit'
+  let viewMode = 'create'; // 'create' | 'view'
   /** @type {'search' | 'choose' | 'confirm'} */
   let phase = 'search';
   /** @type {{id: string, displayName: string} | null} */
@@ -130,7 +129,7 @@ export function setupRsvp() {
     if (nameInput) nameInput.disabled = true;
     if (submitBtn) {
       submitBtn.hidden = false;
-      submitBtn.textContent = viewMode === 'edit' ? 'Atualizar confirmação' : 'Confirmar presença';
+      submitBtn.textContent = 'Confirmar presença';
     }
   }
 
@@ -143,40 +142,17 @@ export function setupRsvp() {
       allInputs.forEach((input) => {
         input.disabled = false;
       });
-      if (editBtn) editBtn.hidden = true;
       enterSearchPhase();
     } else if (mode === 'view') {
       allInputs.forEach((input) => {
-        if (input === editBtn) return;
         input.disabled = true;
       });
-      if (editBtn) {
-        editBtn.hidden = false;
-        editBtn.disabled = false;
-      }
       if (submitBtn) submitBtn.hidden = true;
       if (inviteBox) inviteBox.hidden = false;
       if (confirmFields) confirmFields.hidden = false;
       if (matchesBlock) matchesBlock.hidden = true;
+      if (changeGuestBtn) changeGuestBtn.hidden = true;
       phase = 'confirm';
-    } else if (mode === 'edit') {
-      allInputs.forEach((input) => {
-        if (input === nameInput || input === editBtn) {
-          input.disabled = true;
-        } else {
-          input.disabled = false;
-        }
-      });
-      if (submitBtn) {
-        submitBtn.hidden = false;
-        submitBtn.textContent = 'Atualizar confirmação';
-      }
-      if (editBtn) editBtn.hidden = true;
-      if (inviteBox) inviteBox.hidden = false;
-      if (confirmFields) confirmFields.hidden = false;
-      if (matchesBlock) matchesBlock.hidden = true;
-      phase = 'confirm';
-      if (changeGuestBtn) changeGuestBtn.disabled = true;
     }
   }
 
@@ -250,12 +226,6 @@ export function setupRsvp() {
       `input[name="attending"][value="${attendingValue}"]`
     );
     if (attendingRadio) attendingRadio.checked = true;
-  }
-
-  function enableEditMode() {
-    viewMode = 'edit';
-    setViewMode('edit');
-    hideStatus();
   }
 
   async function runSearch() {
@@ -362,18 +332,15 @@ export function setupRsvp() {
       consentGiven: true,
     };
 
-    const method = savedViewMode === 'edit' ? 'PUT' : 'POST';
-    const headers = { 'Content-Type': 'application/json' };
-
-    if (method === 'POST') {
-      headers['Idempotency-Key'] = getIdempotencyKey();
-      if (manageToken) headers.Authorization = `Bearer ${manageToken}`;
-    } else if (method === 'PUT' && manageToken) {
-      headers.Authorization = `Bearer ${manageToken}`;
-    }
+    const method = 'POST';
+    const headers = {
+      'Content-Type': 'application/json',
+      'Idempotency-Key': getIdempotencyKey(),
+    };
+    if (manageToken) headers.Authorization = `Bearer ${manageToken}`;
 
     setBusyState(true);
-    if (submitBtn) submitBtn.textContent = savedViewMode === 'edit' ? 'Atualizando...' : 'Enviando...';
+    if (submitBtn) submitBtn.textContent = 'Enviando...';
 
     let success = false;
 
@@ -431,12 +398,7 @@ export function setupRsvp() {
         clearIdempotencyKey();
       }
 
-      showStatus(
-        savedViewMode === 'edit'
-          ? 'Confirmação atualizada com sucesso!'
-          : 'Confirmação enviada com sucesso!',
-        'success'
-      );
+      showStatus('Confirmação enviada com sucesso!', 'success');
 
       viewMode = 'view';
       setViewMode('view');
@@ -450,11 +412,6 @@ export function setupRsvp() {
       if (success) return;
 
       setBusyState(false);
-
-      if (savedViewMode === 'edit') {
-        setViewMode('edit');
-        return;
-      }
 
       if (selectedGuest && phase === 'confirm') {
         enterConfirmPhase();
@@ -474,7 +431,6 @@ export function setupRsvp() {
     }
   }
 
-  if (editBtn) editBtn.addEventListener('click', enableEditMode);
   if (changeGuestBtn) {
     changeGuestBtn.addEventListener('click', () => {
       if (viewMode !== 'create') return;

@@ -37,7 +37,6 @@ describe('Frontend RSVP - Real DOM Tests', () => {
           <span id="rsvp-attending-error" class="form-error"></span>
         </div>
         <button type="submit" id="rsvp-submit">Buscar</button>
-        <button type="button" id="rsvp-edit" hidden>Alterar minha resposta</button>
         <div id="rsvp-status" hidden>
           <span id="rsvp-status-message"></span>
         </div>
@@ -113,7 +112,6 @@ describe('Frontend RSVP - Real DOM Tests', () => {
 
     const form = document.getElementById('rsvp-form');
     const submitBtn = document.getElementById('rsvp-submit');
-    const editBtn = document.getElementById('rsvp-edit');
 
     form.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
     await waitFor(() => fetchCalls.length === 2, 3000, 'POST not called');
@@ -126,7 +124,7 @@ describe('Frontend RSVP - Real DOM Tests', () => {
 
     assert.equal(fetchCalls[1].options.method, 'POST');
     assert.equal(localStorage.getItem('rsvp_manage_token'), 'token-success');
-    assert.equal(editBtn.hidden, false);
+    assert.equal(document.getElementById('rsvp-edit'), null);
     const body = JSON.parse(fetchCalls[1].options.body);
     assert.equal(body.guestName, 'Bruno Butzke e Familia');
   });
@@ -396,20 +394,20 @@ describe('Frontend RSVP - Real DOM Tests', () => {
     assert.equal(document.querySelectorAll('input[name="rsvp-match"]').length, 2);
   });
 
-  it('Edit button click unlocks only editable fields', async () => {
+  it('existing confirmation loads in locked view without edit button', async () => {
     const { document, mockFetch } = await setupWindow();
-    localStorage.setItem('rsvp_manage_token', 'edit-token');
+    localStorage.setItem('rsvp_manage_token', 'view-token');
 
     global.fetch = mockFetch([
       {
         status: 200,
         body: {
           id: 'id3',
-          guestName: 'Edit User',
+          guestName: 'View User',
           attending: true,
-          adultsCount: 1,
+          adultsCount: 0,
           childrenCount: 0,
-          observations: 'Convidado Extra',
+          observations: null,
           consentGiven: true,
           createdAt: '2026-11-05T00:00:00Z',
           updatedAt: '2026-11-05T00:00:00Z',
@@ -421,114 +419,9 @@ describe('Frontend RSVP - Real DOM Tests', () => {
     setupRsvp();
     await new Promise((resolve) => setTimeout(resolve, 100));
 
-    const editBtn = document.getElementById('rsvp-edit');
-    const nameInput = document.getElementById('rsvp-name');
-    const submitBtn = document.getElementById('rsvp-submit');
-    const attendingTrue = document.getElementById('attending-true');
-
-    editBtn.click();
-
-    assert.equal(nameInput.disabled, true);
-    assert.equal(attendingTrue.disabled, false);
-    assert.equal(submitBtn.hidden, false);
-    assert.match(submitBtn.textContent, /Atualizar/i);
-  });
-
-  it('PUT success locks all fields again', async () => {
-    const { window, document, mockFetch, fetchCalls } = await setupWindow();
-    localStorage.setItem('rsvp_manage_token', 'put-token');
-
-    global.fetch = mockFetch([
-      {
-        status: 200,
-        body: {
-          id: 'id4',
-          guestName: 'PUT User',
-          attending: true,
-          adultsCount: 0,
-          childrenCount: 0,
-          observations: null,
-          consentGiven: true,
-          createdAt: '2026-11-05T00:00:00Z',
-          updatedAt: '2026-11-05T00:00:00Z',
-        },
-      },
-      {
-        status: 200,
-        body: {
-          id: 'id4',
-          guestName: 'PUT User',
-          attending: false,
-          adultsCount: 0,
-          childrenCount: 0,
-          observations: null,
-          consentGiven: true,
-          createdAt: '2026-11-05T00:00:00Z',
-          updatedAt: '2026-11-06T00:00:00Z',
-        },
-      },
-    ]);
-
-    const { setupRsvp } = await import('../src/dani-carine/rsvp.mjs?' + Math.random());
-    setupRsvp();
-    await window.happyDOM.waitUntilComplete();
-    await waitFor(() => fetchCalls.length === 1);
-
-    const editBtn = document.getElementById('rsvp-edit');
-    const submitBtn = document.getElementById('rsvp-submit');
-    const attendingFalse = document.getElementById('attending-false');
-    editBtn.click();
-    attendingFalse.checked = true;
-
-    document.getElementById('rsvp-form').dispatchEvent(
-      new window.Event('submit', { bubbles: true, cancelable: true })
-    );
-    await waitFor(() => fetchCalls.length === 2, 3000, 'PUT not called');
-    await window.happyDOM.waitUntilComplete();
-
-    await waitFor(() => submitBtn.hidden === true, 3000, 'not locked');
-
-    assert.equal(fetchCalls[1].options.method, 'PUT');
-    assert.equal(editBtn.hidden, false);
-    assert.equal(attendingFalse.disabled, true);
-  });
-
-  it('PUT error restores edit mode', async () => {
-    const { document, mockFetch } = await setupWindow();
-    localStorage.setItem('rsvp_manage_token', 'error-token');
-
-    global.fetch = mockFetch([
-      {
-        status: 200,
-        body: {
-          id: 'id5',
-          guestName: 'Error User',
-          attending: false,
-          adultsCount: 0,
-          childrenCount: 0,
-          observations: null,
-          consentGiven: true,
-          createdAt: '2026-11-05T00:00:00Z',
-          updatedAt: '2026-11-05T00:00:00Z',
-        },
-      },
-      { status: 500, body: { error: 'Internal error' } },
-    ]);
-
-    const { setupRsvp } = await import('../src/dani-carine/rsvp.mjs?' + Math.random());
-    setupRsvp();
-    await Promise.resolve();
-    await Promise.resolve();
-
-    document.getElementById('rsvp-edit').click();
-    document.getElementById('attending-false').checked = true;
-    document.getElementById('rsvp-form').dispatchEvent(
-      new window.Event('submit', { bubbles: true, cancelable: true })
-    );
-    await Promise.resolve();
-    await Promise.resolve();
-
-    assert.equal(document.getElementById('attending-false').disabled, false);
     assert.equal(document.getElementById('rsvp-name').disabled, true);
+    assert.equal(document.getElementById('rsvp-submit').hidden, true);
+    assert.equal(document.getElementById('rsvp-edit'), null);
+    assert.equal(document.getElementById('rsvp-invite').hidden, false);
   });
 });

@@ -966,16 +966,34 @@ h2 {
   background: var(--cream);
 }
 
+.gifts__intro {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1.25rem 1.75rem;
+  margin-bottom: 0.35rem;
+}
+
+.gifts__intro-copy {
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+
+.gifts__intro-copy h2 {
+  margin-bottom: 0.35rem;
+}
+
 .gifts__lead {
-  margin: 0 0 1.75rem;
+  margin: 0;
   color: var(--muted);
   max-width: 36rem;
   line-height: 1.55;
 }
 
 .gifts__toggle {
-  width: 100%;
-  max-width: 420px;
+  flex: 0 1 22rem;
+  width: min(100%, 22rem);
   display: flex;
   align-items: center;
   justify-content: space-between;

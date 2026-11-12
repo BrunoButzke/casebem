@@ -1,9 +1,10 @@
 /**
  * RSVP Form Controller
- * Isolated module for frontend testing without GSAP/Lenis dependencies
+ * Fluxo: buscar nome na lista oculta → (escolher se houver vários) → confirmar
  */
 
 const MAX_COMPANIONS = 10;
+const SEARCH_URL = '/api/guests/search';
 
 export function setupRsvp() {
   const form = document.getElementById('rsvp-form');
@@ -19,13 +20,25 @@ export function setupRsvp() {
   const editBtn = document.getElementById('rsvp-edit');
   const statusDiv = document.getElementById('rsvp-status');
   const statusMessage = document.getElementById('rsvp-status-message');
+  const matchesBlock = document.getElementById('rsvp-matches-block');
+  const matchesList = document.getElementById('rsvp-matches-list');
+  const inviteBox = document.getElementById('rsvp-invite');
+  const inviteNameEl = document.getElementById('rsvp-invite-name');
+  const confirmFields = document.getElementById('rsvp-confirm-fields');
+  const changeGuestBtn = document.getElementById('rsvp-change-guest');
 
   const API_URL = '/api/rsvp';
   const TOKEN_KEY = 'rsvp_manage_token';
 
   let manageToken = localStorage.getItem(TOKEN_KEY);
   let viewMode = 'create'; // 'create' | 'view' | 'edit'
+  /** @type {'search' | 'choose' | 'confirm'} */
+  let phase = 'search';
   let companionSeq = 0;
+  /** @type {{id: string, displayName: string} | null} */
+  let selectedGuest = null;
+  /** @type {Array<{id: string, displayName: string}>} */
+  let lastMatches = [];
 
   function showStatus(message, type = 'info') {
     statusDiv.hidden = false;
@@ -40,14 +53,13 @@ export function setupRsvp() {
 
   function showError(fieldId, message) {
     const errorEl = document.getElementById(`${fieldId}-error`);
-    if (errorEl) {
-      errorEl.textContent = message;
-    }
+    if (errorEl) errorEl.textContent = message;
   }
 
   function clearErrors() {
-    const errors = form.querySelectorAll('.form-error');
-    errors.forEach((el) => (el.textContent = ''));
+    form.querySelectorAll('.form-error').forEach((el) => {
+      el.textContent = '';
+    });
   }
 
   function isAttending() {
@@ -123,21 +135,100 @@ export function setupRsvp() {
 
   function updateCompanionsVisibility() {
     const attending = isAttending();
-    if (companionsBlock) companionsBlock.hidden = !attending;
+    if (companionsBlock) companionsBlock.hidden = !attending || phase !== 'confirm';
     if (!attending) clearCompanions();
     syncAddCompanionBtn();
   }
 
+  function setSelectedGuest(guest) {
+    selectedGuest = guest;
+    if (inviteNameEl) inviteNameEl.textContent = guest?.displayName || '';
+    if (nameInput && guest) nameInput.value = guest.displayName;
+  }
+
+  function renderMatches(matches) {
+    if (!matchesList) return;
+    matchesList.innerHTML = '';
+    matches.forEach((m, i) => {
+      const id = `rsvp-match-${m.id}`;
+      const label = document.createElement('label');
+      label.className = 'radio-label';
+      const input = document.createElement('input');
+      input.type = 'radio';
+      input.name = 'rsvp-match';
+      input.value = m.id;
+      input.id = id;
+      if (i === 0 && matches.length === 1) input.checked = true;
+      input.addEventListener('change', () => {
+        if (input.checked) {
+          setSelectedGuest(m);
+          enterConfirmPhase();
+        }
+      });
+      const span = document.createElement('span');
+      span.textContent = m.displayName;
+      label.append(input, span);
+      matchesList.appendChild(label);
+    });
+  }
+
+  function enterSearchPhase() {
+    phase = 'search';
+    selectedGuest = null;
+    lastMatches = [];
+    if (matchesBlock) matchesBlock.hidden = true;
+    if (inviteBox) inviteBox.hidden = true;
+    if (confirmFields) confirmFields.hidden = true;
+    if (matchesList) matchesList.innerHTML = '';
+    if (nameInput) nameInput.disabled = viewMode === 'view';
+    if (submitBtn) {
+      submitBtn.hidden = viewMode === 'view';
+      submitBtn.textContent = 'Buscar';
+    }
+    clearCompanions();
+    updateCompanionsVisibility();
+  }
+
+  function enterChoosePhase(matches) {
+    phase = 'choose';
+    lastMatches = matches;
+    selectedGuest = null;
+    if (matchesBlock) matchesBlock.hidden = false;
+    if (inviteBox) inviteBox.hidden = true;
+    if (confirmFields) confirmFields.hidden = true;
+    renderMatches(matches);
+    if (submitBtn) {
+      submitBtn.hidden = false;
+      submitBtn.textContent = 'Continuar';
+    }
+    showStatus('Encontramos mais de um convite. Escolha o seu.', 'info');
+  }
+
+  function enterConfirmPhase() {
+    if (!selectedGuest) return;
+    phase = 'confirm';
+    if (matchesBlock) matchesBlock.hidden = true;
+    if (inviteBox) inviteBox.hidden = false;
+    if (confirmFields) confirmFields.hidden = false;
+    if (nameInput) nameInput.disabled = true;
+    if (submitBtn) {
+      submitBtn.hidden = false;
+      submitBtn.textContent = viewMode === 'edit' ? 'Atualizar confirmação' : 'Confirmar presença';
+    }
+    updateCompanionsVisibility();
+  }
+
   function setViewMode(mode) {
-    const allInputs = form.querySelectorAll('input, textarea, button[type="submit"], button[type="button"]');
+    const allInputs = form.querySelectorAll(
+      'input, textarea, button[type="submit"], button[type="button"]'
+    );
 
     if (mode === 'create') {
-      allInputs.forEach((input) => (input.disabled = false));
-      if (submitBtn) {
-        submitBtn.hidden = false;
-        submitBtn.textContent = 'Confirmar presença';
-      }
+      allInputs.forEach((input) => {
+        input.disabled = false;
+      });
       if (editBtn) editBtn.hidden = true;
+      enterSearchPhase();
     } else if (mode === 'view') {
       allInputs.forEach((input) => {
         if (input === editBtn) return;
@@ -148,11 +239,13 @@ export function setupRsvp() {
         editBtn.disabled = false;
       }
       if (submitBtn) submitBtn.hidden = true;
+      if (inviteBox) inviteBox.hidden = false;
+      if (confirmFields) confirmFields.hidden = false;
+      if (matchesBlock) matchesBlock.hidden = true;
+      phase = 'confirm';
     } else if (mode === 'edit') {
       allInputs.forEach((input) => {
-        if (input === nameInput) {
-          input.disabled = true;
-        } else if (input === editBtn) {
+        if (input === nameInput || input === editBtn) {
           input.disabled = true;
         } else {
           input.disabled = false;
@@ -163,13 +256,19 @@ export function setupRsvp() {
         submitBtn.textContent = 'Atualizar confirmação';
       }
       if (editBtn) editBtn.hidden = true;
+      if (inviteBox) inviteBox.hidden = false;
+      if (confirmFields) confirmFields.hidden = false;
+      if (matchesBlock) matchesBlock.hidden = true;
+      phase = 'confirm';
+      if (changeGuestBtn) changeGuestBtn.disabled = true;
     }
     syncAddCompanionBtn();
   }
 
   function setBusyState(busy) {
-    const allInputs = form.querySelectorAll('input, textarea, button');
-    allInputs.forEach((input) => (input.disabled = busy));
+    form.querySelectorAll('input, textarea, button').forEach((input) => {
+      input.disabled = busy;
+    });
   }
 
   function getIdempotencyKey() {
@@ -194,15 +293,14 @@ export function setupRsvp() {
   async function fetchRsvp() {
     if (!manageToken) {
       viewMode = 'create';
+      enterSearchPhase();
       return;
     }
 
     try {
       const response = await fetch(API_URL, {
         method: 'GET',
-        headers: {
-          Authorization: `Bearer ${manageToken}`,
-        },
+        headers: { Authorization: `Bearer ${manageToken}` },
       });
 
       if (!response.ok) {
@@ -229,10 +327,13 @@ export function setupRsvp() {
   }
 
   function populateForm(data) {
+    setSelectedGuest({ id: 'stored', displayName: data.guestName });
     if (nameInput) nameInput.value = data.guestName;
 
     const attendingValue = data.attending === true || data.attending === 'true' ? 'true' : 'false';
-    const attendingRadio = document.querySelector(`input[name="attending"][value="${attendingValue}"]`);
+    const attendingRadio = document.querySelector(
+      `input[name="attending"][value="${attendingValue}"]`
+    );
     if (attendingRadio) attendingRadio.checked = true;
 
     updateCompanionsVisibility();
@@ -245,10 +346,97 @@ export function setupRsvp() {
     hideStatus();
   }
 
+  async function runSearch() {
+    clearErrors();
+    hideStatus();
+    const q = nameInput?.value.trim() || '';
+    if (q.length < 2) {
+      showError('rsvp-name', 'Digite pelo menos 2 letras do nome.');
+      return;
+    }
+
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Buscando…';
+    }
+
+    try {
+      const res = await fetch(`${SEARCH_URL}?q=${encodeURIComponent(q)}`);
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        showStatus(data.message || 'Não foi possível buscar o convite.', 'error');
+        return;
+      }
+
+      const matches = data.matches || [];
+      if (matches.length === 0) {
+        enterSearchPhase();
+        showStatus(
+          'Não encontramos esse nome na lista. Confira a escrita ou fale com os noivos.',
+          'error'
+        );
+        return;
+      }
+
+      if (matches.length === 1) {
+        setSelectedGuest(matches[0]);
+        enterConfirmPhase();
+        showStatus('Convite encontrado! Confirme sua presença abaixo.', 'success');
+        return;
+      }
+
+      enterChoosePhase(matches);
+    } catch (err) {
+      console.error(err);
+      showStatus('Erro de conexão ao buscar. Tente de novo.', 'error');
+    } finally {
+      if (submitBtn && viewMode === 'create') {
+        submitBtn.disabled = false;
+        if (phase === 'search') submitBtn.textContent = 'Buscar';
+        else if (phase === 'choose') submitBtn.textContent = 'Continuar';
+        else submitBtn.textContent = 'Confirmar presença';
+      }
+    }
+  }
+
   async function submitForm(e) {
     e.preventDefault();
     clearErrors();
     hideStatus();
+
+    if (viewMode === 'create' && phase === 'search') {
+      await runSearch();
+      return;
+    }
+
+    if (viewMode === 'create' && phase === 'choose') {
+      const checked = document.querySelector('input[name="rsvp-match"]:checked');
+      if (!checked) {
+        showError('rsvp-matches', 'Selecione o seu convite na lista.');
+        return;
+      }
+      const guest = lastMatches.find((m) => m.id === checked.value);
+      if (!guest) {
+        showError('rsvp-matches', 'Seleção inválida. Busque de novo.');
+        enterSearchPhase();
+        return;
+      }
+      setSelectedGuest(guest);
+      enterConfirmPhase();
+      return;
+    }
+
+    if (!selectedGuest?.displayName) {
+      showStatus('Busque e selecione seu convite antes de confirmar.', 'error');
+      enterSearchPhase();
+      return;
+    }
+
+    const attendingRadio = document.querySelector('input[name="attending"]:checked');
+    if (!attendingRadio) {
+      showError('rsvp-attending', 'Informe se você vai comparecer.');
+      return;
+    }
 
     const savedViewMode = viewMode;
     const attending = isAttending();
@@ -260,9 +448,8 @@ export function setupRsvp() {
       return;
     }
 
-    // API legado: adultsCount + observations (nomes) + consent implícito ao enviar
     const payload = {
-      guestName: nameInput?.value.trim(),
+      guestName: selectedGuest.displayName,
       attending,
       adultsCount: companions.length,
       childrenCount: 0,
@@ -271,15 +458,11 @@ export function setupRsvp() {
     };
 
     const method = savedViewMode === 'edit' ? 'PUT' : 'POST';
-    const headers = {
-      'Content-Type': 'application/json',
-    };
+    const headers = { 'Content-Type': 'application/json' };
 
     if (method === 'POST') {
       headers['Idempotency-Key'] = getIdempotencyKey();
-      if (manageToken) {
-        headers.Authorization = `Bearer ${manageToken}`;
-      }
+      if (manageToken) headers.Authorization = `Bearer ${manageToken}`;
     } else if (method === 'PUT' && manageToken) {
       headers.Authorization = `Bearer ${manageToken}`;
     }
@@ -329,7 +512,14 @@ export function setupRsvp() {
           setViewMode('create');
           return;
         }
-        throw new Error(data.error || 'Erro desconhecido');
+        if (response.status === 403 && data?.error === 'GUEST_NOT_ON_LIST') {
+          showStatus(
+            data.message || 'Este nome não está na lista de convidados.',
+            'error'
+          );
+          return;
+        }
+        throw new Error(data.error || data.message || 'Erro desconhecido');
       }
 
       success = true;
@@ -350,20 +540,39 @@ export function setupRsvp() {
       setViewMode('view');
     } catch (error) {
       console.error('Failed to submit RSVP:', error);
-      showStatus(error.message || 'Erro de conexão. Verifique sua internet e tente novamente.', 'error');
+      showStatus(
+        error.message || 'Erro de conexão. Verifique sua internet e tente novamente.',
+        'error'
+      );
     } finally {
-      if (submitBtn) {
-        submitBtn.textContent =
-          savedViewMode === 'edit' ? 'Atualizar confirmação' : 'Confirmar presença';
-      }
-
       if (success) {
         // view mode already applied
-      } else if (viewMode !== savedViewMode) {
-        setBusyState(false);
-      } else {
-        setViewMode(savedViewMode);
+        return;
       }
+
+      setBusyState(false);
+
+      if (savedViewMode === 'edit') {
+        setViewMode('edit');
+        return;
+      }
+
+      // Mantém o convite selecionado após erro (409/413/etc.)
+      if (selectedGuest && phase === 'confirm') {
+        enterConfirmPhase();
+        form
+          .querySelectorAll(
+            '#rsvp-confirm-fields input, #rsvp-confirm-fields button, #rsvp-submit, #rsvp-change-guest, #rsvp-add-companion'
+          )
+          .forEach((el) => {
+            el.disabled = false;
+          });
+        if (nameInput) nameInput.disabled = true;
+        if (submitBtn) submitBtn.textContent = 'Confirmar presença';
+        return;
+      }
+
+      setViewMode(savedViewMode);
     }
   }
 
@@ -375,8 +584,20 @@ export function setupRsvp() {
     });
   }
   if (editBtn) editBtn.addEventListener('click', enableEditMode);
+  if (changeGuestBtn) {
+    changeGuestBtn.addEventListener('click', () => {
+      if (viewMode !== 'create') return;
+      hideStatus();
+      if (nameInput) {
+        nameInput.disabled = false;
+        nameInput.focus();
+        nameInput.select();
+      }
+      enterSearchPhase();
+    });
+  }
   form.addEventListener('submit', submitForm);
 
-  updateCompanionsVisibility();
+  enterSearchPhase();
   fetchRsvp();
 }

@@ -1,8 +1,9 @@
 /**
- * RSVP closed-list helpers — D1 only (Cloudflare Free).
+ * RSVP closed-list helpers — D1 + seed/memory fallback (Cloudflare Free).
  */
 
 import { WEDDING_KEY, normalizeName } from './rsvp-validators.mjs';
+import { GUEST_LIST_SEED } from '../../data/guest-list-seed.mjs';
 
 /**
  * Canonical key for matching invite names (case/accents-insensitive-ish).
@@ -13,6 +14,40 @@ export function nameKey(name) {
   return normalizeName(name)
     .normalize('NFC')
     .toLowerCase();
+}
+
+/** In-memory store for local Vite / no-D1 */
+let memoryGuests = null;
+
+function ensureMemoryGuests() {
+  if (!memoryGuests) {
+    const now = new Date().toISOString();
+    memoryGuests = GUEST_LIST_SEED.map((display) => {
+      const displayName = normalizeName(display);
+      return {
+        id: crypto.randomUUID(),
+        displayName,
+        nameKey: nameKey(displayName),
+        createdAt: now,
+      };
+    });
+  }
+  return memoryGuests;
+}
+
+export function resetMemoryGuestsForTests() {
+  memoryGuests = null;
+}
+
+export async function seedGuestListIfEmpty(db) {
+  if (!db) return { seeded: false, count: ensureMemoryGuests().length };
+  const countRow = await db
+    .prepare(`SELECT COUNT(*) AS c FROM rsvp_guest_list WHERE wedding_key = ?`)
+    .bind(WEDDING_KEY)
+    .first();
+  const count = Number(countRow?.c || 0);
+  if (count > 0) return { seeded: false, count };
+  return { seeded: true, ...(await addGuests(db, GUEST_LIST_SEED)) };
 }
 
 export async function getRsvpMode(db) {
@@ -42,6 +77,14 @@ export async function setRsvpMode(db, mode) {
 }
 
 export async function listGuestList(db) {
+  if (!db) {
+    return [...ensureMemoryGuests()].sort((a, b) =>
+      a.displayName.localeCompare(b.displayName, 'pt-BR', { sensitivity: 'base' })
+    );
+  }
+
+  await seedGuestListIfEmpty(db);
+
   const rows = await db
     .prepare(
       `SELECT id, display_name, name_key, created_at
@@ -50,6 +93,42 @@ export async function listGuestList(db) {
        ORDER BY display_name COLLATE NOCASE ASC`
     )
     .bind(WEDDING_KEY)
+    .all();
+
+  return (rows?.results || []).map((r) => ({
+    id: r.id,
+    displayName: r.display_name,
+    nameKey: r.name_key,
+    createdAt: r.created_at,
+  }));
+}
+
+/**
+ * Partial search by name (e.g. "Bruno" → "Bruno Butzke e Familia").
+ * @returns {Promise<Array<{id, displayName, nameKey, createdAt}>>}
+ */
+export async function searchGuests(db, query) {
+  const q = nameKey(query || '');
+  if (q.length < 2) return [];
+
+  if (!db) {
+    return ensureMemoryGuests()
+      .filter((g) => g.nameKey.includes(q))
+      .sort((a, b) => a.displayName.localeCompare(b.displayName, 'pt-BR', { sensitivity: 'base' }))
+      .slice(0, 20);
+  }
+
+  await seedGuestListIfEmpty(db);
+
+  const rows = await db
+    .prepare(
+      `SELECT id, display_name, name_key, created_at
+       FROM rsvp_guest_list
+       WHERE wedding_key = ? AND name_key LIKE ?
+       ORDER BY display_name COLLATE NOCASE ASC
+       LIMIT 20`
+    )
+    .bind(WEDDING_KEY, `%${q}%`)
     .all();
 
   return (rows?.results || []).map((r) => ({
@@ -74,6 +153,30 @@ export async function addGuests(db, names) {
   let added = 0;
   let skipped = 0;
   const now = new Date().toISOString();
+
+  if (!db) {
+    const mem = ensureMemoryGuests();
+    for (const raw of names) {
+      const display = normalizeName(String(raw || ''));
+      if (display.length < 2 || display.length > 100) {
+        skipped++;
+        continue;
+      }
+      const key = nameKey(display);
+      if (mem.some((g) => g.nameKey === key)) {
+        skipped++;
+        continue;
+      }
+      mem.push({
+        id: crypto.randomUUID(),
+        displayName: display,
+        nameKey: key,
+        createdAt: now,
+      });
+      added++;
+    }
+    return { added, skipped };
+  }
 
   for (const raw of names) {
     const display = normalizeName(String(raw || ''));
@@ -108,6 +211,15 @@ export async function removeGuest(db, guestId) {
   if (!guestId || typeof guestId !== 'string') {
     throw new Error('INVALID_GUEST_ID');
   }
+
+  if (!db) {
+    const mem = ensureMemoryGuests();
+    const idx = mem.findIndex((g) => g.id === guestId);
+    if (idx < 0) throw new Error('GUEST_NOT_FOUND');
+    mem.splice(idx, 1);
+    return { id: guestId, removed: true };
+  }
+
   const result = await db
     .prepare(`DELETE FROM rsvp_guest_list WHERE id = ? AND wedding_key = ?`)
     .bind(guestId, WEDDING_KEY)

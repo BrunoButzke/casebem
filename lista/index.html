@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex,nofollow" />
+    <title>Lista de convidados · Dani &amp; Carine</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Outfit:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --sand: #f3ebe1;
+        --lagoon: #3d5a4c;
+        --ink: #1c1917;
+        --cream: #faf7f2;
+        --muted: #6b6560;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: Outfit, system-ui, sans-serif;
+        background: var(--sand);
+        color: var(--ink);
+        line-height: 1.5;
+      }
+      main {
+        width: min(720px, calc(100% - 2rem));
+        margin: 2.5rem auto 4rem;
+      }
+      h1 {
+        font-family: 'Cormorant Garamond', Georgia, serif;
+        font-size: clamp(2rem, 5vw, 2.8rem);
+        font-weight: 500;
+        margin: 0 0 0.35rem;
+      }
+      .sub { color: var(--muted); margin: 0 0 1.5rem; font-size: 0.95rem; }
+      .warn {
+        background: color-mix(in srgb, #c45c26 12%, white);
+        border: 1px solid color-mix(in srgb, #c45c26 28%, transparent);
+        border-radius: 12px;
+        padding: 0.85rem 1rem;
+        margin-bottom: 1.25rem;
+        font-size: 0.9rem;
+      }
+      label { display: block; font-weight: 500; margin-bottom: 0.4rem; }
+      textarea {
+        width: 100%;
+        min-height: 7rem;
+        padding: 0.85rem 1rem;
+        border-radius: 12px;
+        border: 1px solid color-mix(in srgb, var(--ink) 14%, transparent);
+        background: var(--cream);
+        font: inherit;
+        resize: vertical;
+      }
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.65rem;
+        margin: 0.85rem 0 1.5rem;
+      }
+      button {
+        font: inherit;
+        border: 0;
+        border-radius: 999px;
+        padding: 0.7rem 1.25rem;
+        cursor: pointer;
+        background: var(--ink);
+        color: #fff;
+      }
+      button.secondary {
+        background: transparent;
+        color: var(--ink);
+        border: 1px solid color-mix(in srgb, var(--ink) 18%, transparent);
+      }
+      button.danger {
+        background: transparent;
+        color: #9b2c2c;
+        border: 0;
+        text-decoration: underline;
+        padding: 0.25rem 0.4rem;
+      }
+      .status { min-height: 1.4rem; margin: 0 0 1rem; font-size: 0.92rem; }
+      .status.ok { color: var(--lagoon); }
+      .status.err { color: #9b2c2c; }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: var(--cream);
+        border-radius: 14px;
+        overflow: hidden;
+      }
+      th, td {
+        text-align: left;
+        padding: 0.75rem 0.9rem;
+        border-bottom: 1px solid color-mix(in srgb, var(--ink) 8%, transparent);
+        font-size: 0.95rem;
+      }
+      th { font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+      .empty { color: var(--muted); padding: 1rem 0; }
+      a.back { color: var(--lagoon); }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p><a class="back" href="/dani-carine/">← Site do casal</a></p>
+      <h1>Lista de convidados</h1>
+      <p class="sub">Página oculta · um nome (ou família) por linha · usado na busca do RSVP.</p>
+      <p class="warn">
+        Sem login por enquanto. Não compartilhe o link <code>/lista</code>.
+      </p>
+
+      <label for="names">Adicionar convidados</label>
+      <textarea id="names" placeholder="Bruno Butzke e Familia&#10;Maria Silva"></textarea>
+      <div class="row">
+        <button type="button" id="add-btn">Adicionar</button>
+        <button type="button" class="secondary" id="refresh-btn">Atualizar</button>
+      </div>
+      <p class="status" id="status" role="status"></p>
+
+      <h2 style="font-family:'Cormorant Garamond',Georgia,serif;font-weight:500;margin:0 0 0.75rem">
+        Na lista (<span id="count">0</span>)
+      </h2>
+      <div id="table-wrap"><p class="empty">Carregando…</p></div>
+    </main>
+
+    <script type="module">
+      const statusEl = document.getElementById('status');
+      const tableWrap = document.getElementById('table-wrap');
+      const countEl = document.getElementById('count');
+      const namesEl = document.getElementById('names');
+
+      function setStatus(text, ok = true) {
+        statusEl.textContent = text || '';
+        statusEl.className = `status ${ok ? 'ok' : 'err'}`;
+      }
+
+      function render(guests) {
+        countEl.textContent = String(guests.length);
+        if (!guests.length) {
+          tableWrap.innerHTML = '<p class="empty">Nenhum convidado ainda.</p>';
+          return;
+        }
+        const rows = guests
+          .map(
+            (g) => `<tr>
+              <td>${escapeHtml(g.displayName)}</td>
+              <td style="width:1%;white-space:nowrap">
+                <button type="button" class="danger" data-remove="${escapeHtml(g.id)}">Remover</button>
+              </td>
+            </tr>`
+          )
+          .join('');
+        tableWrap.innerHTML = `<table>
+          <thead><tr><th>Convite</th><th></th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>`;
+      }
+
+      function escapeHtml(s) {
+        return String(s)
+          .replaceAll('&', '&amp;')
+          .replaceAll('<', '&lt;')
+          .replaceAll('>', '&gt;')
+          .replaceAll('"', '&quot;');
+      }
+
+      async function load() {
+        const res = await fetch('/api/guests');
+        const data = await res.json();
+        if (!res.ok || !data.ok) throw new Error(data.message || data.error || 'Falha ao listar');
+        render(data.guests || []);
+      }
+
+      document.getElementById('refresh-btn').addEventListener('click', async () => {
+        try {
+          await load();
+          setStatus('Lista atualizada.');
+        } catch (e) {
+          setStatus(e.message, false);
+        }
+      });
+
+      document.getElementById('add-btn').addEventListener('click', async () => {
+        const names = namesEl.value
+          .split(/\n+/)
+          .map((s) => s.trim())
+          .filter(Boolean);
+        if (!names.length) {
+          setStatus('Cole ao menos um nome.', false);
+          return;
+        }
+        try {
+          const res = await fetch('/api/guests', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ names }),
+          });
+          const data = await res.json();
+          if (!res.ok || !data.ok) throw new Error(data.message || data.error || 'Falha ao adicionar');
+          namesEl.value = '';
+          render(data.guests || []);
+          setStatus(`Adicionados: ${data.added} · ignorados: ${data.skipped}`);
+        } catch (e) {
+          setStatus(e.message, false);
+        }
+      });
+
+      tableWrap.addEventListener('click', async (e) => {
+        const btn = e.target.closest('[data-remove]');
+        if (!btn) return;
+        const id = btn.getAttribute('data-remove');
+        if (!confirm('Remover este convite da lista?')) return;
+        try {
+          const res = await fetch(`/api/guests?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+          const data = await res.json();
+          if (!res.ok || !data.ok) throw new Error(data.message || data.error || 'Falha ao remover');
+          render(data.guests || []);
+          setStatus('Removido.');
+        } catch (err) {
+          setStatus(err.message, false);
+        }
+      });
+
+      load().catch((e) => setStatus(e.message, false));
+    </script>
+  </body>
+</html>

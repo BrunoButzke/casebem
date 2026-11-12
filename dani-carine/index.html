@@ -465,7 +465,7 @@
 
               <div class="rsvp__fields" id="rsvp-fields">
                 <div class="form-field">
-                  <label for="rsvp-name">Seu nome completo <span class="required">*</span></label>
+                  <label for="rsvp-name">Qual o seu nome? <span class="required">*</span></label>
                   <input
                     type="text"
                     id="rsvp-name"
@@ -473,54 +473,73 @@
                     required
                     maxlength="100"
                     autocomplete="name"
+                    placeholder="Digite parte do nome do convite"
                     aria-describedby="rsvp-name-error"
                   />
+                  <span class="form-hint">Ex.: digite Bruno para achar “Bruno Butzke e Familia”</span>
                   <span class="form-error" id="rsvp-name-error" role="alert"></span>
                 </div>
 
-                <fieldset class="form-field">
-                  <legend>Você vai comparecer? <span class="required">*</span></legend>
-                  <div class="radio-group radio-group--row">
-                    <label class="radio-label">
-                      <input
-                        type="radio"
-                        name="attending"
-                        value="true"
-                        required
-                        aria-describedby="rsvp-attending-error"
-                      />
-                      <span>Sim, estaremos lá!</span>
-                    </label>
-                    <label class="radio-label">
-                      <input
-                        type="radio"
-                        name="attending"
-                        value="false"
-                      />
-                      <span>Infelizmente não poderei ir</span>
-                    </label>
-                  </div>
-                  <span class="form-error" id="rsvp-attending-error" role="alert"></span>
-                </fieldset>
+                <div class="form-field" id="rsvp-matches-block" hidden>
+                  <fieldset>
+                    <legend>Encontramos mais de um convite — qual é o seu?</legend>
+                    <div class="radio-group" id="rsvp-matches-list"></div>
+                  </fieldset>
+                  <span class="form-error" id="rsvp-matches-error" role="alert"></span>
+                </div>
 
-                <div class="form-field" id="rsvp-companions-block" hidden>
-                  <div class="rsvp__companions-head">
-                    <span class="rsvp__companions-label">Acompanhantes</span>
-                    <span class="form-hint" id="rsvp-companions-hint">Opcional · máximo 10</span>
-                  </div>
-                  <div id="rsvp-companions-list" class="rsvp__companions-list"></div>
-                  <button
-                    type="button"
-                    class="btn btn--ghost magnetic rsvp__add-companion"
-                    id="rsvp-add-companion"
-                  >
-                    Adicionar acompanhante
+                <div class="rsvp__invite" id="rsvp-invite" hidden>
+                  <p class="rsvp__invite-label">Seu convite</p>
+                  <p class="rsvp__invite-name" id="rsvp-invite-name"></p>
+                  <button type="button" class="btn btn--ghost rsvp__invite-change" id="rsvp-change-guest">
+                    Buscar outro nome
                   </button>
-                  <span class="form-error" id="rsvp-companions-error" role="alert"></span>
+                </div>
+
+                <div id="rsvp-confirm-fields" hidden>
+                  <fieldset class="form-field">
+                    <legend>Você vai comparecer? <span class="required">*</span></legend>
+                    <div class="radio-group radio-group--row">
+                      <label class="radio-label">
+                        <input
+                          type="radio"
+                          name="attending"
+                          value="true"
+                          aria-describedby="rsvp-attending-error"
+                        />
+                        <span>Sim, estaremos lá!</span>
+                      </label>
+                      <label class="radio-label">
+                        <input
+                          type="radio"
+                          name="attending"
+                          value="false"
+                        />
+                        <span>Infelizmente não poderei ir</span>
+                      </label>
+                    </div>
+                    <span class="form-error" id="rsvp-attending-error" role="alert"></span>
+                  </fieldset>
+
+                  <div class="form-field" id="rsvp-companions-block" hidden>
+                    <div class="rsvp__companions-head">
+                      <span class="rsvp__companions-label">Acompanhantes</span>
+                      <span class="form-hint" id="rsvp-companions-hint">Opcional · máximo 10</span>
+                    </div>
+                    <div id="rsvp-companions-list" class="rsvp__companions-list"></div>
+                    <button
+                      type="button"
+                      class="btn btn--ghost magnetic rsvp__add-companion"
+                      id="rsvp-add-companion"
+                    >
+                      Adicionar acompanhante
+                    </button>
+                    <span class="form-error" id="rsvp-companions-error" role="alert"></span>
+                  </div>
                 </div>
 
                 <button type="submit" class="btn magnetic rsvp__submit" id="rsvp-submit">
-                  Confirmar presença
+                  Buscar
                 </button>
 
                 <button 

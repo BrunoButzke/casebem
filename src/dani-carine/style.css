@@ -1766,6 +1766,40 @@ h2 {
   display: none;
 }
 
+.rsvp__invite {
+  margin: 0.35rem 0 1rem;
+  padding: 1rem 1.15rem;
+  border-radius: calc(var(--radius) - 4px);
+  background: color-mix(in srgb, var(--lagoon) 10%, var(--cream));
+  border: 1px solid color-mix(in srgb, var(--lagoon) 22%, transparent);
+}
+
+.rsvp__invite-label {
+  margin: 0 0 0.2rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--lagoon);
+}
+
+.rsvp__invite-name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.35rem, 3vw, 1.75rem);
+  font-weight: 500;
+  line-height: 1.25;
+}
+
+.rsvp__invite-change {
+  margin-top: 0.65rem;
+  width: auto;
+  padding-inline: 0.9rem;
+}
+
+#rsvp-matches-list .radio-label {
+  margin-bottom: 0.35rem;
+}
+
 .rsvp__submit,
 .rsvp__edit {
   width: 100%;

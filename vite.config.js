@@ -207,6 +207,7 @@ export default defineConfig(({ mode }) => {
           landing: resolve(rootDir, 'landing-page-animada/index.html'),
           daniCarine: resolve(rootDir, 'dani-carine/index.html'),
           daniCarineAdmin: resolve(rootDir, 'dani-carine/admin.html'),
+          daniCarineLista: resolve(rootDir, 'dani-carine/lista.html'),
           lista: resolve(rootDir, 'lista/index.html'),
         },
       },

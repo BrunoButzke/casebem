@@ -103,6 +103,16 @@
       th { font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
       .empty { color: var(--muted); padding: 1rem 0; }
       a.back { color: var(--lagoon); }
+      .badge {
+        display: inline-block;
+        padding: 0.2rem 0.55rem;
+        border-radius: 999px;
+        font-size: 0.78rem;
+        font-weight: 500;
+      }
+      .badge.ok { background: color-mix(in srgb, var(--lagoon) 16%, white); color: var(--lagoon); }
+      .badge.no { background: color-mix(in srgb, #9b2c2c 12%, white); color: #9b2c2c; }
+      .badge.pend { background: color-mix(in srgb, var(--ink) 8%, white); color: var(--muted); }
     </style>
   </head>
   <body>
@@ -139,6 +149,12 @@
         statusEl.className = `status ${ok ? 'ok' : 'err'}`;
       }
 
+      function statusLabel(g) {
+        if (g.attending === true) return '<span class="badge ok">Confirmou · vai</span>';
+        if (g.attending === false) return '<span class="badge no">Confirmou · não vai</span>';
+        return '<span class="badge pend">Pendente</span>';
+      }
+
       function render(guests) {
         countEl.textContent = String(guests.length);
         if (!guests.length) {
@@ -149,6 +165,8 @@
           .map(
             (g) => `<tr>
               <td>${escapeHtml(g.displayName)}</td>
+              <td>${statusLabel(g)}</td>
+              <td style="color:var(--muted);font-size:0.85rem">${g.respondedAt ? escapeHtml(new Date(g.respondedAt).toLocaleString('pt-BR')) : '—'}</td>
               <td style="width:1%;white-space:nowrap">
                 <button type="button" class="danger" data-remove="${escapeHtml(g.id)}">Remover</button>
               </td>
@@ -156,7 +174,7 @@
           )
           .join('');
         tableWrap.innerHTML = `<table>
-          <thead><tr><th>Convite</th><th></th></tr></thead>
+          <thead><tr><th>Convite</th><th>RSVP</th><th>Quando</th><th></th></tr></thead>
           <tbody>${rows}</tbody>
         </table>`;
       }

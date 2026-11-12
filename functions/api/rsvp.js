@@ -218,6 +218,17 @@ async function handlePost(request, env) {
       bearerToken
     );
 
+    try {
+      const { markGuestResponse } = await import('../_lib/rsvp-guest-list.mjs');
+      await markGuestResponse(
+        env.DB,
+        rsvp.guestName || validation.data.guestName,
+        rsvp.attending ?? validation.data.attending
+      );
+    } catch {
+      /* lista oculta: best-effort */
+    }
+
     // Best-effort e-mail (Resend free). Sem key = no-op.
     try {
       const { sendAdminNotification } = await import('../_lib/notify-email.mjs');
@@ -319,6 +330,17 @@ async function handlePut(request, env) {
     if (!rsvp) {
       // Invalid/unknown token = 401 Unauthorized (not 404)
       return errorResponse(request, 'Token de autorização inválido', 401);
+    }
+
+    try {
+      const { markGuestResponse } = await import('../_lib/rsvp-guest-list.mjs');
+      if (typeof rsvp.attending === 'boolean') {
+        await markGuestResponse(env.DB, rsvp.guestName, rsvp.attending);
+      } else if (typeof validation.data.attending === 'boolean') {
+        await markGuestResponse(env.DB, rsvp.guestName, validation.data.attending);
+      }
+    } catch {
+      /* lista oculta: best-effort */
     }
 
     return jsonResponse(request, rsvp, 200);

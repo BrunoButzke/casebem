@@ -13,7 +13,9 @@ import {
   listGuestList,
   addGuests,
   removeGuest,
+  markGuestResponse,
 } from './functions/_lib/rsvp-guest-list.mjs';
+import { validateRsvpCreate } from './functions/_lib/rsvp-validators.mjs';
 
 const rootDir = dirname(fileURLToPath(import.meta.url));
 
@@ -22,6 +24,9 @@ const PLANS = {
   pro: { name: 'Pro', amount: 299 },
   vip: { name: 'VIP', amount: 499 },
 };
+
+/** Local-only RSVP store (Vite) so confirmação funciona sem D1 */
+const localRsvpsByToken = new Map();
 
 function guestListApiPlugin() {
   return {
@@ -32,6 +37,43 @@ function guestListApiPlugin() {
           const rawUrl = req.url || '/';
           const parsed = new URL(rawUrl, 'http://localhost');
           const path = parsed.pathname;
+
+          if (path === '/api/rsvp' && req.method === 'POST') {
+            const idem = req.headers['idempotency-key'];
+            if (!idem) return sendJson(res, 400, { error: 'Header Idempotency-Key é obrigatório' });
+            const body = await readJsonBody(req);
+            const validation = validateRsvpCreate(body);
+            if (!validation.valid) {
+              return sendJson(res, 400, { error: 'Dados inválidos', details: validation.errors });
+            }
+            const data = validation.data;
+            await markGuestResponse(null, data.guestName, data.attending);
+            const manageToken = crypto.randomUUID().replaceAll('-', '');
+            const now = new Date().toISOString();
+            const rsvp = {
+              id: crypto.randomUUID(),
+              guestName: data.guestName,
+              attending: data.attending,
+              adultsCount: data.attending ? data.adultsCount : 0,
+              childrenCount: 0,
+              observations: data.observations ?? null,
+              consentGiven: true,
+              createdAt: now,
+              updatedAt: now,
+              manageToken,
+            };
+            localRsvpsByToken.set(manageToken, rsvp);
+            return sendJson(res, 201, rsvp);
+          }
+
+          if (path === '/api/rsvp' && req.method === 'GET') {
+            const auth = req.headers.authorization || '';
+            const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+            const rsvp = localRsvpsByToken.get(token);
+            if (!rsvp) return sendJson(res, 401, { error: 'Token de autorização inválido' });
+            const { manageToken, ...publicRsvp } = rsvp;
+            return sendJson(res, 200, publicRsvp);
+          }
 
           if (path === '/api/guests/search' && req.method === 'GET') {
             const q = parsed.searchParams.get('q') || '';

@@ -12,6 +12,8 @@ import {
   addGuests,
   searchGuests,
   resetMemoryGuestsForTests,
+  markGuestResponse,
+  listGuestList,
 } from '../functions/_lib/rsvp-guest-list.mjs';
 
 test('nameKey: normaliza espaços e case', () => {
@@ -128,4 +130,24 @@ test('searchGuests: memory fallback sem DB', async () => {
   const hits = await searchGuests(null, 'Bruno');
   assert.ok(hits.length >= 1);
   assert.ok(hits.some((h) => /bruno/i.test(h.displayName)));
+});
+
+test('markGuestResponse: atualiza status na lista (memória)', async () => {
+  resetMemoryGuestsForTests();
+  const before = await listGuestList(null);
+  const target = before.find((g) => /bruno butzke/i.test(g.displayName));
+  assert.ok(target);
+  assert.equal(target.attending, null);
+
+  const marked = await markGuestResponse(null, target.displayName, true);
+  assert.equal(marked.updated, true);
+
+  const after = await listGuestList(null);
+  const updated = after.find((g) => g.id === target.id);
+  assert.equal(updated.attending, true);
+  assert.ok(updated.respondedAt);
+
+  await markGuestResponse(null, target.displayName, false);
+  const declined = (await listGuestList(null)).find((g) => g.id === target.id);
+  assert.equal(declined.attending, false);
 });

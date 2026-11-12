@@ -394,7 +394,7 @@ describe('Frontend RSVP - Real DOM Tests', () => {
     assert.equal(document.querySelectorAll('input[name="rsvp-match"]').length, 2);
   });
 
-  it('existing confirmation loads in locked view without edit button', async () => {
+  it('existing confirmation loads locked but allows Buscar outro nome', async () => {
     const { document, mockFetch } = await setupWindow();
     localStorage.setItem('rsvp_manage_token', 'view-token');
 
@@ -419,9 +419,17 @@ describe('Frontend RSVP - Real DOM Tests', () => {
     setupRsvp();
     await new Promise((resolve) => setTimeout(resolve, 100));
 
+    const changeBtn = document.getElementById('rsvp-change-guest');
     assert.equal(document.getElementById('rsvp-name').disabled, true);
     assert.equal(document.getElementById('rsvp-submit').hidden, true);
-    assert.equal(document.getElementById('rsvp-edit'), null);
     assert.equal(document.getElementById('rsvp-invite').hidden, false);
+    assert.equal(changeBtn.hidden, false);
+    assert.equal(changeBtn.disabled, false);
+
+    changeBtn.click();
+    assert.equal(document.getElementById('rsvp-name').disabled, false);
+    assert.match(document.getElementById('rsvp-submit').textContent, /Buscar/i);
+    assert.equal(document.getElementById('rsvp-invite').hidden, true);
+    assert.equal(localStorage.getItem('rsvp_manage_token'), null);
   });
 });

@@ -98,9 +98,20 @@ export function setupRsvp() {
     if (inviteBox) inviteBox.hidden = true;
     if (confirmFields) confirmFields.hidden = true;
     if (matchesList) matchesList.innerHTML = '';
-    if (nameInput) nameInput.disabled = viewMode === 'view';
+    attendingRadios.forEach((r) => {
+      r.checked = false;
+    });
+    if (nameInput) {
+      nameInput.disabled = false;
+      if (!nameInput.value) nameInput.value = '';
+    }
+    if (changeGuestBtn) {
+      changeGuestBtn.hidden = true;
+      changeGuestBtn.disabled = false;
+    }
     if (submitBtn) {
-      submitBtn.hidden = viewMode === 'view';
+      submitBtn.hidden = false;
+      submitBtn.disabled = false;
       submitBtn.textContent = 'Buscar';
     }
   }
@@ -127,10 +138,33 @@ export function setupRsvp() {
     if (inviteBox) inviteBox.hidden = false;
     if (confirmFields) confirmFields.hidden = false;
     if (nameInput) nameInput.disabled = true;
+    if (changeGuestBtn) {
+      changeGuestBtn.hidden = false;
+      changeGuestBtn.disabled = false;
+    }
     if (submitBtn) {
       submitBtn.hidden = false;
+      submitBtn.disabled = false;
       submitBtn.textContent = 'Confirmar presença';
     }
+  }
+
+  function resetToNewSearch() {
+    viewMode = 'create';
+    manageToken = null;
+    localStorage.removeItem(TOKEN_KEY);
+    rotateIdempotencyKey();
+    hideStatus();
+    clearErrors();
+    if (nameInput) {
+      nameInput.value = '';
+      nameInput.disabled = false;
+    }
+    form.querySelectorAll('input, textarea, button').forEach((el) => {
+      el.disabled = false;
+    });
+    enterSearchPhase();
+    nameInput?.focus();
   }
 
   function setViewMode(mode) {
@@ -145,13 +179,23 @@ export function setupRsvp() {
       enterSearchPhase();
     } else if (mode === 'view') {
       allInputs.forEach((input) => {
+        if (input === changeGuestBtn) return;
         input.disabled = true;
       });
-      if (submitBtn) submitBtn.hidden = true;
+      if (submitBtn) {
+        submitBtn.hidden = true;
+        submitBtn.textContent = 'Confirmar presença';
+        submitBtn.disabled = true;
+      }
       if (inviteBox) inviteBox.hidden = false;
       if (confirmFields) confirmFields.hidden = false;
       if (matchesBlock) matchesBlock.hidden = true;
-      if (changeGuestBtn) changeGuestBtn.hidden = true;
+      // Permite buscar outro convite após confirmar
+      if (changeGuestBtn) {
+        changeGuestBtn.hidden = false;
+        changeGuestBtn.disabled = false;
+        changeGuestBtn.textContent = 'Buscar outro nome';
+      }
       phase = 'confirm';
     }
   }
@@ -401,6 +445,7 @@ export function setupRsvp() {
       showStatus('Confirmação enviada com sucesso!', 'success');
 
       viewMode = 'view';
+      setBusyState(false);
       setViewMode('view');
     } catch (error) {
       console.error('Failed to submit RSVP:', error);
@@ -432,15 +477,10 @@ export function setupRsvp() {
   }
 
   if (changeGuestBtn) {
-    changeGuestBtn.addEventListener('click', () => {
-      if (viewMode !== 'create') return;
-      hideStatus();
-      if (nameInput) {
-        nameInput.disabled = false;
-        nameInput.focus();
-        nameInput.select();
-      }
-      enterSearchPhase();
+    changeGuestBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      resetToNewSearch();
     });
   }
   form.addEventListener('submit', submitForm);

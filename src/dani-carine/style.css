@@ -1485,13 +1485,15 @@ h2 {
 
 .radio-group--row {
   flex-direction: row;
-  flex-wrap: wrap;
-  gap: 0.75rem;
+  flex-wrap: nowrap;
+  gap: 0.65rem;
+  align-items: stretch;
 }
 
 .radio-group--row .radio-label {
-  flex: 1 1 12rem;
+  flex: 1 1 0;
   min-width: 0;
+  padding: 0.65rem 0.7rem;
 }
 
 .rsvp__companions-head {

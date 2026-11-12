@@ -3,7 +3,6 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import Lenis from 'lenis';
 import { setupRsvp } from './rsvp.mjs';
 import { initMessages } from './messages.mjs';
-import { initCart } from './cart.mjs';
 import { initLodging } from './lodging.mjs';
 import { initStationery } from './stationery.mjs';
 
@@ -606,7 +605,6 @@ function boot() {
   setupGifts();
   setupRsvp();
   initMessages();
-  initCart();
   initLodging();
   initStationery();
   setupReveals();

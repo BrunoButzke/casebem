@@ -12,7 +12,8 @@ export const LIMITS = {
   ADULTS_MAX: 10,
   CHILDREN_MIN: 0,
   CHILDREN_MAX: 10,
-  OBSERVATIONS_MAX: 500,
+  // Acompanhantes são persistidos em observations (1 nome/linha); 10×100 + quebras
+  OBSERVATIONS_MAX: 1200,
   IDEMPOTENCY_KEY_MAX: 128,
   BODY_SIZE_MAX: 8192, // 8KB
 };
@@ -135,16 +136,27 @@ export function validateObservations(observations) {
 }
 
 /**
- * Validate consent given
+ * Validate consent given.
+ * Consentimento explícito no formulário foi removido: enviar o RSVP implica consentimento.
+ * Aceita `true` ou omitido; rejeita apenas `false`/tipos inválidos.
  */
 export function validateConsent(consent) {
-  if (consent !== true) {
-    return { 
-      valid: false, 
-      error: 'Consentimento é obrigatório para armazenar seus dados' 
+  if (consent === undefined || consent === null) {
+    return { valid: true, value: true };
+  }
+  if (consent === true) {
+    return { valid: true, value: true };
+  }
+  if (consent === false) {
+    return {
+      valid: false,
+      error: 'Consentimento é obrigatório para armazenar seus dados',
     };
   }
-  return { valid: true, value: true };
+  return {
+    valid: false,
+    error: 'Consentimento inválido',
+  };
 }
 
 /**

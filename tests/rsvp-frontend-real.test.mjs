@@ -17,26 +17,27 @@ describe('Frontend RSVP - Real DOM Tests', () => {
     const window = new Window({ url: 'https://casebem.pages.dev/dani-carine/' });
     const { document } = window;
     
-    // Minimal form HTML with all required IDs
+    // Minimal form HTML aligned with simplified RSVP UI
     document.body.innerHTML = `
       <form id="rsvp-form">
         <input type="text" id="rsvp-name" />
-        <div>
+        <div class="radio-group radio-group--row">
           <input type="radio" name="attending" value="true" id="attending-true" />
           <input type="radio" name="attending" value="false" id="attending-false" />
         </div>
-        <input type="number" id="rsvp-adults" value="0" />
-        <input type="number" id="rsvp-children" value="0" />
-        <textarea id="rsvp-observations"></textarea>
-        <span id="rsvp-observations-count">0/500</span>
-        <input type="checkbox" id="rsvp-consent" />
-        <button type="submit" id="rsvp-submit">Confirmar Presença</button>
-        <button type="button" id="rsvp-edit" hidden>Editar</button>
+        <div id="rsvp-companions-block" hidden>
+          <div id="rsvp-companions-list"></div>
+          <button type="button" id="rsvp-add-companion">Adicionar acompanhante</button>
+          <span id="rsvp-companions-error" class="form-error"></span>
+        </div>
+        <button type="submit" id="rsvp-submit">Confirmar presença</button>
+        <button type="button" id="rsvp-edit" hidden>Alterar minha resposta</button>
         <div id="rsvp-status" hidden>
           <span id="rsvp-status-message"></span>
         </div>
         <div id="rsvp-fields"></div>
-        <span id="rsvp-name-error"></span>
+        <span id="rsvp-name-error" class="form-error"></span>
+        <span id="rsvp-attending-error" class="form-error"></span>
       </form>
     `;
 
@@ -89,15 +90,12 @@ describe('Frontend RSVP - Real DOM Tests', () => {
 
     const form = document.getElementById('rsvp-form');
     const nameInput = document.getElementById('rsvp-name');
-    const adultsInput = document.getElementById('rsvp-adults');
-    const consentCheckbox = document.getElementById('rsvp-consent');
     const attendingTrue = document.getElementById('attending-true');
+    const addCompanionBtn = document.getElementById('rsvp-add-companion');
     const submitBtn = document.getElementById('rsvp-submit');
     const editBtn = document.getElementById('rsvp-edit');
 
     nameInput.value = 'Test User';
-    adultsInput.value = '2';
-    consentCheckbox.checked = true;
     attendingTrue.checked = true;
 
     form.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
@@ -126,8 +124,7 @@ describe('Frontend RSVP - Real DOM Tests', () => {
     
     // Fields locked
     assert.equal(nameInput.disabled, true);
-    assert.equal(adultsInput.disabled, true);
-    assert.equal(consentCheckbox.disabled, true);
+    assert.equal(addCompanionBtn.disabled, true);
     
     // Buttons
     assert.equal(submitBtn.hidden, true);
@@ -177,11 +174,9 @@ describe('Frontend RSVP - Real DOM Tests', () => {
 
     const form = document.getElementById('rsvp-form');
     const nameInput = document.getElementById('rsvp-name');
-    const consentCheckbox = document.getElementById('rsvp-consent');
     const attendingFalse = document.getElementById('attending-false');
 
     nameInput.value = 'Retry User';
-    consentCheckbox.checked = true;
     attendingFalse.checked = true;
 
     form.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
@@ -208,7 +203,6 @@ describe('Frontend RSVP - Real DOM Tests', () => {
     const submitBtn = document.getElementById('rsvp-submit');
     
     nameInput.value = 'Conflict';
-    document.getElementById('rsvp-consent').checked = true;
     document.getElementById('attending-true').checked = true;
 
     form.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
@@ -225,10 +219,10 @@ describe('Frontend RSVP - Real DOM Tests', () => {
     // Form NOT disabled (setBusyState(false) called)
     assert.equal(submitBtn.disabled, false);
     assert.equal(nameInput.disabled, false);
-    assert.equal(submitBtn.textContent, 'Confirmar Presença');
+    assert.match(submitBtn.textContent, /Confirmar presença/i);
   });
 
-  it('413 payload too large: field error shown, form enabled', async () => {
+  it('413 payload too large: message shown, form enabled', async () => {
     const { document, mockFetch } = await setupWindow();
     
     global.fetch = mockFetch([{
@@ -241,12 +235,9 @@ describe('Frontend RSVP - Real DOM Tests', () => {
 
     const form = document.getElementById('rsvp-form');
     const nameInput = document.getElementById('rsvp-name');
-    const observationsInput = document.getElementById('rsvp-observations');
     const submitBtn = document.getElementById('rsvp-submit');
     
     nameInput.value = '413 Test';
-    observationsInput.value = 'x'.repeat(600); // Too long
-    document.getElementById('rsvp-consent').checked = true;
     document.getElementById('attending-true').checked = true;
 
     form.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
@@ -259,10 +250,8 @@ describe('Frontend RSVP - Real DOM Tests', () => {
     assert.equal(statusDiv.hidden, false);
     assert.ok(statusMsg.textContent.includes('longo') || statusMsg.textContent.includes('muito'));
     
-    // Form enabled (setBusyState(false) called)
     assert.equal(submitBtn.disabled, false);
     assert.equal(nameInput.disabled, false);
-    assert.equal(observationsInput.disabled, false);
   });
 
   it('429 rate limit: message shown, form enabled', async () => {
@@ -281,7 +270,6 @@ describe('Frontend RSVP - Real DOM Tests', () => {
     const submitBtn = document.getElementById('rsvp-submit');
     
     nameInput.value = '429 Test';
-    document.getElementById('rsvp-consent').checked = true;
     document.getElementById('attending-true').checked = true;
 
     form.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
@@ -316,7 +304,6 @@ describe('Frontend RSVP - Real DOM Tests', () => {
     const submitBtn = document.getElementById('rsvp-submit');
     
     document.getElementById('rsvp-name').value = 'JSON Test';
-    document.getElementById('rsvp-consent').checked = true;
     document.getElementById('attending-true').checked = true;
 
     form.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
@@ -352,7 +339,6 @@ describe('Frontend RSVP - Real DOM Tests', () => {
 
     const form = document.getElementById('rsvp-form');
     document.getElementById('rsvp-name').value = '503 Test';
-    document.getElementById('rsvp-consent').checked = true;
     document.getElementById('attending-true').checked = true;
 
     form.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
@@ -386,7 +372,7 @@ describe('Frontend RSVP - Real DOM Tests', () => {
     assert.notEqual(localStorage.getItem('rsvp_idempotency_key'), 'old-key');
     assert.equal(nameInput.disabled, false);
     assert.equal(submitBtn.hidden, false);
-    assert.equal(submitBtn.textContent, 'Confirmar Presença');
+    assert.match(submitBtn.textContent, /Confirmar presença/i);
   });
 
   it('Edit button click unlocks only editable fields', async () => {
@@ -416,17 +402,15 @@ describe('Frontend RSVP - Real DOM Tests', () => {
 
     const editBtn = document.getElementById('rsvp-edit');
     const nameInput = document.getElementById('rsvp-name');
-    const consentCheckbox = document.getElementById('rsvp-consent');
-    const adultsInput = document.getElementById('rsvp-adults');
+    const addCompanionBtn = document.getElementById('rsvp-add-companion');
     const submitBtn = document.getElementById('rsvp-submit');
 
     editBtn.click();
 
     assert.equal(nameInput.disabled, true); // Locked
-    assert.equal(consentCheckbox.disabled, true); // Locked
-    assert.equal(adultsInput.disabled, false); // Editable
+    assert.equal(addCompanionBtn.disabled, false); // Editable
     assert.equal(submitBtn.hidden, false);
-    assert.equal(submitBtn.textContent, 'Atualizar Confirmação');
+    assert.match(submitBtn.textContent, /Atualizar/i);
   });
 
   it('PUT success locks all fields again', async () => {
@@ -473,10 +457,12 @@ describe('Frontend RSVP - Real DOM Tests', () => {
 
     const editBtn = document.getElementById('rsvp-edit');
     const submitBtn = document.getElementById('rsvp-submit');
+    const addCompanionBtn = document.getElementById('rsvp-add-companion');
     editBtn.click();
 
-    const adultsInput = document.getElementById('rsvp-adults');
-    adultsInput.value = '3';
+    addCompanionBtn.click();
+    const companionInput = document.querySelector('[data-companion-name]');
+    if (companionInput) companionInput.value = 'Convidado Extra';
 
     const form = document.getElementById('rsvp-form');
     form.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
@@ -490,12 +476,12 @@ describe('Frontend RSVP - Real DOM Tests', () => {
     
     // Verify state is stable
     await waitFor(() => {
-      return submitBtn.hidden === true && adultsInput.disabled === true;
-    }, 3000, `submitBtn.hidden=${submitBtn.hidden}, adultsInput.disabled=${adultsInput.disabled}`);
+      return submitBtn.hidden === true && addCompanionBtn.disabled === true;
+    }, 3000, `submitBtn.hidden=${submitBtn.hidden}, addCompanionBtn.disabled=${addCompanionBtn.disabled}`);
     
     assert.equal(fetchCalls.length, 2);
     assert.equal(fetchCalls[1].options.method, 'PUT');
-    assert.equal(adultsInput.disabled, true); // Locked again
+    assert.equal(addCompanionBtn.disabled, true); // Locked again
     assert.equal(submitBtn.hidden, true);
     assert.equal(editBtn.hidden, false);
   });
@@ -540,11 +526,11 @@ describe('Frontend RSVP - Real DOM Tests', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    const adultsInput = document.getElementById('rsvp-adults');
+    const addCompanionBtn = document.getElementById('rsvp-add-companion');
     const nameInput = document.getElementById('rsvp-name');
     
-    // Should restore edit mode (editable except name/consent)
-    assert.equal(adultsInput.disabled, false);
+    // Should restore edit mode (editable except name)
+    assert.equal(addCompanionBtn.disabled, false);
     assert.equal(nameInput.disabled, true);
   });
 });

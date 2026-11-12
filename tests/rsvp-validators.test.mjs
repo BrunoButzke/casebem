@@ -192,16 +192,16 @@ describe('validateObservations', () => {
   });
 
   it('should accept text at max length', () => {
-    const maxText = 'A'.repeat(500);
+    const maxText = 'A'.repeat(LIMITS.OBSERVATIONS_MAX);
     const result = validateObservations(maxText);
     assert.equal(result.valid, true);
   });
 
   it('should reject text exceeding max', () => {
-    const tooLong = 'A'.repeat(501);
+    const tooLong = 'A'.repeat(LIMITS.OBSERVATIONS_MAX + 1);
     const result = validateObservations(tooLong);
     assert.equal(result.valid, false);
-    assert.match(result.error, /500/);
+    assert.match(result.error, new RegExp(String(LIMITS.OBSERVATIONS_MAX)));
   });
 
   it('should reject non-string', () => {
@@ -228,9 +228,10 @@ describe('validateConsent', () => {
     assert.equal(result.valid, false);
   });
 
-  it('should reject null', () => {
-    const result = validateConsent(null);
-    assert.equal(result.valid, false);
+  it('should accept omitted/null (consentimento implícito ao enviar)', () => {
+    assert.equal(validateConsent(null).valid, true);
+    assert.equal(validateConsent(undefined).valid, true);
+    assert.equal(validateConsent(null).value, true);
   });
 });
 
@@ -293,7 +294,7 @@ describe('validateRsvpCreate', () => {
   });
 
   it('should reject long observations', () => {
-    const payload = { ...validPayload, observations: 'A'.repeat(501) };
+    const payload = { ...validPayload, observations: 'A'.repeat(LIMITS.OBSERVATIONS_MAX + 1) };
     const result = validateRsvpCreate(payload);
     assert.equal(result.valid, false);
     assert.ok(result.errors.observations);
@@ -312,7 +313,7 @@ describe('validateRsvpCreate', () => {
       attending: 'maybe',
       adultsCount: -1,
       childrenCount: 11,
-      observations: 'A'.repeat(501),
+      observations: 'A'.repeat(LIMITS.OBSERVATIONS_MAX + 1),
       consentGiven: false,
     };
     const result = validateRsvpCreate(payload);

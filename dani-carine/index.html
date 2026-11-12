@@ -375,22 +375,22 @@
 
                 <fieldset class="form-field">
                   <legend>Você vai comparecer? <span class="required">*</span></legend>
-                  <div class="radio-group">
+                  <div class="radio-group radio-group--row">
                     <label class="radio-label">
                       <input
                         type="radio"
                         name="attending"
-                        value="yes"
+                        value="true"
                         required
                         aria-describedby="rsvp-attending-error"
                       />
-                      <span>Sim, estarei lá! ✨</span>
+                      <span>Sim, estaremos lá!</span>
                     </label>
                     <label class="radio-label">
                       <input
                         type="radio"
                         name="attending"
-                        value="no"
+                        value="false"
                       />
                       <span>Infelizmente não poderei ir</span>
                     </label>
@@ -398,71 +398,20 @@
                   <span class="form-error" id="rsvp-attending-error" role="alert"></span>
                 </fieldset>
 
-                <div class="form-row">
-                  <div class="form-field">
-                    <label for="rsvp-adults">Acompanhantes adultos</label>
-                    <input
-                      type="number"
-                      id="rsvp-adults"
-                      name="adultsCount"
-                      min="0"
-                      max="10"
-                      value="0"
-                      inputmode="numeric"
-                      aria-describedby="rsvp-adults-hint rsvp-adults-error"
-                    />
-                    <span class="form-hint" id="rsvp-adults-hint">Máximo 10 pessoas</span>
-                    <span class="form-error" id="rsvp-adults-error" role="alert"></span>
+                <div class="form-field" id="rsvp-companions-block" hidden>
+                  <div class="rsvp__companions-head">
+                    <span class="rsvp__companions-label">Acompanhantes</span>
+                    <span class="form-hint" id="rsvp-companions-hint">Opcional · máximo 10</span>
                   </div>
-
-                  <div class="form-field">
-                    <label for="rsvp-children">Crianças</label>
-                    <input
-                      type="number"
-                      id="rsvp-children"
-                      name="childrenCount"
-                      min="0"
-                      max="10"
-                      value="0"
-                      inputmode="numeric"
-                      aria-describedby="rsvp-children-hint rsvp-children-error"
-                    />
-                    <span class="form-hint" id="rsvp-children-hint">Máximo 10 crianças</span>
-                    <span class="form-error" id="rsvp-children-error" role="alert"></span>
-                  </div>
-                </div>
-
-                <div class="form-field">
-                  <label for="rsvp-observations">Observações</label>
-                  <textarea
-                    id="rsvp-observations"
-                    name="observations"
-                    maxlength="500"
-                    rows="3"
-                    placeholder="Alergias alimentares, restrições dietéticas ou outras informações..."
-                    aria-describedby="rsvp-observations-hint rsvp-observations-error"
-                  ></textarea>
-                  <span class="form-hint" id="rsvp-observations-hint">
-                    <span id="rsvp-observations-count">0</span>/500 caracteres
-                  </span>
-                  <span class="form-error" id="rsvp-observations-error" role="alert"></span>
-                </div>
-
-                <div class="form-field">
-                  <label class="checkbox-label">
-                    <input
-                      type="checkbox"
-                      name="consentGiven"
-                      id="rsvp-consent"
-                      required
-                      aria-describedby="rsvp-consent-error"
-                    />
-                    <span>
-                      Concordo que meu nome e resposta sejam armazenados para a organização do evento. 
-                      Minhas observações são privadas e visíveis apenas aos noivos.
-                    </span>
-                  </label>
-                  <span class="form-error" id="rsvp-consent-error" role="alert"></span>
+                  <div id="rsvp-companions-list" class="rsvp__companions-list"></div>
+                  <button
+                    type="button"
+                    class="btn btn--ghost magnetic rsvp__add-companion"
+                    id="rsvp-add-companion"
+                  >
+                    Adicionar acompanhante
+                  </button>
+                  <span class="form-error" id="rsvp-companions-error" role="alert"></span>
                 </div>
 
                 <button type="submit" class="btn magnetic rsvp__submit" id="rsvp-submit">
@@ -483,8 +432,7 @@
 
           <div class="rsvp__privacy">
             <p>
-              <strong>🔒 Privacidade:</strong> Seus dados são usados apenas para a organização do evento. 
-              Suas observações nunca serão compartilhadas publicamente.
+              <strong>Privacidade:</strong> Seu nome e resposta são usados apenas para a organização do evento.
             </p>
           </div>
         </div>

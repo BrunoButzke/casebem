@@ -115,12 +115,13 @@ test('createPixPayment: items em ordem canônica alfabética', async () => {
       payerEmail: 'test@example.com',
     });
     
-    // Validar que items foram ordenados alfabeticamente
-    assert.ok(capturedBody.items, 'items presente');
-    assert.equal(capturedBody.items.length, 3);
-    assert.equal(capturedBody.items[0].title, 'danca', 'primeiro alfabeticamente');
-    assert.equal(capturedBody.items[1].title, 'musica', 'segundo alfabeticamente');
-    assert.equal(capturedBody.items[2].title, 'viagem', 'terceiro alfabeticamente');
+    // Items oficiais vão em additional_info.items (não no top-level)
+    assert.ok(capturedBody.additional_info?.items, 'additional_info.items presente');
+    assert.equal(capturedBody.additional_info.items.length, 3);
+    assert.equal(capturedBody.additional_info.items[0].id, 'danca', 'primeiro alfabeticamente');
+    assert.equal(capturedBody.additional_info.items[1].id, 'musica', 'segundo alfabeticamente');
+    assert.equal(capturedBody.additional_info.items[2].id, 'viagem', 'terceiro alfabeticamente');
+    assert.equal(capturedBody.items, undefined, 'top-level items não deve existir no Payments API');
     
   } finally {
     globalThis.fetch = originalFetch;

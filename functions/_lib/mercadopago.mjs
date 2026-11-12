@@ -9,6 +9,42 @@ function jsonError(status, message, details) {
   return { ok: false, status, error: message, details };
 }
 
+function roundMoney(value) {
+  return Math.round(Number(value) * 100) / 100;
+}
+
+/**
+ * Extrai mensagem útil do erro MP (cause[] / message).
+ */
+export function extractMercadoPagoError(data, fallbackStatus) {
+  const cause = Array.isArray(data?.cause) ? data.cause : [];
+  const fromCause =
+    cause.map((c) => c?.description || c?.message || c?.code).filter(Boolean).join('; ') || null;
+  return (
+    fromCause ||
+    data?.message ||
+    data?.error ||
+    `Mercado Pago retornou ${fallbackStatus || 'erro'}`
+  );
+}
+
+/**
+ * E-mail do pagador compatível com sandbox MP.
+ * Em TEST_*, e-mails que não são @testuser.com são rejeitados.
+ */
+export function resolvePixPayerEmail(email, accessToken) {
+  const trimmed = String(email || '').trim().toLowerCase();
+  const token = String(accessToken || '');
+  // Credenciais de teste do MP usam prefixo TEST- (não confundir com APP_USR- de produção)
+  const isTestToken = /^TEST-/i.test(token);
+  if (isTestToken && trimmed && !trimmed.endsWith('@testuser.com')) {
+    return 'test_user_pix@testuser.com';
+  }
+  if (trimmed && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(trimmed)) return trimmed;
+  if (isTestToken) return 'test_user_pix@testuser.com';
+  return 'noreply@casebem.com';
+}
+
 export async function createPixPayment({
   accessToken,
   amount,
@@ -24,76 +60,118 @@ export async function createPixPayment({
   totalInCents,
   intentKey,
   payerEmail,
+  notificationUrl = null,
+  payerIdentification = null, // { type: 'CPF', number: '...' } opcional
 }) {
   if (!accessToken) {
     return jsonError(500, 'MP_ACCESS_TOKEN não configurado no servidor.');
   }
-  
+
   // Suportar nova e antiga assinatura (backward compatible)
   const isNewSignature = intentKey && items && totalInCents !== undefined;
-  
-  let finalAmount, finalDescription, finalExternalRef, finalIdempotencyKey, finalItems, finalPayerEmail;
-  
+
+  let finalAmount;
+  let finalDescription;
+  let finalExternalRef;
+  let finalIdempotencyKey;
+  let finalItems;
+  let finalPayerEmail;
+  let finalPayerName;
+
   if (isNewSignature) {
-    // Nova assinatura: multi-item com intentKey estável
-    finalAmount = totalInCents / 100; // Converter cents para reais
+    finalAmount = totalInCents / 100;
     finalDescription = `Presentes CaseBem - ${gifterName || 'Convidado'}`.slice(0, 200);
-    finalExternalRef = `casebem:gift:${intentKey}`; // ESTÁVEL - sem timestamp
-    finalIdempotencyKey = intentKey; // Usar intentKey como idempotency key do MP
-    finalPayerEmail = payerEmail || 'noreply@casebem.com'; // Service email, not customer identity
-    
-    // Items em ordem canônica (alfabética por giftId) para consistência
-    const sortedItems = [...items].sort((a, b) => a.giftId.localeCompare(b.giftId));
-    finalItems = sortedItems.map(item => ({
-      title: item.giftId,
+    finalExternalRef = `casebem:gift:${intentKey}`;
+    finalIdempotencyKey = idempotencyKey || intentKey;
+    finalPayerEmail = resolvePixPayerEmail(payerEmail || email, accessToken);
+    finalPayerName = String(gifterName || 'Convidado').slice(0, 60);
+
+    const sortedItems = [...items].sort((a, b) =>
+      String(a.giftId).localeCompare(String(b.giftId))
+    );
+    finalItems = sortedItems.map((item) => ({
+      id: String(item.giftId).slice(0, 60),
+      title: String(item.name || item.giftId).slice(0, 256),
+      description: String(item.name || item.giftId).slice(0, 256),
       quantity: item.quantity,
-      unit_price: Math.round((item.priceInCents || 0) / 100 * 100) / 100,
+      unit_price: roundMoney((item.priceInCents || 0) / 100),
+      category_id: 'others',
     }));
   } else {
-    // Antiga assinatura: single gift (planos)
     const value = Number(amount);
     if (!Number.isFinite(value) || value < 0.99) {
       return jsonError(400, 'Valor mínimo é R$ 0,99.');
     }
-    
-    const payerEmail = String(email || '').trim().toLowerCase();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(payerEmail)) {
+
+    const legacyEmail = String(email || '').trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(legacyEmail)) {
       return jsonError(400, 'Informe um e-mail válido para o Pix.');
     }
-    
+
     finalAmount = value;
     finalDescription = String(title || 'Presente CaseBem').slice(0, 200);
     finalIdempotencyKey = idempotencyKey || crypto.randomUUID();
-    finalExternalRef = `casebem:plan:${finalIdempotencyKey}`; // Estável via idempotencyKey
+    finalExternalRef = `casebem:plan:${finalIdempotencyKey}`;
     finalItems = null;
+    finalPayerEmail = resolvePixPayerEmail(legacyEmail, accessToken);
+    finalPayerName = String(payerName || 'Convidado').slice(0, 60);
+  }
+
+  if (!Number.isFinite(finalAmount) || finalAmount < 0.99) {
+    return jsonError(400, 'Valor mínimo é R$ 0,99.');
+  }
+
+  // Pix expira em ~24h (MP)
+  const expires = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+  const payer = {
+    email: finalPayerEmail,
+    first_name: finalPayerName,
+  };
+
+  if (
+    payerIdentification &&
+    typeof payerIdentification === 'object' &&
+    payerIdentification.type &&
+    payerIdentification.number
+  ) {
+    const number = String(payerIdentification.number).replace(/\D/g, '');
+    const type = String(payerIdentification.type).toUpperCase();
+    if (number.length >= 11) {
+      payer.identification = { type, number };
+    }
   }
 
   const body = {
-    transaction_amount: Math.round(finalAmount * 100) / 100,
+    transaction_amount: roundMoney(finalAmount),
     description: finalDescription,
     payment_method_id: 'pix',
-    payer: isNewSignature ? {
-      email: finalPayerEmail,
-      first_name: (gifterName || 'Convidado').slice(0, 60),
-    } : {
-      email: String(email || '').trim().toLowerCase(),
-      ...(payerName ? { first_name: String(payerName).slice(0, 60) } : {}),
-    },
+    date_of_expiration: expires,
+    payer,
     metadata: {
       gift_id: isNewSignature ? 'multi' : String(giftId).slice(0, 60),
-      message: String(message).slice(0, 300),
+      message: String(message || '').slice(0, 300),
       source: 'casebem-dani-carine',
+      intent_key: intentKey || null,
     },
     external_reference: finalExternalRef,
-    ...(finalItems ? { items: finalItems } : {}),
   };
+
+  if (finalItems && finalItems.length > 0) {
+    // Campo oficial: additional_info.items (top-level `items` não é do Payments API)
+    body.additional_info = { items: finalItems };
+  }
+
+  if (notificationUrl && String(notificationUrl).startsWith('https://')) {
+    body.notification_url = String(notificationUrl).slice(0, 500);
+  }
 
   const res = await fetch(`${MP_API}/v1/payments`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${accessToken}`,
       'Content-Type': 'application/json',
-      'X-Idempotency-Key': finalIdempotencyKey,
+      'X-Idempotency-Key': String(finalIdempotencyKey).slice(0, 128),
       Accept: 'application/json',
     },
     body: JSON.stringify(body),
@@ -101,14 +179,17 @@ export async function createPixPayment({
 
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const msg =
-      data?.message ||
-      data?.cause?.[0]?.description ||
-      `Mercado Pago retornou ${res.status}`;
-    return jsonError(res.status, msg, data);
+    return jsonError(res.status, extractMercadoPagoError(data, res.status), data);
   }
 
   const tx = data.point_of_interaction?.transaction_data || {};
+  const qrCode = tx.qr_code || '';
+  const qrCodeBase64 = tx.qr_code_base64 || '';
+
+  if (!qrCode) {
+    return jsonError(502, 'Mercado Pago não retornou QR Code Pix.', data);
+  }
+
   return {
     ok: true,
     status: 200,
@@ -117,9 +198,10 @@ export async function createPixPayment({
       status: data.status,
       statusDetail: data.status_detail,
       amount: data.transaction_amount,
-      qrCode: tx.qr_code || '',
-      qrCodeBase64: tx.qr_code_base64 || '',
+      qrCode,
+      qrCodeBase64,
       ticketUrl: tx.ticket_url || '',
+      externalReference: data.external_reference || finalExternalRef,
     },
   };
 }
@@ -140,7 +222,7 @@ export async function getPaymentStatus({ accessToken, paymentId }) {
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    return jsonError(res.status, data?.message || 'Falha ao consultar pagamento.', data);
+    return jsonError(res.status, extractMercadoPagoError(data, res.status), data);
   }
 
   return {
@@ -193,14 +275,13 @@ export async function createGiftPreference({
     title: String(item.name || item.giftId).slice(0, 200),
     quantity: item.quantity,
     currency_id: 'BRL',
-    unit_price: Math.round((item.priceInCents || 0) / 100 * 100) / 100,
+    unit_price: roundMoney((item.priceInCents || 0) / 100),
   }));
 
   const isLocal =
     String(successUrl || '').includes('localhost') ||
     String(successUrl || '').includes('127.0.0.1');
 
-  // boleto no MP = tipo ticket; cartão = credit/debit
   const paymentMethods =
     paymentMethod === 'boleto'
       ? {
@@ -222,7 +303,7 @@ export async function createGiftPreference({
   const body = {
     items: mpItems,
     payer: {
-      email: String(payerEmail || 'noreply@casebem.com').trim().toLowerCase(),
+      email: resolvePixPayerEmail(payerEmail, accessToken),
       name: String(gifterName || 'Convidado').slice(0, 60),
     },
     back_urls: {
@@ -254,7 +335,7 @@ export async function createGiftPreference({
 
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    return jsonError(res.status, data?.message || 'Falha ao criar preferência de presente.', data);
+    return jsonError(res.status, extractMercadoPagoError(data, res.status), data);
   }
 
   return {
@@ -282,7 +363,6 @@ export async function createPlanPreference({
   if (!accessToken) {
     return jsonError(500, 'MP_ACCESS_TOKEN não configurado no servidor.');
   }
-
   const value = Number(amount);
   if (!Number.isFinite(value) || value <= 0) {
     return jsonError(400, 'Valor do plano inválido.');
@@ -299,10 +379,12 @@ export async function createPlanPreference({
         title: `CaseBem · ${planName || 'Plano'}`,
         quantity: 1,
         currency_id: 'BRL',
-        unit_price: Math.round(value * 100) / 100,
+        unit_price: roundMoney(value),
       },
     ],
-    payer: payerEmail ? { email: String(payerEmail).trim().toLowerCase() } : undefined,
+    payer: payerEmail
+      ? { email: resolvePixPayerEmail(payerEmail, accessToken) }
+      : undefined,
     back_urls: {
       success: successUrl,
       failure: failureUrl,
@@ -325,7 +407,7 @@ export async function createPlanPreference({
 
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    return jsonError(res.status, data?.message || 'Falha ao criar preferência.', data);
+    return jsonError(res.status, extractMercadoPagoError(data, res.status), data);
   }
 
   return {
@@ -348,7 +430,8 @@ export async function readJsonBody(req) {
 }
 
 export function sendJson(res, status, payload) {
+  const body = JSON.stringify(payload);
   res.statusCode = status;
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
-  res.end(JSON.stringify(payload));
+  res.end(body);
 }

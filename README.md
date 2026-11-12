@@ -38,6 +38,14 @@ Abre em `/landing-page-animada/`.
 
 **Custo:** mantenha **Workers/Pages Free**. Não ative Workers Paid. E-mail é opcional e externo. Subdomínio `casal.casebem.com` fica para depois (Cloudflare for SaaS).
 
+### Pix não gera QR?
+
+1. `MP_ACCESS_TOKEN` no Pages (produção) — token de **produção** no site live; de **teste** só em sandbox.
+2. Com token **TEST**, o e-mail do pagador precisa ser `@testuser.com` (o app força isso automaticamente se detectar `TEST-…`).
+3. Webhook no painel MP: `https://seu-dominio/api/webhooks/mercadopago`.
+4. Binding D1 + `RSVP_SECRET` (checkout de presentes usa os dois).
+5. Abra o site pelo domínio permitido (Origin) — senão o checkout responde 403.
+
 ### O que está integrado
 
 | Fluxo | Onde | Comportamento |

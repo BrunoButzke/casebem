@@ -10,6 +10,10 @@ import {
   getRsvpMode,
   setRsvpMode,
   addGuests,
+  searchGuests,
+  resetMemoryGuestsForTests,
+  markGuestResponse,
+  listGuestList,
 } from '../functions/_lib/rsvp-guest-list.mjs';
 
 test('nameKey: normaliza espaços e case', () => {
@@ -29,10 +33,13 @@ function mockDb({ mode = 'open', guests = new Map() } = {}) {
           return this;
         },
         async first() {
+          if (sql.includes('COUNT(*)')) {
+            return { c: self.data.guests.size };
+          }
           if (sql.includes('FROM wedding_settings')) {
             return { rsvp_mode: self.data.mode };
           }
-          if (sql.includes('FROM rsvp_guest_list') && sql.includes('name_key')) {
+          if (sql.includes('FROM rsvp_guest_list') && sql.includes('name_key =')) {
             const key = this._params[1];
             const hit = [...self.data.guests.values()].find((g) => g.name_key === key);
             return hit ? { id: hit.id } : null;
@@ -40,7 +47,12 @@ function mockDb({ mode = 'open', guests = new Map() } = {}) {
           return null;
         },
         async all() {
-          return { results: [...self.data.guests.values()] };
+          let results = [...self.data.guests.values()];
+          if (sql.includes('LIKE')) {
+            const like = String(this._params[1] || '').replaceAll('%', '');
+            results = results.filter((g) => g.name_key.includes(like));
+          }
+          return { results };
         },
         async run() {
           if (sql.includes('INSERT INTO wedding_settings') || sql.includes('ON CONFLICT(wedding_key)')) {
@@ -103,4 +115,39 @@ test('addGuests: ignora duplicata via UNIQUE', async () => {
   assert.equal(first.added, 1);
   assert.equal(second.added, 1);
   assert.equal(second.skipped, 1);
+});
+
+test('searchGuests: partial match (Bruno → Bruno Butzke e Familia)', async () => {
+  const db = mockDb();
+  await addGuests(db, ['Bruno Butzke e Familia', 'Bruno Silva', 'Maria Silva']);
+  const hits = await searchGuests(db, 'Bruno');
+  assert.equal(hits.length, 2);
+  assert.ok(hits.every((h) => h.displayName.toLowerCase().includes('bruno')));
+});
+
+test('searchGuests: memory fallback sem DB', async () => {
+  resetMemoryGuestsForTests();
+  const hits = await searchGuests(null, 'Bruno');
+  assert.ok(hits.length >= 1);
+  assert.ok(hits.some((h) => /bruno/i.test(h.displayName)));
+});
+
+test('markGuestResponse: atualiza status na lista (memória)', async () => {
+  resetMemoryGuestsForTests();
+  const before = await listGuestList(null);
+  const target = before.find((g) => /bruno butzke/i.test(g.displayName));
+  assert.ok(target);
+  assert.equal(target.attending, null);
+
+  const marked = await markGuestResponse(null, target.displayName, true);
+  assert.equal(marked.updated, true);
+
+  const after = await listGuestList(null);
+  const updated = after.find((g) => g.id === target.id);
+  assert.equal(updated.attending, true);
+  assert.ok(updated.respondedAt);
+
+  await markGuestResponse(null, target.displayName, false);
+  const declined = (await listGuestList(null)).find((g) => g.id === target.id);
+  assert.equal(declined.attending, false);
 });

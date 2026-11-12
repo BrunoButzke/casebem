@@ -8,6 +8,14 @@ import {
   readJsonBody,
   sendJson,
 } from './functions/_lib/mercadopago.mjs';
+import {
+  searchGuests,
+  listGuestList,
+  addGuests,
+  removeGuest,
+  markGuestResponse,
+} from './functions/_lib/rsvp-guest-list.mjs';
+import { validateRsvpCreate } from './functions/_lib/rsvp-validators.mjs';
 
 const rootDir = dirname(fileURLToPath(import.meta.url));
 
@@ -16,6 +24,112 @@ const PLANS = {
   pro: { name: 'Pro', amount: 299 },
   vip: { name: 'VIP', amount: 499 },
 };
+
+/** Local-only RSVP store (Vite) so confirmação funciona sem D1 */
+const localRsvpsByToken = new Map();
+
+function guestListApiPlugin() {
+  return {
+    name: 'guest-list-api',
+    configureServer(server) {
+      server.middlewares.use(async (req, res, next) => {
+        try {
+          const rawUrl = req.url || '/';
+          const parsed = new URL(rawUrl, 'http://localhost');
+          const path = parsed.pathname;
+
+          if (path === '/api/rsvp' && req.method === 'POST') {
+            const idem = req.headers['idempotency-key'];
+            if (!idem) return sendJson(res, 400, { error: 'Header Idempotency-Key é obrigatório' });
+            const body = await readJsonBody(req);
+            const validation = validateRsvpCreate(body);
+            if (!validation.valid) {
+              return sendJson(res, 400, { error: 'Dados inválidos', details: validation.errors });
+            }
+            const data = validation.data;
+            await markGuestResponse(null, data.guestName, data.attending);
+            const manageToken = crypto.randomUUID().replaceAll('-', '');
+            const now = new Date().toISOString();
+            const rsvp = {
+              id: crypto.randomUUID(),
+              guestName: data.guestName,
+              attending: data.attending,
+              adultsCount: data.attending ? data.adultsCount : 0,
+              childrenCount: 0,
+              observations: data.observations ?? null,
+              consentGiven: true,
+              createdAt: now,
+              updatedAt: now,
+              manageToken,
+            };
+            localRsvpsByToken.set(manageToken, rsvp);
+            return sendJson(res, 201, rsvp);
+          }
+
+          if (path === '/api/rsvp' && req.method === 'GET') {
+            const auth = req.headers.authorization || '';
+            const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+            const rsvp = localRsvpsByToken.get(token);
+            if (!rsvp) return sendJson(res, 401, { error: 'Token de autorização inválido' });
+            const { manageToken, ...publicRsvp } = rsvp;
+            return sendJson(res, 200, publicRsvp);
+          }
+
+          if (path === '/api/guests/search' && req.method === 'GET') {
+            const q = parsed.searchParams.get('q') || '';
+            if (String(q).trim().length < 2) {
+              return sendJson(res, 400, {
+                ok: false,
+                error: 'QUERY_TOO_SHORT',
+                message: 'Digite pelo menos 2 letras para buscar.',
+              });
+            }
+            const matches = await searchGuests(null, q);
+            return sendJson(res, 200, {
+              ok: true,
+              query: q,
+              count: matches.length,
+              matches: matches.map((g) => ({ id: g.id, displayName: g.displayName })),
+            });
+          }
+
+          if (path === '/api/guests' && req.method === 'GET') {
+            const guests = await listGuestList(null);
+            return sendJson(res, 200, { ok: true, guests, count: guests.length });
+          }
+
+          if (path === '/api/guests' && req.method === 'POST') {
+            const body = await readJsonBody(req);
+            try {
+              const result = await addGuests(null, body?.names || []);
+              const guests = await listGuestList(null);
+              return sendJson(res, 200, { ok: true, ...result, guests });
+            } catch (err) {
+              const status = err.message === 'EMPTY_GUEST_LIST' ? 400 : 500;
+              return sendJson(res, status, { ok: false, error: err.message });
+            }
+          }
+
+          if (path === '/api/guests' && req.method === 'DELETE') {
+            const id = parsed.searchParams.get('id');
+            try {
+              await removeGuest(null, id);
+              const guests = await listGuestList(null);
+              return sendJson(res, 200, { ok: true, removed: id, guests });
+            } catch (err) {
+              const status =
+                err.message === 'GUEST_NOT_FOUND' || err.message === 'INVALID_GUEST_ID' ? 404 : 500;
+              return sendJson(res, status, { ok: false, error: err.message });
+            }
+          }
+        } catch (err) {
+          return sendJson(res, 500, { ok: false, error: err?.message || 'Erro interno.' });
+        }
+        next();
+      });
+    },
+  };
+}
 
 function mercadopagoApiPlugin(env) {
   return {
@@ -84,7 +198,7 @@ export default defineConfig(({ mode }) => {
   return {
     root: '.',
     publicDir: 'public',
-    plugins: [mercadopagoApiPlugin(env)],
+    plugins: [guestListApiPlugin(), mercadopagoApiPlugin(env)],
     build: {
       outDir: 'dist',
       emptyOutDir: true,
@@ -93,6 +207,8 @@ export default defineConfig(({ mode }) => {
           landing: resolve(rootDir, 'landing-page-animada/index.html'),
           daniCarine: resolve(rootDir, 'dani-carine/index.html'),
           daniCarineAdmin: resolve(rootDir, 'dani-carine/admin.html'),
+          daniCarineLista: resolve(rootDir, 'dani-carine/lista.html'),
+          lista: resolve(rootDir, 'lista/index.html'),
         },
       },
     },

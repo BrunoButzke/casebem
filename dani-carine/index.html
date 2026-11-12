@@ -46,11 +46,14 @@
         >
       </div>
       <nav class="nav__links" aria-label="Seções">
+        <a href="#boas-vindas">Boas-vindas</a>
+        <a href="#o-casal">O casal</a>
         <a href="#o-dia">O dia</a>
         <a href="#local">Local</a>
         <a href="#hospedagem">Hospedagem</a>
         <a href="#confirmar-presenca">Confirmar presença</a>
         <a href="#dress-code">Dress code</a>
+        <a href="#manual-convidado">Manual</a>
         <a href="#presentes">Presentes</a>
         <a href="#mural-recados">Mural</a>
         <a href="#convite">Convite</a>
@@ -99,6 +102,37 @@
         </div>
       </div>
 
+      <section class="story" id="boas-vindas">
+        <div class="container story__inner">
+          <p class="eyebrow">Bem-vindos</p>
+          <h2>Sejam muito bem-vindos ao nosso cantinho especial!</h2>
+          <div class="story__body">
+            <p>
+              Criamos este site para compartilhar com vocês todos os detalhes do
+              nosso grande dia. Estamos muito felizes por celebrar o nosso amor
+              ao lado de pessoas tão especiais e importantes em nossas vidas.
+              Contamos os dias para viver esse momento único e inesquecível
+              junto de vocês!
+            </p>
+            <p>
+              Aqui vocês encontrarão informações importantes sobre a cerimônia e
+              a recepção, além de dicas de traje e estacionamento. Pedimos
+              também que confirmem sua presença por meio do menu
+              <a href="#confirmar-presenca">“Confirme sua Presença”</a>,
+              preenchendo os dados solicitados.
+            </p>
+            <p>
+              Caso desejarem nos presentear, preparamos uma
+              <a href="#presentes">Lista de Casamento</a> com muito carinho.
+              Sintam-se à vontade para escolher o presente que preferirem.
+            </p>
+            <p>
+              Estamos ansiosos para celebrar esse dia tão especial com vocês!
+            </p>
+          </div>
+        </div>
+      </section>
+
       <section class="manifesto" id="manifesto">
         <div class="container manifesto__grid">
           <p class="manifesto__text" data-words>
@@ -130,6 +164,58 @@
             width="1280"
             height="720"
           />
+        </div>
+      </section>
+
+      <section class="story story--lagoon" id="o-casal">
+        <div class="container story__couple">
+          <div class="story__intro">
+            <p class="eyebrow">Nossa história</p>
+            <h2>O casal</h2>
+          </div>
+
+          <div class="story__portraits" aria-label="Fotos de Dani e Carine">
+            <figure class="story__portrait reveal">
+              <img
+                src="/images/casal-dani.png"
+                alt="Dani"
+                width="300"
+                height="300"
+                loading="lazy"
+              />
+              <figcaption>Dani</figcaption>
+            </figure>
+            <span class="story__amp" aria-hidden="true">&amp;</span>
+            <figure class="story__portrait reveal">
+              <img
+                src="/images/casal-carine.png"
+                alt="Carine"
+                width="300"
+                height="300"
+                loading="lazy"
+              />
+              <figcaption>Carine</figcaption>
+            </figure>
+          </div>
+
+          <div class="story__body story__body--couple">
+            <p>
+              Acreditamos que o amor é um ato de sonhar — sonhar com uma vida
+              compartilhada, construída com companheirismo, respeito e amizade.
+            </p>
+            <p>
+              Para nós, o amor é como uma ponte erguida tijolo por tijolo. Ao
+              longo desses oito anos, dedicamos tempo, cuidado e carinho para
+              fortalecer cada parte dessa construção, criando uma base sólida
+              para tudo o que estamos vivendo hoje.
+            </p>
+            <p>
+              Foram três anos sonhando e planejando este momento tão especial e,
+              enfim, ele chegou. Agora, queremos celebrar essa nova etapa ao
+              lado das pessoas que fazem parte da nossa história.
+            </p>
+            <p>Estamos muito felizes por compartilhar esse dia com vocês.</p>
+          </div>
         </div>
       </section>
 
@@ -166,14 +252,14 @@
             <div class="how__visual" aria-hidden="true">
               <figure class="how__frame is-active" data-frame="0">
                 <img
-                  src="/images/cerimonia-casal.jpg"
-                  alt="Dani e Carine na cerimônia"
+                  src="/images/cerimonia-altar.png"
+                  alt="Altar da cerimônia no Indaiá Eventos, com arco floral e vista para a lagoa"
                 />
               </figure>
               <figure class="how__frame" data-frame="1">
                 <img
-                  src="/images/brunch-selfservice.jpg"
-                  alt="Buffet self-service de brunch"
+                  src="/images/brunch-saloes.png"
+                  alt="Salão do brunch com mesas postas e vista para a lagoa"
                 />
               </figure>
               <figure class="how__frame" data-frame="2">
@@ -344,6 +430,25 @@
         </div>
       </section>
 
+      <section class="manual" id="manual-convidado">
+        <div class="container manual__inner">
+          <p class="eyebrow">Para os convidados</p>
+          <h2>Manual do convidado</h2>
+          <p class="manual__lead">
+            Um guia carinhoso com o que importa no nosso grande dia.
+          </p>
+          <figure class="manual__figure reveal">
+            <img
+              src="/images/manual-convidado.png"
+              alt="Manual do convidado: confirme presença, traje, pontualidade e outras orientações"
+              width="1000"
+              height="1485"
+              loading="lazy"
+            />
+          </figure>
+        </div>
+      </section>
+
       <section class="rsvp" id="confirmar-presenca">
         <div class="container">
           <p class="eyebrow">Confirme sua presença</p>
@@ -360,7 +465,7 @@
 
               <div class="rsvp__fields" id="rsvp-fields">
                 <div class="form-field">
-                  <label for="rsvp-name">Seu nome completo <span class="required">*</span></label>
+                  <label for="rsvp-name">Qual o seu nome? <span class="required">*</span></label>
                   <input
                     type="text"
                     id="rsvp-name"
@@ -368,63 +473,57 @@
                     required
                     maxlength="100"
                     autocomplete="name"
+                    placeholder="Digite parte do nome do convite"
                     aria-describedby="rsvp-name-error"
                   />
+                  <span class="form-hint">Ex.: digite Bruno para achar “Bruno Butzke e Familia”</span>
                   <span class="form-error" id="rsvp-name-error" role="alert"></span>
                 </div>
 
-                <fieldset class="form-field">
-                  <legend>Você vai comparecer? <span class="required">*</span></legend>
-                  <div class="radio-group radio-group--row">
-                    <label class="radio-label">
-                      <input
-                        type="radio"
-                        name="attending"
-                        value="true"
-                        required
-                        aria-describedby="rsvp-attending-error"
-                      />
-                      <span>Sim, estaremos lá!</span>
-                    </label>
-                    <label class="radio-label">
-                      <input
-                        type="radio"
-                        name="attending"
-                        value="false"
-                      />
-                      <span>Infelizmente não poderei ir</span>
-                    </label>
-                  </div>
-                  <span class="form-error" id="rsvp-attending-error" role="alert"></span>
-                </fieldset>
+                <div class="form-field" id="rsvp-matches-block" hidden>
+                  <fieldset>
+                    <legend>Encontramos mais de um convite — qual é o seu?</legend>
+                    <div class="radio-group" id="rsvp-matches-list"></div>
+                  </fieldset>
+                  <span class="form-error" id="rsvp-matches-error" role="alert"></span>
+                </div>
 
-                <div class="form-field" id="rsvp-companions-block" hidden>
-                  <div class="rsvp__companions-head">
-                    <span class="rsvp__companions-label">Acompanhantes</span>
-                    <span class="form-hint" id="rsvp-companions-hint">Opcional · máximo 10</span>
-                  </div>
-                  <div id="rsvp-companions-list" class="rsvp__companions-list"></div>
-                  <button
-                    type="button"
-                    class="btn btn--ghost magnetic rsvp__add-companion"
-                    id="rsvp-add-companion"
-                  >
-                    Adicionar acompanhante
+                <div class="rsvp__invite" id="rsvp-invite" hidden>
+                  <p class="rsvp__invite-label">Seu convite</p>
+                  <p class="rsvp__invite-name" id="rsvp-invite-name"></p>
+                  <button type="button" class="btn btn--ghost rsvp__invite-change" id="rsvp-change-guest">
+                    Buscar outro nome
                   </button>
-                  <span class="form-error" id="rsvp-companions-error" role="alert"></span>
+                </div>
+
+                <div id="rsvp-confirm-fields" hidden>
+                  <fieldset class="form-field">
+                    <legend>Você vai comparecer? <span class="required">*</span></legend>
+                    <div class="radio-group radio-group--row">
+                      <label class="radio-label">
+                        <input
+                          type="radio"
+                          name="attending"
+                          value="true"
+                          aria-describedby="rsvp-attending-error"
+                        />
+                        <span>Sim, estaremos lá!</span>
+                      </label>
+                      <label class="radio-label">
+                        <input
+                          type="radio"
+                          name="attending"
+                          value="false"
+                        />
+                        <span>Infelizmente não poderei ir</span>
+                      </label>
+                    </div>
+                    <span class="form-error" id="rsvp-attending-error" role="alert"></span>
+                  </fieldset>
                 </div>
 
                 <button type="submit" class="btn magnetic rsvp__submit" id="rsvp-submit">
-                  Confirmar presença
-                </button>
-
-                <button 
-                  type="button" 
-                  class="btn btn--ghost magnetic rsvp__edit" 
-                  id="rsvp-edit" 
-                  hidden
-                >
-                  Alterar minha resposta
+                  Buscar
                 </button>
               </div>
             </form>

@@ -3,7 +3,6 @@
  * Fluxo: buscar nome na lista oculta → (escolher se houver vários) → confirmar
  */
 
-const MAX_COMPANIONS = 10;
 const SEARCH_URL = '/api/guests/search';
 
 export function setupRsvp() {
@@ -12,10 +11,6 @@ export function setupRsvp() {
 
   const nameInput = document.getElementById('rsvp-name');
   const attendingRadios = document.querySelectorAll('input[name="attending"]');
-  const companionsBlock = document.getElementById('rsvp-companions-block');
-  const companionsList = document.getElementById('rsvp-companions-list');
-  const addCompanionBtn = document.getElementById('rsvp-add-companion');
-  const companionsError = document.getElementById('rsvp-companions-error');
   const submitBtn = document.getElementById('rsvp-submit');
   const editBtn = document.getElementById('rsvp-edit');
   const statusDiv = document.getElementById('rsvp-status');
@@ -34,7 +29,6 @@ export function setupRsvp() {
   let viewMode = 'create'; // 'create' | 'view' | 'edit'
   /** @type {'search' | 'choose' | 'confirm'} */
   let phase = 'search';
-  let companionSeq = 0;
   /** @type {{id: string, displayName: string} | null} */
   let selectedGuest = null;
   /** @type {Array<{id: string, displayName: string}>} */
@@ -66,80 +60,6 @@ export function setupRsvp() {
     return document.querySelector('input[name="attending"]:checked')?.value === 'true';
   }
 
-  function getCompanionNames() {
-    if (!companionsList) return [];
-    return Array.from(companionsList.querySelectorAll('input[data-companion-name]'))
-      .map((input) => input.value.trim())
-      .filter(Boolean);
-  }
-
-  function companionCount() {
-    return companionsList ? companionsList.querySelectorAll('.rsvp__companion-row').length : 0;
-  }
-
-  function syncAddCompanionBtn() {
-    if (!addCompanionBtn) return;
-    addCompanionBtn.disabled = companionCount() >= MAX_COMPANIONS || viewMode === 'view';
-  }
-
-  function addCompanionRow(name = '') {
-    if (!companionsList) return;
-    if (companionCount() >= MAX_COMPANIONS) return;
-
-    companionSeq += 1;
-    const id = `rsvp-companion-${companionSeq}`;
-    const row = document.createElement('div');
-    row.className = 'rsvp__companion-row';
-
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.id = id;
-    input.maxLength = 100;
-    input.placeholder = 'Nome do acompanhante';
-    input.autocomplete = 'name';
-    input.setAttribute('data-companion-name', '1');
-    input.value = name;
-
-    const removeBtn = document.createElement('button');
-    removeBtn.type = 'button';
-    removeBtn.className = 'rsvp__companion-remove';
-    removeBtn.textContent = 'Remover';
-    removeBtn.addEventListener('click', () => {
-      row.remove();
-      syncAddCompanionBtn();
-    });
-
-    row.append(input, removeBtn);
-    companionsList.appendChild(row);
-    syncAddCompanionBtn();
-    return input;
-  }
-
-  function clearCompanions() {
-    if (companionsList) companionsList.innerHTML = '';
-    syncAddCompanionBtn();
-  }
-
-  function setCompanionsFromStored(data) {
-    clearCompanions();
-    const fromObs = String(data.observations || '')
-      .split(/\n+/)
-      .map((s) => s.trim())
-      .filter(Boolean);
-    const names =
-      fromObs.length > 0
-        ? fromObs
-        : Array.from({ length: Number(data.adultsCount) || 0 }, () => '');
-    names.slice(0, MAX_COMPANIONS).forEach((n) => addCompanionRow(n));
-  }
-
-  function updateCompanionsVisibility() {
-    const attending = isAttending();
-    if (companionsBlock) companionsBlock.hidden = !attending || phase !== 'confirm';
-    if (!attending) clearCompanions();
-    syncAddCompanionBtn();
-  }
-
   function setSelectedGuest(guest) {
     selectedGuest = guest;
     if (inviteNameEl) inviteNameEl.textContent = guest?.displayName || '';
@@ -149,7 +69,7 @@ export function setupRsvp() {
   function renderMatches(matches) {
     if (!matchesList) return;
     matchesList.innerHTML = '';
-    matches.forEach((m, i) => {
+    matches.forEach((m) => {
       const id = `rsvp-match-${m.id}`;
       const label = document.createElement('label');
       label.className = 'radio-label';
@@ -158,7 +78,6 @@ export function setupRsvp() {
       input.name = 'rsvp-match';
       input.value = m.id;
       input.id = id;
-      if (i === 0 && matches.length === 1) input.checked = true;
       input.addEventListener('change', () => {
         if (input.checked) {
           setSelectedGuest(m);
@@ -185,8 +104,6 @@ export function setupRsvp() {
       submitBtn.hidden = viewMode === 'view';
       submitBtn.textContent = 'Buscar';
     }
-    clearCompanions();
-    updateCompanionsVisibility();
   }
 
   function enterChoosePhase(matches) {
@@ -215,7 +132,6 @@ export function setupRsvp() {
       submitBtn.hidden = false;
       submitBtn.textContent = viewMode === 'edit' ? 'Atualizar confirmação' : 'Confirmar presença';
     }
-    updateCompanionsVisibility();
   }
 
   function setViewMode(mode) {
@@ -262,7 +178,6 @@ export function setupRsvp() {
       phase = 'confirm';
       if (changeGuestBtn) changeGuestBtn.disabled = true;
     }
-    syncAddCompanionBtn();
   }
 
   function setBusyState(busy) {
@@ -335,9 +250,6 @@ export function setupRsvp() {
       `input[name="attending"][value="${attendingValue}"]`
     );
     if (attendingRadio) attendingRadio.checked = true;
-
-    updateCompanionsVisibility();
-    if (attendingValue === 'true') setCompanionsFromStored(data);
   }
 
   function enableEditMode() {
@@ -440,20 +352,13 @@ export function setupRsvp() {
 
     const savedViewMode = viewMode;
     const attending = isAttending();
-    const companions = attending ? getCompanionNames() : [];
-
-    if (attending && companionCount() > MAX_COMPANIONS) {
-      showError('rsvp-companions', `Máximo de ${MAX_COMPANIONS} acompanhantes`);
-      showStatus(`Máximo de ${MAX_COMPANIONS} acompanhantes.`, 'error');
-      return;
-    }
 
     const payload = {
       guestName: selectedGuest.displayName,
       attending,
-      adultsCount: companions.length,
+      adultsCount: 0,
       childrenCount: 0,
-      observations: companions.length ? companions.join('\n') : null,
+      observations: null,
       consentGiven: true,
     };
 
@@ -496,7 +401,7 @@ export function setupRsvp() {
           return;
         }
         if (response.status === 413) {
-          showStatus('Lista de acompanhantes muito longa. Remova alguns nomes.', 'error');
+          showStatus('Dados muito longos. Tente novamente.', 'error');
           return;
         }
         if (response.status === 429) {
@@ -513,10 +418,7 @@ export function setupRsvp() {
           return;
         }
         if (response.status === 403 && data?.error === 'GUEST_NOT_ON_LIST') {
-          showStatus(
-            data.message || 'Este nome não está na lista de convidados.',
-            'error'
-          );
+          showStatus(data.message || 'Este nome não está na lista de convidados.', 'error');
           return;
         }
         throw new Error(data.error || data.message || 'Erro desconhecido');
@@ -545,10 +447,7 @@ export function setupRsvp() {
         'error'
       );
     } finally {
-      if (success) {
-        // view mode already applied
-        return;
-      }
+      if (success) return;
 
       setBusyState(false);
 
@@ -557,12 +456,11 @@ export function setupRsvp() {
         return;
       }
 
-      // Mantém o convite selecionado após erro (409/413/etc.)
       if (selectedGuest && phase === 'confirm') {
         enterConfirmPhase();
         form
           .querySelectorAll(
-            '#rsvp-confirm-fields input, #rsvp-confirm-fields button, #rsvp-submit, #rsvp-change-guest, #rsvp-add-companion'
+            '#rsvp-confirm-fields input, #rsvp-confirm-fields button, #rsvp-submit, #rsvp-change-guest'
           )
           .forEach((el) => {
             el.disabled = false;
@@ -576,13 +474,6 @@ export function setupRsvp() {
     }
   }
 
-  attendingRadios.forEach((radio) => radio.addEventListener('change', updateCompanionsVisibility));
-  if (addCompanionBtn) {
-    addCompanionBtn.addEventListener('click', () => {
-      const input = addCompanionRow('');
-      input?.focus();
-    });
-  }
   if (editBtn) editBtn.addEventListener('click', enableEditMode);
   if (changeGuestBtn) {
     changeGuestBtn.addEventListener('click', () => {

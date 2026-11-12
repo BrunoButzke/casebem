@@ -1791,9 +1791,19 @@ h2 {
 }
 
 .rsvp__invite-change {
-  margin-top: 0.65rem;
+  margin-top: 0.75rem;
   width: auto;
-  padding-inline: 0.9rem;
+  padding: 0.55rem 1rem;
+  color: var(--ink);
+  background: var(--cream);
+  border: 1px solid color-mix(in srgb, var(--ink) 28%, transparent);
+  font-weight: 500;
+}
+
+.rsvp__invite-change:hover {
+  background: var(--sand);
+  border-color: var(--lagoon);
+  color: var(--lagoon);
 }
 
 #rsvp-matches-list .radio-label {

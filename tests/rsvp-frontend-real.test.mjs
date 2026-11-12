@@ -35,11 +35,6 @@ describe('Frontend RSVP - Real DOM Tests', () => {
             <input type="radio" name="attending" value="false" id="attending-false" />
           </div>
           <span id="rsvp-attending-error" class="form-error"></span>
-          <div id="rsvp-companions-block" hidden>
-            <div id="rsvp-companions-list"></div>
-            <button type="button" id="rsvp-add-companion">Adicionar acompanhante</button>
-            <span id="rsvp-companions-error" class="form-error"></span>
-          </div>
         </div>
         <button type="submit" id="rsvp-submit">Buscar</button>
         <button type="button" id="rsvp-edit" hidden>Alterar minha resposta</button>
@@ -428,13 +423,13 @@ describe('Frontend RSVP - Real DOM Tests', () => {
 
     const editBtn = document.getElementById('rsvp-edit');
     const nameInput = document.getElementById('rsvp-name');
-    const addCompanionBtn = document.getElementById('rsvp-add-companion');
     const submitBtn = document.getElementById('rsvp-submit');
+    const attendingTrue = document.getElementById('attending-true');
 
     editBtn.click();
 
     assert.equal(nameInput.disabled, true);
-    assert.equal(addCompanionBtn.disabled, false);
+    assert.equal(attendingTrue.disabled, false);
     assert.equal(submitBtn.hidden, false);
     assert.match(submitBtn.textContent, /Atualizar/i);
   });
@@ -450,9 +445,9 @@ describe('Frontend RSVP - Real DOM Tests', () => {
           id: 'id4',
           guestName: 'PUT User',
           attending: true,
-          adultsCount: 1,
+          adultsCount: 0,
           childrenCount: 0,
-          observations: 'Original',
+          observations: null,
           consentGiven: true,
           createdAt: '2026-11-05T00:00:00Z',
           updatedAt: '2026-11-05T00:00:00Z',
@@ -463,10 +458,10 @@ describe('Frontend RSVP - Real DOM Tests', () => {
         body: {
           id: 'id4',
           guestName: 'PUT User',
-          attending: true,
-          adultsCount: 1,
+          attending: false,
+          adultsCount: 0,
           childrenCount: 0,
-          observations: 'Convidado Extra',
+          observations: null,
           consentGiven: true,
           createdAt: '2026-11-05T00:00:00Z',
           updatedAt: '2026-11-06T00:00:00Z',
@@ -481,12 +476,9 @@ describe('Frontend RSVP - Real DOM Tests', () => {
 
     const editBtn = document.getElementById('rsvp-edit');
     const submitBtn = document.getElementById('rsvp-submit');
-    const addCompanionBtn = document.getElementById('rsvp-add-companion');
+    const attendingFalse = document.getElementById('attending-false');
     editBtn.click();
-
-    addCompanionBtn.click();
-    const companionInput = document.querySelector('[data-companion-name]');
-    if (companionInput) companionInput.value = 'Convidado Extra';
+    attendingFalse.checked = true;
 
     document.getElementById('rsvp-form').dispatchEvent(
       new window.Event('submit', { bubbles: true, cancelable: true })
@@ -494,14 +486,11 @@ describe('Frontend RSVP - Real DOM Tests', () => {
     await waitFor(() => fetchCalls.length === 2, 3000, 'PUT not called');
     await window.happyDOM.waitUntilComplete();
 
-    await waitFor(
-      () => submitBtn.hidden === true && addCompanionBtn.disabled === true,
-      3000,
-      'not locked'
-    );
+    await waitFor(() => submitBtn.hidden === true, 3000, 'not locked');
 
     assert.equal(fetchCalls[1].options.method, 'PUT');
     assert.equal(editBtn.hidden, false);
+    assert.equal(attendingFalse.disabled, true);
   });
 
   it('PUT error restores edit mode', async () => {
@@ -539,7 +528,7 @@ describe('Frontend RSVP - Real DOM Tests', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    assert.equal(document.getElementById('rsvp-add-companion').disabled, false);
+    assert.equal(document.getElementById('attending-false').disabled, false);
     assert.equal(document.getElementById('rsvp-name').disabled, true);
   });
 });

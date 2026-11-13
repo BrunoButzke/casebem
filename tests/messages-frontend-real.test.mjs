@@ -89,13 +89,18 @@ test('initMessages loads initial messages on page load', async () => {
   const messagesList = window.document.getElementById('messages-list');
   assert.ok(messagesList);
   
-  const items = messagesList.querySelectorAll('.message-item');
+  const items = messagesList.querySelectorAll('.message-item:not([data-marquee-clone])');
   assert.equal(items.length, 2);
-  
+
   // Check order (newest first)
   assert.match(items[0].textContent, /João Silva/);
   assert.match(items[0].textContent, /Felicidades!/);
   assert.match(items[1].textContent, /Maria Santos/);
+
+  // Trilha infinita duplica os cards
+  const clones = messagesList.querySelectorAll('.message-item[data-marquee-clone]');
+  assert.equal(clones.length, 2);
+  assert.ok(messagesList.classList.contains('is-animated'));
 });
 
 test('initMessages shows loading state initially', async () => {
@@ -190,7 +195,7 @@ test('form submit creates new message successfully', async () => {
   
   // New message should be added to list
   const messagesList = window.document.getElementById('messages-list');
-  const items = messagesList.querySelectorAll('.message-item');
+  const items = messagesList.querySelectorAll('.message-item:not([data-marquee-clone])');
   assert.equal(items.length, 1);
   assert.match(items[0].textContent, /Pedro Costa/);
   assert.match(items[0].textContent, /Meus parabéns!/);
@@ -438,13 +443,13 @@ test('load more button fetches next page', async () => {
   await new Promise(resolve => setTimeout(resolve, 50));
   
   const messagesList = window.document.getElementById('messages-list');
-  const items = messagesList.querySelectorAll('.message-item');
-  
+  const items = messagesList.querySelectorAll('.message-item:not([data-marquee-clone])');
+
   // Should have both pages
   assert.equal(items.length, 2);
   assert.match(items[0].textContent, /First/);
   assert.match(items[1].textContent, /Second/);
-  
+
   // Button should be hidden (no more pages)
   assert.equal(loadMoreBtn.style.display, 'none');
 });

@@ -3,6 +3,7 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import Lenis from 'lenis';
 import { setupRsvp } from './rsvp.mjs';
 import { initMessages } from './messages.mjs';
+import { setupAdminLogin } from './admin-login.mjs';
 import { initLodging } from './lodging.mjs';
 import { initStationery } from './stationery.mjs';
 import { initMedia } from './media.mjs';
@@ -208,6 +209,7 @@ function formatBRL(value) {
 }
 
 function setupGifts() {
+  // Checkout de presentes pausado (“Em breve”) — reativar quando MP estiver ok.
   const toggle = document.querySelector('.gifts__toggle');
   const panel = document.querySelector('.gifts__collapse');
   const modal = document.querySelector('#gift-modal');
@@ -267,20 +269,36 @@ function setupGifts() {
     formBox.hidden = false;
     pixBox.hidden = true;
     pixBack.hidden = true;
+    pixQr.hidden = true;
+    pixQr.removeAttribute('src');
+    pixCode.value = '';
     showError('');
+    if (currentMode === 'custom') {
+      customBox.hidden = false;
+      fixedBox.hidden = true;
+    } else if (currentGiftId) {
+      customBox.hidden = true;
+      fixedBox.hidden = false;
+    }
   };
 
   const showPix = (payment) => {
     formBox.hidden = true;
+    customBox.hidden = true;
+    fixedBox.hidden = true;
     pixBox.hidden = false;
-    pixBack.hidden = true;
-    pixStatus.textContent = 'Escaneie o QR ou copie o código Pix';
+    pixBack.hidden = false;
+    pixBack.textContent = 'Voltar';
+    pixStatus.textContent = payment.qrCode
+      ? 'Escaneie o QR ou copie o código Pix'
+      : 'Não foi possível exibir o QR. Use o código Pix abaixo.';
     pixCode.value = payment.qrCode || '';
     if (payment.qrCodeBase64) {
       pixQr.hidden = false;
       pixQr.src = `data:image/png;base64,${payment.qrCodeBase64}`;
     } else {
       pixQr.hidden = true;
+      pixQr.removeAttribute('src');
     }
   };
 
@@ -492,41 +510,72 @@ function setupDressRecolor() {
 }
 
 function setupHow() {
+  const section = document.querySelector('.how');
   const steps = [...document.querySelectorAll('.how__step')];
   const frames = [...document.querySelectorAll('.how__frame')];
-  if (!steps.length) return;
+  if (!section || !steps.length) return;
+
   const n = steps.length;
-  let current = 0;
+  let current = Math.max(
+    0,
+    steps.findIndex((step) => step.classList.contains('is-active'))
+  );
+  if (current >= n) current = 0;
+  let timer = null;
 
   const setStep = (i) => {
-    if (i === current) return;
+    const next = ((i % n) + n) % n;
+    if (next === current) return;
     frames[current]?.classList.remove('is-active');
     frames[current]?.classList.add('was-active');
     steps[current]?.classList.remove('is-active');
-    current = i;
+    steps[current]?.setAttribute('aria-current', 'false');
+    current = next;
     frames[current]?.classList.add('is-active');
     frames[current]?.classList.remove('was-active');
     steps[current]?.classList.add('is-active');
+    steps[current]?.setAttribute('aria-current', 'true');
   };
 
-  const mm = gsap.matchMedia();
-  mm.add('(min-width: 961px)', () => {
+  const stop = () => {
+    if (timer != null) {
+      clearInterval(timer);
+      timer = null;
+    }
+  };
+
+  const start = () => {
+    stop();
     if (reducedMotion) return;
-    ScrollTrigger.create({
-      trigger: '.how',
-      start: 'top top',
-      end: '+=300%',
-      pin: '.how__pin',
-      scrub: true,
-      onUpdate: (s) => setStep(Math.min(n - 1, Math.floor(s.progress * n))),
+    timer = setInterval(() => setStep(current + 1), 3000);
+  };
+
+  const goTo = (i) => {
+    setStep(i);
+    start();
+  };
+
+  steps.forEach((step, i) => {
+    step.setAttribute('role', 'button');
+    step.setAttribute('tabindex', '0');
+    step.setAttribute('aria-current', i === current ? 'true' : 'false');
+    step.addEventListener('click', () => goTo(i));
+    step.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        goTo(i);
+      }
     });
   });
 
-  mm.add('(max-width: 960px)', () => {
-    if (reducedMotion) return;
-    const t = setInterval(() => setStep((current + 1) % n), 2800);
-    return () => clearInterval(t);
+  section.addEventListener('mouseenter', stop);
+  section.addEventListener('mouseleave', start);
+  section.addEventListener('focusin', stop);
+  section.addEventListener('focusout', (e) => {
+    if (!section.contains(e.relatedTarget)) start();
   });
+
+  start();
 }
 
 function setupReveals() {
@@ -606,6 +655,7 @@ function boot() {
   setupGifts();
   setupRsvp();
   initMessages();
+  setupAdminLogin();
   initLodging();
   initStationery();
   initMedia();

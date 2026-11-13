@@ -30,18 +30,32 @@ export function extractMercadoPagoError(data, fallbackStatus) {
 
 /**
  * E-mail do pagador compatível com sandbox MP.
- * Em TEST_*, e-mails que não são @testuser.com são rejeitados.
+ * Em TEST_*, o MP exige um comprador de "Contas de teste" (não inventar e-mail).
+ * Preferência: e-mail @testuser.com informado → MP_TEST_PAYER_EMAIL → erro claro se faltar.
  */
-export function resolvePixPayerEmail(email, accessToken) {
+export function resolvePixPayerEmail(email, accessToken, env = {}) {
   const trimmed = String(email || '').trim().toLowerCase();
   const token = String(accessToken || '');
+  const configuredTestPayer = String(env.MP_TEST_PAYER_EMAIL || '').trim().toLowerCase();
   // Credenciais de teste do MP usam prefixo TEST- (não confundir com APP_USR- de produção)
   const isTestToken = /^TEST-/i.test(token);
-  if (isTestToken && trimmed && !trimmed.endsWith('@testuser.com')) {
-    return 'test_user_pix@testuser.com';
+
+  if (isTestToken) {
+    if (trimmed.endsWith('@testuser.com') && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(trimmed)) {
+      return trimmed;
+    }
+    if (
+      configuredTestPayer.endsWith('@testuser.com') &&
+      /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(configuredTestPayer)
+    ) {
+      return configuredTestPayer;
+    }
+    // Mantém o e-mail digitado só se já for testuser; senão usa o configurado.
+    // Sem conta de teste válida o MP responde "Invalid users involved".
+    return configuredTestPayer || trimmed || '';
   }
+
   if (trimmed && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(trimmed)) return trimmed;
-  if (isTestToken) return 'test_user_pix@testuser.com';
   return 'noreply@casebem.com';
 }
 
@@ -62,10 +76,13 @@ export async function createPixPayment({
   payerEmail,
   notificationUrl = null,
   payerIdentification = null, // { type: 'CPF', number: '...' } opcional
+  testPayerEmail = '',
 }) {
   if (!accessToken) {
     return jsonError(500, 'MP_ACCESS_TOKEN não configurado no servidor.');
   }
+
+  const emailEnv = { MP_TEST_PAYER_EMAIL: testPayerEmail };
 
   // Suportar nova e antiga assinatura (backward compatible)
   const isNewSignature = intentKey && items && totalInCents !== undefined;
@@ -83,7 +100,7 @@ export async function createPixPayment({
     finalDescription = `Presentes CaseBem - ${gifterName || 'Convidado'}`.slice(0, 200);
     finalExternalRef = `casebem:gift:${intentKey}`;
     finalIdempotencyKey = idempotencyKey || intentKey;
-    finalPayerEmail = resolvePixPayerEmail(payerEmail || email, accessToken);
+    finalPayerEmail = resolvePixPayerEmail(payerEmail || email, accessToken, emailEnv);
     finalPayerName = String(gifterName || 'Convidado').slice(0, 60);
 
     const sortedItems = [...items].sort((a, b) =>
@@ -113,12 +130,21 @@ export async function createPixPayment({
     finalIdempotencyKey = idempotencyKey || crypto.randomUUID();
     finalExternalRef = `casebem:plan:${finalIdempotencyKey}`;
     finalItems = null;
-    finalPayerEmail = resolvePixPayerEmail(legacyEmail, accessToken);
+    finalPayerEmail = resolvePixPayerEmail(legacyEmail, accessToken, emailEnv);
     finalPayerName = String(payerName || 'Convidado').slice(0, 60);
   }
 
   if (!Number.isFinite(finalAmount) || finalAmount < 0.99) {
     return jsonError(400, 'Valor mínimo é R$ 0,99.');
+  }
+
+  if (/^TEST-/i.test(String(accessToken || ''))) {
+    if (!finalPayerEmail || !finalPayerEmail.endsWith('@testuser.com')) {
+      return jsonError(
+        400,
+        'Token de teste: use o e-mail de um comprador em Contas de teste (@testuser.com) ou defina MP_TEST_PAYER_EMAIL no .env.'
+      );
+    }
   }
 
   // Pix expira em ~24h (MP)

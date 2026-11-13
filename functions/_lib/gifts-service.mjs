@@ -539,6 +539,7 @@ async function createPixCheckout({
     payerEmail: payerEmail || env.MP_PAYER_EMAIL || null,
     payerIdentification,
     notificationUrl,
+    testPayerEmail: env.MP_TEST_PAYER_EMAIL || '',
   });
 
   if (!result.ok) {

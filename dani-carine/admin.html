@@ -5,139 +5,549 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="robots" content="noindex,nofollow" />
   <title>Painel — Dani &amp; Carine</title>
-  <style>
-    :root {
-      --bg: #f7f3ee;
-      --ink: #1c1917;
-      --muted: #78716c;
-      --card: #fffdf9;
-      --line: #e7e0d6;
-      --accent: #0f766e;
-      --danger: #b91c1c;
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: "Segoe UI", system-ui, sans-serif;
-      background: var(--bg);
-      color: var(--ink);
-      line-height: 1.45;
-    }
-    main { max-width: 960px; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
-    h1 { font-size: 1.5rem; margin: 0 0 0.25rem; }
-    .sub { color: var(--muted); margin-bottom: 1.25rem; font-size: 0.95rem; }
-    .login, .panel { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 1rem 1.1rem; }
-    label { display: block; font-size: 0.85rem; margin-bottom: 0.35rem; }
-    input[type="password"], textarea, select {
-      width: 100%; max-width: 420px; padding: 0.65rem 0.75rem;
-      border: 1px solid var(--line); border-radius: 8px; font-size: 1rem;
-    }
-    textarea { max-width: 100%; min-height: 110px; font-family: inherit; }
-    button {
-      margin-top: 0.75rem; background: var(--accent); color: #fff;
-      border: 0; border-radius: 8px; padding: 0.55rem 1rem; cursor: pointer; font-size: 0.95rem;
-    }
-    button.secondary { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
-    button.danger { background: var(--danger); }
-    .err { color: var(--danger); margin-top: 0.5rem; font-size: 0.9rem; }
-    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.75rem; margin: 1rem 0; }
-    .stat { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 0.75rem; }
-    .stat b { display: block; font-size: 1.35rem; }
-    .stat span { color: var(--muted); font-size: 0.8rem; }
-    h2 { font-size: 1.1rem; margin: 1.5rem 0 0.6rem; }
-    table { width: 100%; border-collapse: collapse; font-size: 0.88rem; background: var(--card); }
-    th, td { border-bottom: 1px solid var(--line); padding: 0.45rem 0.4rem; text-align: left; vertical-align: top; }
-    th { color: var(--muted); font-weight: 600; }
-    .row-actions { display: flex; gap: 0.35rem; flex-wrap: wrap; }
-    .toolbar { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; margin-bottom: 0.75rem; }
-    .pill { display: inline-block; font-size: 0.75rem; padding: 0.15rem 0.45rem; border-radius: 999px; background: #ecfdf5; color: #065f46; }
-    .pill.warn { background: #fff7ed; color: #9a3412; }
-    .hidden { opacity: 0.55; }
-    [hidden] { display: none !important; }
-  </style>
+  <meta name="theme-color" content="#2F4A40" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Outfit:wght@300;400;500;600;700&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="/src/dani-carine/admin.css" />
 </head>
-<body>
-  <main>
-    <h1>Painel dos noivos</h1>
-    <p class="sub">Dani &amp; Carine · Cloudflare Free (token local, sem Access pago)</p>
+<body class="admin">
+  <div class="admin-shell">
+    <header class="admin-top">
+      <a class="admin-top__brand" href="/dani-carine/">Case<em>Bem</em></a>
+      <a class="admin-top__link" href="/dani-carine/">← Voltar ao site</a>
+    </header>
 
-    <section class="login" id="login-box">
-      <label for="token">ADMIN_PANEL_SECRET</label>
-      <input id="token" type="password" autocomplete="current-password" placeholder="Cole o secret do Pages" />
-      <button type="button" id="login-btn">Entrar</button>
-      <p class="err" id="login-err" hidden></p>
-    </section>
+    <main>
+      <section class="admin-login-card" id="login-box">
+        <p class="eyebrow">Painel dos noivos</p>
+        <h1>Bem-vindos</h1>
+        <p class="admin-sub">Dani &amp; Carine · acesso à gestão do casamento</p>
+        <div class="admin-field">
+          <label for="admin-user">Usuário</label>
+          <input id="admin-user" type="text" autocomplete="username" placeholder="login" />
+        </div>
+        <div class="admin-field">
+          <label for="admin-pass">Senha</label>
+          <input id="admin-pass" type="password" autocomplete="current-password" placeholder="senha" />
+        </div>
+        <button type="button" class="btn btn--block" id="login-btn">Entrar</button>
+        <p class="err" id="login-err" hidden></p>
+        <p class="admin-login-hint">Temporário: <code>Dani</code> / <code>Carine</code></p>
+      </section>
 
-    <section class="panel" id="panel" hidden>
+      <section id="panel" hidden>
+        <div class="admin-hero">
+          <div>
+            <p class="eyebrow">Dani &amp; Carine</p>
+            <h1>Painel dos noivos</h1>
+            <p class="admin-sub">Lista, grupos, mural e conteúdos do site</p>
+          </div>
+          <div class="admin-hero__actions">
+            <button type="button" class="btn btn--ghost" id="refresh-btn">Atualizar</button>
+            <button type="button" class="btn btn--ghost" id="csv-btn">Exportar lista</button>
+            <button type="button" class="btn btn--ghost" id="logout-btn">Sair</button>
+          </div>
+        </div>
+
+        <div class="stats" id="stats"></div>
+        <p class="err" id="panel-err" hidden></p>
+
+        <div id="admin-hub" class="admin-hub">
+          <button type="button" class="hub-tile" data-goto="guests">
+            <span class="hub-tile__title">Lista de convidados</span>
+            <span class="hub-tile__lead">Nomes, grupos e confirmações</span>
+          </button>
+          <button type="button" class="hub-tile" data-goto="catalog">
+            <span class="hub-tile__title">Presentes</span>
+            <span class="hub-tile__lead" id="hub-catalog-summary">Catálogo e recebidos</span>
+          </button>
+          <button type="button" class="hub-tile" data-goto="stationery">
+            <span class="hub-tile__title">Papelaria</span>
+            <span class="hub-tile__lead" id="hub-stationery-summary">Templates WhatsApp</span>
+          </button>
+          <button type="button" class="hub-tile" data-goto="media">
+            <span class="hub-tile__title">Playlist / vídeo</span>
+            <span class="hub-tile__lead" id="hub-media-summary">YouTube no site</span>
+          </button>
+          <button type="button" class="hub-tile" data-goto="lodging">
+            <span class="hub-tile__title">Hospedagem</span>
+            <span class="hub-tile__lead" id="hub-lodging-summary">Dicas para convidados</span>
+          </button>
+          <button type="button" class="hub-tile" data-goto="messages">
+            <span class="hub-tile__title">Mural de recados</span>
+            <span class="hub-tile__lead">Moderar mensagens</span>
+          </button>
+          <button type="button" class="hub-tile" data-goto="entertainment">
+            <span class="hub-tile__title">Entretenimento</span>
+            <span class="hub-tile__lead">Desafios, jogos e ranking</span>
+          </button>
+          <button type="button" class="hub-tile" data-goto="album">
+            <span class="hub-tile__title">Álbum compartilhado</span>
+            <span class="hub-tile__lead">Fotos dos convidados</span>
+          </button>
+        </div>
+
+        <div id="admin-section-view" class="admin-section-view" hidden>
+          <button type="button" class="btn btn--ghost hub-back" id="hub-back">← Voltar ao painel</button>
+
+          <div class="admin-sections">
+            <article class="admin-card admin-section" data-section="guests" hidden>
+              <div class="admin-card__head">
+                <div>
+                  <h2>Lista de convidados</h2>
+                  <p class="admin-card__lead">Separe nomes por vírgula, ponto e vírgula ou Enter</p>
+                </div>
+                <div class="admin-field admin-field--compact">
+                  <label for="rsvp-mode">Quem pode confirmar</label>
+                  <select id="rsvp-mode">
+                    <option value="closed" selected>Só da lista</option>
+                    <option value="open">Lista aberta</option>
+                  </select>
+                </div>
+              </div>
+              <div class="guest-group-bar">
+                <div class="admin-field admin-field--compact">
+                  <label for="default-group">Grupo ao adicionar</label>
+                  <div class="group-add-row">
+                    <select id="default-group">
+                      <option value="">Sem grupo</option>
+                    </select>
+                    <button type="button" class="btn btn--icon" id="open-create-group" title="Criar grupo" aria-label="Criar grupo">+</button>
+                  </div>
+                </div>
+                <button type="button" class="link-btn" id="open-view-groups">Ver grupos</button>
+              </div>
+              <div class="admin-field">
+                <label for="guest-names">Novos nomes</label>
+                <textarea id="guest-names" placeholder="Maria Silva, João Souza; Ana Costa"></textarea>
+              </div>
+              <div class="toolbar">
+                <button type="button" class="btn" id="add-guests-btn">Adicionar à lista</button>
+              </div>
+              <div id="guest-table"></div>
+            </article>
+
+            <article class="admin-card admin-section" data-section="catalog" hidden>
+              <div class="admin-card__head">
+                <div>
+                  <h2>Presentes</h2>
+                  <p class="admin-card__lead">Como aparece no site dos noivos</p>
+                  <p class="sub" id="catalog-summary">Carregando…</p>
+                </div>
+                <div class="card-actions">
+                  <button type="button" class="btn btn--icon" id="open-create-gift" title="Novo presente" aria-label="Novo presente">+</button>
+                </div>
+              </div>
+              <div id="catalog-grid" class="admin-gifts-grid"></div>
+              <h3 class="admin-subhead">Recebidos</h3>
+              <p class="admin-card__lead">Checkouts Pix / pagamentos</p>
+              <div id="gifts-table"></div>
+            </article>
+
+            <article class="admin-card admin-section" data-section="stationery" hidden>
+              <div class="admin-card__head">
+                <div>
+                  <h2>Papelaria (WhatsApp)</h2>
+                  <p class="admin-card__lead">Como o convidado vê no site · {{names}} {{date}} {{place}} {{url}}</p>
+                  <p class="sub" id="stationery-summary">Carregando…</p>
+                </div>
+                <div class="card-actions">
+                  <button type="button" class="btn btn--icon" id="open-create-stationery" title="Novo template" aria-label="Novo template">+</button>
+                </div>
+              </div>
+              <div id="stationery-grid" class="admin-stationery-grid"></div>
+            </article>
+
+            <article class="admin-card admin-section" data-section="messages" hidden>
+              <h2>Mural de recados</h2>
+              <p class="admin-card__lead">Moderar mensagens públicas</p>
+              <div id="messages-table"></div>
+            </article>
+
+            <article class="admin-card admin-section" data-section="entertainment" hidden>
+              <div class="admin-card__head">
+                <div>
+                  <h2>Entretenimento</h2>
+                  <p class="admin-card__lead">Desafios, jogos e ranking para a festa</p>
+                </div>
+                <div class="card-actions">
+                  <button type="button" class="btn" id="open-entertainment-access">Acesso</button>
+                </div>
+              </div>
+              <div class="admin-entertainment-grid" id="entertainment-grid">
+                <button type="button" class="admin-entertainment-card" id="open-challenges-section">
+                  <h3 class="admin-entertainment-card__title">Desafios</h3>
+                  <p class="admin-entertainment-card__lead">Quiz, fotos e cartões de selos</p>
+                  <p class="sub">Abrir cadastro</p>
+                </button>
+                <article class="admin-entertainment-card">
+                  <h3 class="admin-entertainment-card__title">Ranking</h3>
+                  <p class="admin-entertainment-card__lead">Placar ao vivo da festa</p>
+                  <p class="sub">Em breve</p>
+                </article>
+                <article class="admin-entertainment-card">
+                  <h3 class="admin-entertainment-card__title">Jogos</h3>
+                  <p class="admin-entertainment-card__lead">Dinâmicas rápidas para animar a pista</p>
+                  <p class="sub">Em breve</p>
+                </article>
+              </div>
+            </article>
+
+            <article class="admin-card admin-section" data-section="challenges" hidden>
+              <div class="admin-card__head">
+                <div>
+                  <h2>Desafios</h2>
+                  <p class="admin-card__lead">Perguntas, missões de foto e cartões de selos</p>
+                </div>
+              </div>
+
+              <div class="admin-card__head admin-card__head--sub">
+                <div>
+                  <h3 class="admin-subhead" style="margin-top:0">Perguntas</h3>
+                  <p class="admin-card__lead">Múltipla escolha · uma resposta correta · pontos ao acertar</p>
+                </div>
+                <div class="card-actions">
+                  <button type="button" class="btn btn--icon" id="open-create-question" title="Nova pergunta" aria-label="Nova pergunta">+</button>
+                </div>
+              </div>
+              <div id="questions-grid" class="admin-challenges-grid"></div>
+
+              <div class="admin-card__head admin-card__head--sub">
+                <div>
+                  <h3 class="admin-subhead">Desafios de foto</h3>
+                  <p class="admin-card__lead">Título, pontos e selo opcional</p>
+                </div>
+                <div class="card-actions">
+                  <button type="button" class="btn btn--icon" id="open-create-photo-mission" title="Nova missão de foto" aria-label="Nova missão de foto">+</button>
+                </div>
+              </div>
+              <div id="photo-missions-grid" class="admin-challenges-grid"></div>
+
+              <div class="admin-card__head admin-card__head--sub">
+                <div>
+                  <h3 class="admin-subhead">Cartões de selos</h3>
+                  <p class="admin-card__lead">Meta de selos e prêmio ao completar</p>
+                </div>
+                <div class="card-actions">
+                  <button type="button" class="btn btn--icon" id="open-create-stamp-card" title="Novo cartão" aria-label="Novo cartão">+</button>
+                </div>
+              </div>
+              <div id="stamp-cards-grid" class="admin-challenges-grid"></div>
+            </article>
+
+            <article class="admin-card admin-section" data-section="media" hidden>
+              <div class="admin-card__head">
+                <div>
+                  <h2>Playlist / vídeo (YouTube)</h2>
+                  <p class="admin-card__lead">Seção #playlist no site · /api/media (migration 0010). O primeiro ativo vira o embed.</p>
+                  <p class="sub" id="media-summary">Carregando…</p>
+                </div>
+              </div>
+              <div class="toolbar" style="flex-direction:column;align-items:stretch;gap:0.5rem;max-width:640px;margin-bottom:1rem">
+                <input id="media-title" type="text" placeholder="Título" maxlength="120" style="max-width:100%" />
+                <input id="media-url" type="url" placeholder="https://www.youtube.com/watch?v=..." maxlength="500" style="max-width:100%" />
+                <button type="button" class="btn" id="media-add-btn">Adicionar vídeo</button>
+              </div>
+              <div id="media-table"></div>
+            </article>
+
+            <article class="admin-card admin-section" data-section="lodging" hidden>
+              <div class="admin-card__head">
+                <div>
+                  <h2>Hospedagem / dicas</h2>
+                  <p class="admin-card__lead">Lista em /dani-carine/#hospedagem · API /api/lodging (migration 0008).</p>
+                  <p class="sub" id="lodging-summary">Carregando…</p>
+                </div>
+              </div>
+              <div class="toolbar" style="flex-direction:column;align-items:stretch;gap:0.5rem;max-width:640px;margin-bottom:1rem">
+                <input id="lodge-name" type="text" placeholder="Nome (ex.: Pousada X)" maxlength="120" style="max-width:100%" />
+                <input id="lodge-area" type="text" placeholder="Área (ex.: Lagoa da Conceição)" maxlength="80" style="max-width:100%" />
+                <textarea id="lodge-desc" placeholder="Descrição / dica" maxlength="500"></textarea>
+                <input id="lodge-maps" type="url" placeholder="URL Maps (https://...)" maxlength="500" style="max-width:100%" />
+                <input id="lodge-web" type="url" placeholder="Site (opcional)" maxlength="500" style="max-width:100%" />
+                <button type="button" class="btn" id="lodge-add-btn">Adicionar dica</button>
+              </div>
+              <div id="lodging-table"></div>
+            </article>
+
+            <article class="admin-card admin-section" data-section="album" hidden>
+              <div class="admin-card__head">
+                <div>
+                  <h2>Álbum compartilhado</h2>
+                  <p class="admin-card__lead">Fotos enviadas pelos convidados</p>
+                  <p class="sub" id="album-summary">Nenhuma foto ainda</p>
+                </div>
+              </div>
+              <div class="admin-album-grid" id="album-grid">
+                <p class="sub admin-album-empty">Quando os convidados enviarem fotos, elas aparecem aqui.</p>
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <dialog class="admin-modal" id="modal-create-group">
+    <form method="dialog" class="admin-modal__panel" id="form-create-group">
+      <header class="admin-modal__head">
+        <h3>Novo grupo</h3>
+        <button type="submit" class="admin-modal__close" value="cancel" aria-label="Fechar">×</button>
+      </header>
+      <div class="admin-field">
+        <label for="group-name">Nome do grupo</label>
+        <input id="group-name" type="text" maxlength="80" placeholder="Ex.: Família Silva" />
+      </div>
+      <div class="admin-modal__actions">
+        <button type="submit" class="btn btn--ghost" value="cancel">Cancelar</button>
+        <button type="button" class="btn" id="add-group-btn">Criar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog class="admin-modal" id="modal-view-groups">
+    <div class="admin-modal__panel">
+      <header class="admin-modal__head">
+        <h3>Grupos</h3>
+        <button type="button" class="admin-modal__close" id="close-view-groups" aria-label="Fechar">×</button>
+      </header>
+      <div id="groups-table"></div>
+    </div>
+  </dialog>
+
+  <dialog class="admin-modal" id="modal-create-gift">
+    <form method="dialog" class="admin-modal__panel">
+      <header class="admin-modal__head">
+        <h3 id="gift-modal-title">Novo presente</h3>
+        <button type="submit" class="admin-modal__close" value="cancel" aria-label="Fechar">×</button>
+      </header>
+      <input type="hidden" id="gift-edit-id" value="" />
+      <div class="gift-photo-field">
+        <div class="gift-photo-preview" id="gift-photo-preview">
+          <img id="gift-photo-img" alt="" hidden />
+          <span id="gift-photo-placeholder">Sem foto</span>
+        </div>
+        <div class="admin-field">
+          <label for="gift-photo">Foto do presente</label>
+          <input id="gift-photo" type="file" accept="image/*" />
+        </div>
+        <div class="admin-field">
+          <label for="gift-image-url">Ou URL da imagem</label>
+          <input id="gift-image-url" type="url" maxlength="300" placeholder="https://..." />
+        </div>
+      </div>
+      <div class="admin-field">
+        <label for="gift-name">Nome</label>
+        <input id="gift-name" type="text" maxlength="100" placeholder="Ex.: Jantar romântico" />
+      </div>
+      <div class="admin-field">
+        <label for="gift-desc">Descrição</label>
+        <input id="gift-desc" type="text" maxlength="300" placeholder="Curta e carinhosa" />
+      </div>
       <div class="toolbar">
-        <button type="button" class="secondary" id="refresh-btn">Atualizar</button>
-        <button type="button" class="secondary" id="csv-btn">Exportar RSVPs (CSV)</button>
-        <button type="button" class="secondary" id="logout-btn">Sair</button>
+        <div class="admin-field admin-field--compact">
+          <label for="gift-price">Preço (R$)</label>
+          <input id="gift-price" type="number" min="0.99" step="0.01" placeholder="150,00" />
+        </div>
+        <div class="admin-field admin-field--compact">
+          <label for="gift-mode">Tipo</label>
+          <select id="gift-mode">
+            <option value="fixed">Valor fixo</option>
+            <option value="custom">Valor livre</option>
+          </select>
+        </div>
       </div>
-      <div class="stats" id="stats"></div>
-      <p class="err" id="panel-err" hidden></p>
-
-      <h2>Modo RSVP</h2>
-      <div class="toolbar">
-        <label for="rsvp-mode" style="margin:0">Aberto = qualquer nome · Fechado = só lista</label>
-        <select id="rsvp-mode">
-          <option value="open">Aberto</option>
-          <option value="closed">Fechado</option>
-        </select>
-        <button type="button" class="secondary" id="save-mode-btn">Salvar modo</button>
+      <label class="gift-active-row">
+        <input id="gift-active" type="checkbox" checked />
+        <span>Ativo na lista do site</span>
+      </label>
+      <div class="admin-modal__actions">
+        <button type="submit" class="btn btn--ghost" value="cancel">Cancelar</button>
+        <button type="button" class="btn" id="create-gift-btn">Salvar</button>
       </div>
+    </form>
+  </dialog>
 
-      <h2>Lista de convidados (RSVP fechado)</h2>
-      <label for="guest-names">Um nome por linha</label>
-      <textarea id="guest-names" placeholder="Maria Silva&#10;João Souza"></textarea>
-      <div class="toolbar">
-        <button type="button" id="add-guests-btn">Adicionar à lista</button>
+  <dialog class="admin-modal" id="modal-entertainment-access">
+    <div class="admin-modal__panel">
+      <header class="admin-modal__head">
+        <h3>Acesso aos desafios</h3>
+        <button type="button" class="admin-modal__close" id="close-entertainment-access" aria-label="Fechar">×</button>
+      </header>
+      <p class="admin-card__lead">Link e QR do jogo oficial para compartilhar com os convidados</p>
+      <div class="admin-field">
+        <label for="entertainment-access-url">Link</label>
+        <div class="entertainment-access-url-row">
+          <input id="entertainment-access-url" type="text" readonly />
+          <button type="button" class="btn btn--ghost" id="copy-entertainment-access">Copiar</button>
+        </div>
       </div>
-      <div id="guest-table"></div>
-
-      <h2>RSVPs</h2>
-      <div id="rsvp-table"></div>
-
-      <h2>Catálogo (editar preços)</h2>
-      <p class="sub">Alterações no D1 — convidados veem via /api/gifts/catalog (sem rebuild).</p>
-      <div id="catalog-table"></div>
-
-      <h2>Papelaria (WhatsApp)</h2>
-      <p class="sub">Placeholders: {{names}} {{date}} {{place}} {{url}} · /api/stationery (migration 0009).</p>
-      <div id="stationery-table"></div>
-
-      <h2>Playlist / vídeo (YouTube)</h2>
-      <p class="sub">Seção #playlist no site · /api/media (migration 0010). O primeiro ativo vira o embed.</p>
-      <div class="toolbar" style="flex-direction:column;align-items:stretch;gap:0.5rem;max-width:640px">
-        <input id="media-title" type="text" placeholder="Título" maxlength="120" style="max-width:100%" />
-        <input id="media-url" type="url" placeholder="https://www.youtube.com/watch?v=..." maxlength="500" style="max-width:100%" />
-        <button type="button" id="media-add-btn">Adicionar vídeo</button>
+      <div class="entertainment-access-qr">
+        <canvas id="entertainment-access-qr" width="220" height="220" aria-label="QR code do jogo"></canvas>
+        <p class="sub">Escaneie para abrir o mesmo link</p>
       </div>
-      <div id="media-table"></div>
-
-      <h2>Hospedagem / dicas</h2>
-      <p class="sub">Lista em /dani-carine/#hospedagem · API /api/lodging (migration 0008).</p>
-      <div class="toolbar" style="flex-direction:column;align-items:stretch;gap:0.5rem;max-width:640px">
-        <input id="lodge-name" type="text" placeholder="Nome (ex.: Pousada X)" maxlength="120" style="max-width:100%" />
-        <input id="lodge-area" type="text" placeholder="Área (ex.: Lagoa da Conceição)" maxlength="80" style="max-width:100%" />
-        <textarea id="lodge-desc" placeholder="Descrição / dica" maxlength="500"></textarea>
-        <input id="lodge-maps" type="url" placeholder="URL Maps (https://...)" maxlength="500" style="max-width:100%" />
-        <input id="lodge-web" type="url" placeholder="Site (opcional)" maxlength="500" style="max-width:100%" />
-        <button type="button" id="lodge-add-btn">Adicionar dica</button>
+      <div class="admin-modal__actions">
+        <button type="button" class="btn btn--ghost" id="close-entertainment-access-btn">Fechar</button>
+        <a class="btn" id="open-entertainment-access-link" href="/games/" target="_blank" rel="noopener">Abrir link</a>
       </div>
-      <div id="lodging-table"></div>
+    </div>
+  </dialog>
 
-      <h2>Checkouts / presentes recebidos</h2>
-      <div id="gifts-table"></div>
+  <dialog class="admin-modal" id="modal-question">
+    <form method="dialog" class="admin-modal__panel">
+      <header class="admin-modal__head">
+        <h3 id="q-modal-title">Nova pergunta</h3>
+        <button type="submit" class="admin-modal__close" value="cancel" aria-label="Fechar">×</button>
+      </header>
+      <input type="hidden" id="q-edit-id" value="" />
+      <div class="admin-field">
+        <label for="q-prompt">Pergunta</label>
+        <input id="q-prompt" type="text" maxlength="200" placeholder="Ex.: Onde os noivos se conheceram?" />
+      </div>
+      <fieldset class="admin-challenge-options">
+        <legend>Respostas (2 a 4) · marque a correta</legend>
+        <label class="admin-challenge-option">
+          <input type="radio" name="q-correct" value="0" checked />
+          <input id="q-opt-0" type="text" maxlength="120" placeholder="Resposta 1" />
+        </label>
+        <label class="admin-challenge-option">
+          <input type="radio" name="q-correct" value="1" />
+          <input id="q-opt-1" type="text" maxlength="120" placeholder="Resposta 2" />
+        </label>
+        <label class="admin-challenge-option">
+          <input type="radio" name="q-correct" value="2" />
+          <input id="q-opt-2" type="text" maxlength="120" placeholder="Resposta 3 (opcional)" />
+        </label>
+        <label class="admin-challenge-option">
+          <input type="radio" name="q-correct" value="3" />
+          <input id="q-opt-3" type="text" maxlength="120" placeholder="Resposta 4 (opcional)" />
+        </label>
+      </fieldset>
+      <div class="admin-field">
+        <label for="q-points">Pontos</label>
+        <input id="q-points" type="number" min="1" max="999" step="1" placeholder="10" />
+      </div>
+      <label class="gift-active-row">
+        <input id="q-active" type="checkbox" checked />
+        <span>Ativa</span>
+      </label>
+      <div class="admin-modal__actions">
+        <button type="submit" class="btn btn--ghost" value="cancel">Cancelar</button>
+        <button type="button" class="btn" id="save-question-btn">Salvar</button>
+      </div>
+    </form>
+  </dialog>
 
-      <h2>Mural</h2>
-      <div id="messages-table"></div>
-    </section>
-  </main>
+  <dialog class="admin-modal" id="modal-photo-mission">
+    <form method="dialog" class="admin-modal__panel">
+      <header class="admin-modal__head">
+        <h3 id="pm-modal-title">Nova missão de foto</h3>
+        <button type="submit" class="admin-modal__close" value="cancel" aria-label="Fechar">×</button>
+      </header>
+      <input type="hidden" id="pm-edit-id" value="" />
+      <div class="admin-field">
+        <label for="pm-title">Título</label>
+        <input id="pm-title" type="text" maxlength="100" placeholder="Ex.: Selfie com os noivos" />
+      </div>
+      <div class="admin-field">
+        <label for="pm-points">Pontos</label>
+        <input id="pm-points" type="number" min="1" max="999" step="1" placeholder="20" />
+      </div>
+      <label class="gift-active-row">
+        <input id="pm-awards-stamp" type="checkbox" />
+        <span>Vale 1 selo</span>
+      </label>
+      <label class="gift-active-row">
+        <input id="pm-active" type="checkbox" checked />
+        <span>Ativa</span>
+      </label>
+      <div class="admin-modal__actions">
+        <button type="submit" class="btn btn--ghost" value="cancel">Cancelar</button>
+        <button type="button" class="btn" id="save-photo-mission-btn">Salvar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog class="admin-modal" id="modal-stamp-card">
+    <form method="dialog" class="admin-modal__panel">
+      <header class="admin-modal__head">
+        <h3 id="sc-modal-title">Novo cartão de selos</h3>
+        <button type="submit" class="admin-modal__close" value="cancel" aria-label="Fechar">×</button>
+      </header>
+      <input type="hidden" id="sc-edit-id" value="" />
+      <div class="admin-field">
+        <label for="sc-name">Nome</label>
+        <input id="sc-name" type="text" maxlength="80" placeholder="Ex.: Drink do casamento" />
+      </div>
+      <div class="admin-field">
+        <label for="sc-stamps">Selos para completar</label>
+        <input id="sc-stamps" type="number" min="1" max="50" step="1" placeholder="5" />
+      </div>
+      <div class="admin-field">
+        <label for="sc-reward">Prêmio</label>
+        <input id="sc-reward" type="text" maxlength="200" placeholder="Ex.: Um drink no bar" />
+      </div>
+      <label class="gift-active-row">
+        <input id="sc-active" type="checkbox" checked />
+        <span>Ativo</span>
+      </label>
+      <div class="admin-modal__actions">
+        <button type="submit" class="btn btn--ghost" value="cancel">Cancelar</button>
+        <button type="button" class="btn" id="save-stamp-card-btn">Salvar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog class="admin-modal" id="modal-create-stationery">
+    <form method="dialog" class="admin-modal__panel">
+      <header class="admin-modal__head">
+        <h3 id="st-modal-title">Novo template</h3>
+        <button type="submit" class="admin-modal__close" value="cancel" aria-label="Fechar">×</button>
+      </header>
+      <input type="hidden" id="st-edit-id" value="" />
+      <div class="admin-field">
+        <label for="st-title">Título</label>
+        <input id="st-title" type="text" maxlength="120" placeholder="Ex.: Save the date" />
+      </div>
+      <div class="admin-field">
+        <label for="st-body">Texto</label>
+        <textarea id="st-body" maxlength="1000" placeholder="Use {{names}} {{date}} {{place}} {{url}}"></textarea>
+      </div>
+      <label class="gift-active-row">
+        <input id="st-active" type="checkbox" checked />
+        <span>Ativo no site</span>
+      </label>
+      <div class="admin-modal__actions">
+        <button type="submit" class="btn btn--ghost" value="cancel">Cancelar</button>
+        <button type="button" class="btn" id="create-stationery-btn">Salvar</button>
+      </div>
+    </form>
+  </dialog>
 
   <script type="module">
-    const STORAGE_KEY = 'casebem_admin_token';
+    import QRCode from 'qrcode';
+    import {
+      TEMP_ADMIN_USER,
+      TEMP_ADMIN_PASS,
+      TEMP_ADMIN_TOKEN,
+      ADMIN_STORAGE_KEY as STORAGE_KEY,
+    } from '/src/dani-carine/admin-credentials.mjs';
+
     const $ = (id) => document.getElementById(id);
+
+    function parseGuestNamesInput(text) {
+      return String(text || '')
+        .split(/[,;\n\r]+/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+    }
+
+    let cachedGroups = [];
 
     function getToken() {
       return sessionStorage.getItem(STORAGE_KEY) || '';
@@ -149,6 +559,10 @@
 
     function clearToken() {
       sessionStorage.removeItem(STORAGE_KEY);
+    }
+
+    function tryTempLogin(user, pass) {
+      return user === TEMP_ADMIN_USER && pass === TEMP_ADMIN_PASS;
     }
 
     function authHeaders() {
@@ -172,6 +586,85 @@
       $('login-box').hidden = true;
       $('panel').hidden = false;
       $('login-err').hidden = true;
+      showHub();
+    }
+
+    function showHub() {
+      $('admin-hub').hidden = false;
+      $('admin-section-view').hidden = true;
+      document.querySelectorAll('.admin-section').forEach((el) => {
+        el.hidden = true;
+      });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function openSection(id) {
+      $('admin-hub').hidden = true;
+      $('admin-section-view').hidden = false;
+      document.querySelectorAll('.admin-section').forEach((el) => {
+        el.hidden = el.getAttribute('data-section') !== id;
+      });
+      const card = document.querySelector(`.admin-section[data-section="${CSS.escape(id)}"]`);
+      card?.classList.remove('admin-section--enter');
+      // reflow for animation
+      void card?.offsetWidth;
+      card?.classList.add('admin-section--enter');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      if (id === 'challenges') void loadChallengesEditor();
+      if (id === 'catalog') void loadCatalogEditor();
+      if (id === 'stationery') void loadStationeryEditor();
+    }
+
+    $('admin-hub')?.addEventListener('click', (ev) => {
+      const tile = ev.target.closest('[data-goto]');
+      if (!tile) return;
+      openSection(tile.getAttribute('data-goto'));
+    });
+
+    $('open-challenges-section')?.addEventListener('click', () => openSection('challenges'));
+
+    $('hub-back')?.addEventListener('click', () => showHub());
+
+    function syncModeSelect(mode) {
+      const sel = $('rsvp-mode');
+      if (!sel) return;
+      sel.value = mode === 'open' ? 'open' : 'closed';
+    }
+
+    function statusLabel(attending) {
+      if (attending === true) return 'Confirmado';
+      if (attending === false) return 'Ausente';
+      return 'Pendente';
+    }
+
+    function statusPillClass(attending) {
+      if (attending === true) return 'pill';
+      if (attending === false) return 'pill warn';
+      return 'pill muted';
+    }
+
+    function fillDefaultGroupSelect(selected) {
+      const sel = $('default-group');
+      const keep = selected ?? sel.value;
+      sel.innerHTML =
+        `<option value="">Sem grupo</option>` +
+        cachedGroups
+          .map((g) => `<option value="${escapeHtml(g.id)}">${escapeHtml(g.name)}</option>`)
+          .join('');
+      if ([...sel.options].some((o) => o.value === keep)) sel.value = keep;
+    }
+
+    function groupOptionsHtml(selectedId) {
+      const cur = selectedId || '';
+      return (
+        `<option value="">Sem grupo</option>` +
+        cachedGroups
+          .map(
+            (g) =>
+              `<option value="${escapeHtml(g.id)}" ${g.id === cur ? 'selected' : ''}>${escapeHtml(g.name)}</option>`
+          )
+          .join('')
+      );
     }
 
     async function load() {
@@ -191,20 +684,23 @@
 
       showPanel();
       const s = data.summary;
+      cachedGroups = data.groups || [];
+      fillDefaultGroupSelect();
+
       $('stats').innerHTML = `
-        <div class="stat"><b>${s.attendingCount}</b><span>confirmados</span></div>
-        <div class="stat"><b>${s.adults + s.children}</b><span>pessoas (${s.adults}A/${s.children}C)</span></div>
-        <div class="stat"><b>${s.messagesVisible}</b><span>recados visíveis</span></div>
-        <div class="stat"><b>${s.giftsPaid}</b><span>presentes pagos</span></div>
+        <div class="stat"><b>${s.attendingCount ?? 0}</b><span>confirmados</span></div>
+        <div class="stat"><b>${s.declinedCount ?? 0}</b><span>ausentes</span></div>
+        <div class="stat"><b>${s.pendingCount ?? 0}</b><span>pendentes</span></div>
+        <div class="stat"><b>${s.guestListCount ?? (data.guestList || []).length}</b><span>na lista</span></div>
+        <div class="stat"><b>${s.messagesVisible ?? 0}</b><span>recados visíveis</span></div>
+        <div class="stat"><b>${s.giftsPaid ?? 0}</b><span>presentes pagos</span></div>
         <div class="stat"><b>${money(s.giftsPaidCents)}</b><span>arrecadado (pago)</span></div>
-        <div class="stat"><b>${s.giftsPending}</b><span>pix pendentes</span></div>
-        <div class="stat"><b>${s.rsvpMode || data.rsvpMode || 'open'}</b><span>modo RSVP</span></div>
-        <div class="stat"><b>${s.guestListCount ?? (data.guestList || []).length}</b><span>na lista fechada</span></div>
+        <div class="stat"><b>${(data.rsvpMode || s.rsvpMode) === 'open' ? 'Lista aberta' : 'Só da lista'}</b><span>quem pode confirmar</span></div>
       `;
 
-      $('rsvp-mode').value = data.rsvpMode || s.rsvpMode || 'open';
+      syncModeSelect(data.rsvpMode || s.rsvpMode || 'closed');
+      $('groups-table').innerHTML = renderGroups(cachedGroups);
       $('guest-table').innerHTML = renderGuests(data.guestList || []);
-      $('rsvp-table').innerHTML = renderRsvps(data.rsvps || []);
       $('gifts-table').innerHTML = renderGifts(data.gifts || []);
       $('messages-table').innerHTML = renderMessages(data.messages || []);
       await loadCatalogEditor();
@@ -213,51 +709,298 @@
       await loadLodgingEditor();
     }
 
+    let cachedGifts = [];
+    let cachedStationery = [];
+    let cachedQuestions = [];
+    let cachedPhotoMissions = [];
+    let cachedStampCards = [];
+
+    let pendingGiftImageData = null;
+
+    function formatGiftPrice(cents) {
+      return (Number(cents || 0) / 100).toLocaleString('pt-BR', {
+        style: 'currency',
+        currency: 'BRL',
+      });
+    }
+
+    function setGiftPhotoPreview(src) {
+      const img = $('gift-photo-img');
+      const ph = $('gift-photo-placeholder');
+      if (src) {
+        img.src = src;
+        img.hidden = false;
+        ph.hidden = true;
+      } else {
+        img.removeAttribute('src');
+        img.hidden = true;
+        ph.hidden = false;
+      }
+    }
+
+    function compressImageFile(file) {
+      return new Promise((resolve, reject) => {
+        if (!file || !file.type.startsWith('image/')) {
+          reject(new Error('Selecione uma imagem'));
+          return;
+        }
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error('Falha ao ler a imagem'));
+        reader.onload = () => {
+          const img = new Image();
+          img.onload = () => {
+            const max = 900;
+            const scale = Math.min(1, max / Math.max(img.width, img.height));
+            const w = Math.max(1, Math.round(img.width * scale));
+            const h = Math.max(1, Math.round(img.height * scale));
+            const canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, w, h);
+            let quality = 0.82;
+            let dataUrl = canvas.toDataURL('image/jpeg', quality);
+            while (dataUrl.length > 160000 && quality > 0.45) {
+              quality -= 0.1;
+              dataUrl = canvas.toDataURL('image/jpeg', quality);
+            }
+            if (dataUrl.length > 180000) {
+              reject(new Error('Imagem ainda grande demais. Tente outra foto.'));
+              return;
+            }
+            resolve(dataUrl);
+          };
+          img.onerror = () => reject(new Error('Imagem inválida'));
+          img.src = reader.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
     async function loadCatalogEditor() {
       const res = await fetch('/api/admin/gifts', { headers: authHeaders() });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) {
-        $('catalog-table').innerHTML = `<p class="err">${escapeHtml(data.message || data.error || 'Falha ao carregar catálogo (rode migration 0007?)')}</p>`;
+        $('catalog-summary').textContent = data.message || data.error || 'Catálogo indisponível';
+        $('catalog-grid').innerHTML = `<p class="sub">${escapeHtml(data.message || data.error || 'Catálogo indisponível')}</p>`;
         return;
       }
-      $('catalog-table').innerHTML = renderCatalog(data.gifts || []);
+      cachedGifts = data.gifts || [];
+      const active = cachedGifts.filter((g) => g.active).length;
+      const catalogLabel =
+        cachedGifts.length === 0
+          ? 'Nenhum presente cadastrado.'
+          : `${cachedGifts.length} item(ns) · ${active} ativo(s)`;
+      $('catalog-summary').textContent = catalogLabel;
+      if ($('hub-catalog-summary')) $('hub-catalog-summary').textContent = catalogLabel;
+      $('catalog-grid').innerHTML = renderCatalog(cachedGifts);
     }
 
     async function loadStationeryEditor() {
       const res = await fetch('/api/admin/stationery', { headers: authHeaders() });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) {
-        $('stationery-table').innerHTML = `<p class="err">${escapeHtml(data.message || data.error || 'Falha ao carregar papelaria (rode migration 0009?)')}</p>`;
+        $('stationery-summary').textContent = data.message || data.error || 'Papelaria indisponível';
+        $('stationery-grid').innerHTML = `<p class="sub">${escapeHtml(data.message || data.error || 'Papelaria indisponível')}</p>`;
         return;
       }
-      $('stationery-table').innerHTML = renderStationery(data.templates || []);
+      cachedStationery = data.templates || [];
+      const active = cachedStationery.filter((t) => t.active).length;
+      const stationeryLabel =
+        cachedStationery.length === 0
+          ? 'Nenhum template cadastrado.'
+          : `${cachedStationery.length} template(s) · ${active} ativo(s)`;
+      $('stationery-summary').textContent = stationeryLabel;
+      if ($('hub-stationery-summary')) $('hub-stationery-summary').textContent = stationeryLabel;
+      $('stationery-grid').innerHTML = renderStationery(cachedStationery);
+    }
+
+    function renderGroups(rows) {
+      if (!rows.length) return '<p class="sub">Nenhum grupo ainda.</p>';
+      return `<div class="admin-table-wrap"><table><thead><tr>
+        <th>Nome</th><th></th>
+      </tr></thead><tbody>
+      ${rows
+        .map(
+          (g) => `<tr>
+        <td>${escapeHtml(g.name)}</td>
+        <td class="row-actions">
+          <button type="button" class="btn btn--ghost btn--sm" data-group-remove="${escapeHtml(g.id)}">Remover</button>
+        </td>
+      </tr>`
+        )
+        .join('')}
+      </tbody></table></div>`;
+    }
+
+    async function loadChallengesEditor() {
+      await Promise.all([loadQuestions(), loadPhotoMissions(), loadStampCards()]);
+    }
+
+    async function loadQuestions() {
+      const grid = $('questions-grid');
+      if (!grid) return;
+      const res = await fetch('/api/admin/challenges/questions', { headers: authHeaders() });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        grid.innerHTML = `<p class="sub">${escapeHtml(data.message || data.error || 'Perguntas indisponíveis')}</p>`;
+        return;
+      }
+      cachedQuestions = data.questions || [];
+      grid.innerHTML = renderQuestions(cachedQuestions);
+    }
+
+    async function loadPhotoMissions() {
+      const grid = $('photo-missions-grid');
+      if (!grid) return;
+      const res = await fetch('/api/admin/challenges/photo-missions', { headers: authHeaders() });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        grid.innerHTML = `<p class="sub">${escapeHtml(data.message || data.error || 'Missões indisponíveis')}</p>`;
+        return;
+      }
+      cachedPhotoMissions = data.photoMissions || [];
+      grid.innerHTML = renderPhotoMissions(cachedPhotoMissions);
+    }
+
+    async function loadStampCards() {
+      const grid = $('stamp-cards-grid');
+      if (!grid) return;
+      const res = await fetch('/api/admin/challenges/stamp-cards', { headers: authHeaders() });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        grid.innerHTML = `<p class="sub">${escapeHtml(data.message || data.error || 'Cartões indisponíveis')}</p>`;
+        return;
+      }
+      cachedStampCards = data.stampCards || [];
+      grid.innerHTML = renderStampCards(cachedStampCards);
+    }
+
+    function renderQuestions(rows) {
+      if (!rows.length) return '<p class="sub">Nenhuma pergunta — use + para adicionar.</p>';
+      return rows
+        .map((q) => {
+          const correct = q.options?.[q.correctIndex] || '';
+          return `<article class="admin-challenge-card ${q.active ? '' : 'is-inactive'}" data-q-id="${escapeHtml(q.id)}">
+          <h3>${escapeHtml(q.prompt)}</h3>
+          <p class="admin-challenge-card__meta">${q.points} pts · correta: ${escapeHtml(correct)}</p>
+          ${q.active ? '' : '<span class="pill muted">inativa</span>'}
+          <div class="row-actions admin-challenge-card__actions">
+            <button type="button" class="btn btn--ghost btn--sm" data-q-edit="${escapeHtml(q.id)}">Editar</button>
+            <button type="button" class="btn btn--ghost btn--sm" data-q-remove="${escapeHtml(q.id)}">Remover</button>
+          </div>
+        </article>`;
+        })
+        .join('');
+    }
+
+    function renderPhotoMissions(rows) {
+      if (!rows.length) return '<p class="sub">Nenhuma missão de foto — use + para adicionar.</p>';
+      return rows
+        .map((m) => `<article class="admin-challenge-card ${m.active ? '' : 'is-inactive'}" data-pm-id="${escapeHtml(m.id)}">
+          <h3>${escapeHtml(m.title)}</h3>
+          <p class="admin-challenge-card__meta">${m.points} pts${m.awardsStamp ? ' · vale 1 selo' : ''}</p>
+          ${m.active ? '' : '<span class="pill muted">inativa</span>'}
+          <div class="row-actions admin-challenge-card__actions">
+            <button type="button" class="btn btn--ghost btn--sm" data-pm-edit="${escapeHtml(m.id)}">Editar</button>
+            <button type="button" class="btn btn--ghost btn--sm" data-pm-remove="${escapeHtml(m.id)}">Remover</button>
+          </div>
+        </article>`)
+        .join('');
+    }
+
+    function renderStampCards(rows) {
+      if (!rows.length) return '<p class="sub">Nenhum cartão — use + para adicionar.</p>';
+      return rows
+        .map((c) => `<article class="admin-challenge-card ${c.active ? '' : 'is-inactive'}" data-sc-id="${escapeHtml(c.id)}">
+          <h3>${escapeHtml(c.name)}</h3>
+          <p class="admin-challenge-card__meta">${c.stampsRequired} selos → ${escapeHtml(c.rewardText)}</p>
+          ${c.active ? '' : '<span class="pill muted">inativo</span>'}
+          <div class="row-actions admin-challenge-card__actions">
+            <button type="button" class="btn btn--ghost btn--sm" data-sc-edit="${escapeHtml(c.id)}">Editar</button>
+            <button type="button" class="btn btn--ghost btn--sm" data-sc-remove="${escapeHtml(c.id)}">Remover</button>
+          </div>
+        </article>`)
+        .join('');
+    }
+
+    function openQuestionForm(q) {
+      $('q-edit-id').value = q?.id || '';
+      $('q-modal-title').textContent = q ? 'Editar pergunta' : 'Nova pergunta';
+      $('q-prompt').value = q?.prompt || '';
+      for (let i = 0; i < 4; i++) {
+        const input = $(`q-opt-${i}`);
+        if (input) input.value = q?.options?.[i] || '';
+      }
+      const radios = document.querySelectorAll('input[name="q-correct"]');
+      radios.forEach((r) => {
+        r.checked = Number(r.value) === Number(q?.correctIndex ?? 0);
+      });
+      $('q-points').value = q ? String(q.points) : '10';
+      $('q-active').checked = q ? Boolean(q.active) : true;
+      openModal('modal-question');
+      requestAnimationFrame(() => $('q-prompt').focus());
+    }
+
+    function openPhotoMissionForm(m) {
+      $('pm-edit-id').value = m?.id || '';
+      $('pm-modal-title').textContent = m ? 'Editar missão de foto' : 'Nova missão de foto';
+      $('pm-title').value = m?.title || '';
+      $('pm-points').value = m ? String(m.points) : '20';
+      $('pm-awards-stamp').checked = Boolean(m?.awardsStamp);
+      $('pm-active').checked = m ? Boolean(m.active) : true;
+      openModal('modal-photo-mission');
+      requestAnimationFrame(() => $('pm-title').focus());
+    }
+
+    function openStampCardForm(c) {
+      $('sc-edit-id').value = c?.id || '';
+      $('sc-modal-title').textContent = c ? 'Editar cartão' : 'Novo cartão de selos';
+      $('sc-name').value = c?.name || '';
+      $('sc-stamps').value = c ? String(c.stampsRequired) : '5';
+      $('sc-reward').value = c?.rewardText || '';
+      $('sc-active').checked = c ? Boolean(c.active) : true;
+      openModal('modal-stamp-card');
+      requestAnimationFrame(() => $('sc-name').focus());
     }
 
     function renderStationery(rows) {
-      if (!rows.length) return '<p class="sub">Nenhum template.</p>';
-      return `<table><thead><tr>
-        <th>Título</th><th>Texto (placeholders ok)</th><th>Ativo</th><th></th>
-      </tr></thead><tbody>
-      ${rows.map((t) => `<tr class="${t.active ? '' : 'hidden'}">
-        <td><input data-st-title="${escapeHtml(t.id)}" value="${escapeHtml(t.title)}" style="width:100%;max-width:140px;padding:0.35rem" /></td>
-        <td><textarea data-st-body="${escapeHtml(t.id)}" style="width:100%;min-height:72px;padding:0.35rem">${escapeHtml(t.body)}</textarea></td>
-        <td><input data-st-active="${escapeHtml(t.id)}" type="checkbox" ${t.active ? 'checked' : ''} /></td>
-        <td class="row-actions">
-          <button type="button" class="secondary" data-st-save="${escapeHtml(t.id)}">Salvar</button>
-          ${t.shareUrl ? `<a class="secondary" style="display:inline-block;margin-top:0.75rem;padding:0.55rem 1rem;border:1px solid var(--accent);border-radius:8px;color:var(--accent);text-decoration:none" href="${escapeHtml(t.shareUrl)}" target="_blank" rel="noopener noreferrer">WhatsApp</a>` : ''}
-        </td>
-      </tr>`).join('')}
-      </tbody></table>`;
+      if (!rows.length) return '<p class="sub">Nenhum template — use + para adicionar.</p>';
+      return rows
+        .map((t) => {
+          const preview = t.text || t.body || '';
+          return `<article class="admin-stationery-card ${t.active ? '' : 'is-inactive'}" data-st-id="${escapeHtml(t.id)}">
+          <h3>${escapeHtml(t.title)}</h3>
+          <p class="admin-stationery-card__preview">${escapeHtml(preview)}</p>
+          ${t.active ? '' : '<span class="pill muted">inativo</span>'}
+          <div class="row-actions admin-stationery-card__actions">
+            ${t.shareUrl ? `<a class="btn btn--ghost btn--sm" href="${escapeHtml(t.shareUrl)}" target="_blank" rel="noopener noreferrer">WhatsApp</a>` : ''}
+            <button type="button" class="btn btn--ghost btn--sm" data-st-edit="${escapeHtml(t.id)}">Editar</button>
+            <button type="button" class="btn btn--ghost btn--sm" data-st-remove="${escapeHtml(t.id)}">Remover</button>
+          </div>
+        </article>`;
+        })
+        .join('');
     }
+
 
     async function loadMediaEditor() {
       const res = await fetch('/api/admin/media', { headers: authHeaders() });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) {
-        $('media-table').innerHTML = `<p class="err">${escapeHtml(data.message || data.error || 'Falha ao carregar mídia (rode migration 0010?)')}</p>`;
+        const msg = data.message || data.error || 'Falha ao carregar mídia (rode migration 0010?)';
+        $('media-summary').textContent = msg;
+        $('media-table').innerHTML = `<p class="err">${escapeHtml(msg)}</p>`;
+        $('hub-media-summary').textContent = 'Indisponível';
         return;
       }
-      $('media-table').innerHTML = renderMedia(data.items || []);
+      const items = data.items || [];
+      const active = items.filter((t) => t.active).length;
+      $('media-summary').textContent =
+        items.length === 0 ? 'Nenhum vídeo — a seção fica oculta no site.' : `${items.length} vídeo(s) · ${active} ativo(s)`;
+      $('hub-media-summary').textContent =
+        items.length === 0 ? 'Nenhum vídeo' : `${items.length} vídeo(s)`;
+      $('media-table').innerHTML = renderMedia(items);
     }
 
     function renderMedia(rows) {
@@ -269,7 +1012,7 @@
         <td><input data-media-title="${escapeHtml(t.id)}" value="${escapeHtml(t.title)}" style="width:100%;max-width:140px;padding:0.35rem" /></td>
         <td><input data-media-url="${escapeHtml(t.id)}" value="${escapeHtml(t.youtubeUrl)}" style="width:100%;min-width:180px;padding:0.35rem" /></td>
         <td><input data-media-active="${escapeHtml(t.id)}" type="checkbox" ${t.active ? 'checked' : ''} /></td>
-        <td><button type="button" class="secondary" data-media-save="${escapeHtml(t.id)}">Salvar</button></td>
+        <td><button type="button" class="btn btn--ghost btn--sm" data-media-save="${escapeHtml(t.id)}">Salvar</button></td>
       </tr>`).join('')}
       </tbody></table>`;
     }
@@ -278,10 +1021,19 @@
       const res = await fetch('/api/admin/lodging', { headers: authHeaders() });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) {
-        $('lodging-table').innerHTML = `<p class="err">${escapeHtml(data.message || data.error || 'Falha ao carregar hospedagem (rode migration 0008?)')}</p>`;
+        const msg = data.message || data.error || 'Falha ao carregar hospedagem (rode migration 0008?)';
+        $('lodging-summary').textContent = msg;
+        $('lodging-table').innerHTML = `<p class="err">${escapeHtml(msg)}</p>`;
+        $('hub-lodging-summary').textContent = 'Indisponível';
         return;
       }
-      $('lodging-table').innerHTML = renderLodging(data.tips || []);
+      const tips = data.tips || [];
+      const active = tips.filter((t) => t.active).length;
+      $('lodging-summary').textContent =
+        tips.length === 0 ? 'Nenhuma dica ainda.' : `${tips.length} dica(s) · ${active} ativa(s)`;
+      $('hub-lodging-summary').textContent =
+        tips.length === 0 ? 'Nenhuma dica' : `${tips.length} dica(s)`;
+      $('lodging-table').innerHTML = renderLodging(tips);
     }
 
     function renderLodging(rows) {
@@ -295,83 +1047,132 @@
         <td><input data-lodge-desc="${escapeHtml(t.id)}" value="${escapeHtml(t.description)}" style="width:100%;min-width:180px;padding:0.35rem" /></td>
         <td><input data-lodge-active="${escapeHtml(t.id)}" type="checkbox" ${t.active ? 'checked' : ''} /></td>
         <td class="row-actions">
-          <button type="button" class="secondary" data-lodge-save="${escapeHtml(t.id)}">Salvar</button>
+          <button type="button" class="btn btn--ghost btn--sm" data-lodge-save="${escapeHtml(t.id)}">Salvar</button>
         </td>
       </tr>`).join('')}
       </tbody></table>`;
     }
 
+    function openStationeryForm(tpl) {
+      $('st-edit-id').value = tpl?.id || '';
+      $('st-modal-title').textContent = tpl ? 'Editar template' : 'Novo template';
+      $('st-title').value = tpl?.title || '';
+      $('st-body').value = tpl?.body || '';
+      $('st-active').checked = tpl ? Boolean(tpl.active) : true;
+      openModal('modal-create-stationery');
+      requestAnimationFrame(() => $('st-title').focus());
+    }
+
     function renderCatalog(rows) {
-      if (!rows.length) return '<p class="sub">Catálogo vazio.</p>';
-      return `<table><thead><tr>
-        <th>ID</th><th>Nome</th><th>Preço (centavos)</th><th>Ativo</th><th></th>
-      </tr></thead><tbody>
-      ${rows.map((g) => `<tr class="${g.active ? '' : 'hidden'}">
-        <td>${escapeHtml(g.id)}</td>
-        <td><input data-cat-name="${escapeHtml(g.id)}" value="${escapeHtml(g.name)}" style="width:100%;max-width:220px;padding:0.35rem" /></td>
-        <td><input data-cat-price="${escapeHtml(g.id)}" type="number" min="99" value="${g.priceInCents}" style="width:110px;padding:0.35rem" /></td>
-        <td><input data-cat-active="${escapeHtml(g.id)}" type="checkbox" ${g.active ? 'checked' : ''} /></td>
-        <td><button type="button" class="secondary" data-cat-save="${escapeHtml(g.id)}">Salvar</button></td>
-      </tr>`).join('')}
-      </tbody></table>`;
+      if (!rows.length) return '<p class="sub">Catálogo vazio — use + para adicionar.</p>';
+      return rows
+        .map((g) => {
+          const img = escapeHtml(g.imageUrl || '/images/gifts/mensagem.jpg');
+          return `<article class="gift-card admin-gift-card ${g.active ? '' : 'is-inactive'}" data-gift-id="${escapeHtml(g.id)}">
+          <figure>
+            <img src="${img}" alt="${escapeHtml(g.name)}" loading="lazy" />
+          </figure>
+          <h3>${escapeHtml(g.name)}</h3>
+          <p>${escapeHtml(formatGiftPrice(g.priceInCents))}${g.mode === 'custom' ? ' · valor livre' : ''}</p>
+          <p class="admin-gift-card__desc">${escapeHtml(g.description || '')}</p>
+          ${g.active ? '' : '<span class="pill muted">inativo</span>'}
+          <div class="row-actions admin-gift-card__actions">
+            <button type="button" class="btn btn--ghost btn--sm" data-cat-edit="${escapeHtml(g.id)}">Editar</button>
+            <button type="button" class="btn btn--ghost btn--sm" data-cat-remove="${escapeHtml(g.id)}">Remover</button>
+          </div>
+        </article>`;
+        })
+        .join('');
+    }
+
+    function openGiftForm(gift) {
+      pendingGiftImageData = null;
+      $('gift-edit-id').value = gift?.id || '';
+      $('gift-modal-title').textContent = gift ? 'Editar presente' : 'Novo presente';
+      $('gift-name').value = gift?.name || '';
+      $('gift-desc').value = gift?.description || '';
+      $('gift-price').value = gift ? (Number(gift.priceInCents || 0) / 100).toFixed(2) : '';
+      $('gift-mode').value = gift?.mode === 'custom' ? 'custom' : 'fixed';
+      $('gift-active').checked = gift ? Boolean(gift.active) : true;
+      $('gift-photo').value = '';
+      const src = gift?.imageUrl || '';
+      if (src && src.startsWith('http')) $('gift-image-url').value = src;
+      else $('gift-image-url').value = '';
+      setGiftPhotoPreview(src || '');
+      openModal('modal-create-gift');
+      requestAnimationFrame(() => $('gift-name').focus());
     }
 
     function renderGuests(rows) {
-      if (!rows.length) return '<p class="sub">Lista vazia — no modo fechado ninguém consegue confirmar.</p>';
-      return `<table><thead><tr><th>Nome</th><th></th></tr></thead><tbody>
-      ${rows.map((g) => `<tr>
-        <td>${escapeHtml(g.displayName)}</td>
-        <td><button type="button" class="secondary" data-guest-remove="${escapeHtml(g.id)}">Remover</button></td>
-      </tr>`).join('')}
-      </tbody></table>`;
-    }
-
-    function renderRsvps(rows) {
-      if (!rows.length) return '<p class="sub">Nenhum RSVP ainda.</p>';
-      return `<table><thead><tr>
-        <th>Nome</th><th>Vai?</th><th>Adultos</th><th>Crianças</th><th>Obs</th><th>Quando</th>
+      if (!rows.length) return '<p class="sub">Lista vazia — no modo “Só da lista” ninguém consegue confirmar.</p>';
+      return `<div class="admin-table-wrap"><table><thead><tr>
+        <th>Nome</th><th>Status</th><th>Grupo</th><th></th>
       </tr></thead><tbody>
-      ${rows.map((r) => `<tr>
-        <td>${escapeHtml(r.guestName)}</td>
-        <td>${r.attending ? 'Sim' : 'Não'}</td>
-        <td>${r.adultsCount}</td>
-        <td>${r.childrenCount}</td>
-        <td>${escapeHtml(r.observations || '')}</td>
-        <td>${escapeHtml((r.createdAt || '').slice(0, 16).replace('T', ' '))}</td>
-      </tr>`).join('')}
-      </tbody></table>`;
+      ${rows
+        .map((g) => {
+          const attending = g.attending;
+          return `<tr>
+        <td>
+          <div class="guest-name">${escapeHtml(g.displayName)}</div>
+          <span class="${statusPillClass(attending)}">${statusLabel(attending)}</span>
+        </td>
+        <td class="row-actions">
+          <button type="button" class="btn btn--ghost btn--sm ${attending === true ? 'is-active' : ''}" data-guest-status="${escapeHtml(g.id)}" data-attending="1">Confirmado</button>
+          <button type="button" class="btn btn--ghost btn--sm ${attending === false ? 'is-active' : ''}" data-guest-status="${escapeHtml(g.id)}" data-attending="0">Ausente</button>
+          <button type="button" class="btn btn--ghost btn--sm ${attending == null ? 'is-active' : ''}" data-guest-status="${escapeHtml(g.id)}" data-attending="">Pendente</button>
+        </td>
+        <td>
+          <select class="inline" data-guest-group="${escapeHtml(g.id)}">
+            ${groupOptionsHtml(g.groupId)}
+          </select>
+        </td>
+        <td>
+          <button type="button" class="btn btn--ghost btn--sm" data-guest-remove="${escapeHtml(g.id)}">Remover</button>
+        </td>
+      </tr>`;
+        })
+        .join('')}
+      </tbody></table></div>`;
     }
 
     function renderGifts(rows) {
       if (!rows.length) return '<p class="sub">Nenhum checkout ainda.</p>';
-      return `<table><thead><tr>
+      return `<div class="admin-table-wrap"><table><thead><tr>
         <th>Presenteador</th><th>Valor</th><th>Status</th><th>Pago</th><th>Quando</th>
       </tr></thead><tbody>
-      ${rows.map((g) => `<tr>
+      ${rows
+        .map(
+          (g) => `<tr>
         <td>${escapeHtml(g.gifterName)}</td>
         <td>${money(g.amountCents)}</td>
         <td>${escapeHtml(g.status)}</td>
         <td>${g.paid ? '<span class="pill">pago</span>' : '<span class="pill warn">pendente</span>'}</td>
         <td>${escapeHtml((g.createdAt || '').slice(0, 16).replace('T', ' '))}</td>
-      </tr>`).join('')}
-      </tbody></table>`;
+      </tr>`
+        )
+        .join('')}
+      </tbody></table></div>`;
     }
 
     function renderMessages(rows) {
       if (!rows.length) return '<p class="sub">Nenhum recado.</p>';
-      return `<table><thead><tr>
+      return `<div class="admin-table-wrap"><table><thead><tr>
         <th>Nome</th><th>Recado</th><th></th>
       </tr></thead><tbody>
-      ${rows.map((m) => `<tr class="${m.hidden ? 'hidden' : ''}">
+      ${rows
+        .map(
+          (m) => `<tr class="${m.hidden ? 'hidden' : ''}">
         <td>${escapeHtml(m.guestName)}</td>
         <td>${escapeHtml(m.message)}</td>
         <td class="row-actions">
-          <button type="button" class="secondary" data-msg="${escapeHtml(m.id)}" data-hidden="${m.hidden ? '0' : '1'}">
+          <button type="button" class="btn btn--ghost btn--sm" data-msg="${escapeHtml(m.id)}" data-hidden="${m.hidden ? '0' : '1'}">
             ${m.hidden ? 'Restaurar' : 'Ocultar'}
           </button>
         </td>
-      </tr>`).join('')}
-      </tbody></table>`;
+      </tr>`
+        )
+        .join('')}
+      </tbody></table></div>`;
     }
 
     function escapeHtml(s) {
@@ -382,22 +1183,56 @@
         .replace(/"/g, '&quot;');
     }
 
+    async function patchGuestList(body) {
+      const res = await fetch('/api/admin/guest-list', {
+        method: 'PATCH',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        $('panel-err').hidden = false;
+        $('panel-err').textContent = data.message || data.error || 'Falha ao salvar';
+        return null;
+      }
+      return data;
+    }
+
+    function applyGuestListSnapshot(data) {
+      if (!data) return;
+      cachedGroups = data.groups || cachedGroups;
+      fillDefaultGroupSelect();
+      if (data.rsvpMode) syncModeSelect(data.rsvpMode);
+      $('groups-table').innerHTML = renderGroups(cachedGroups);
+      $('guest-table').innerHTML = renderGuests(data.guests || []);
+    }
+
     $('login-btn').addEventListener('click', async () => {
-      const token = $('token').value.trim();
-      if (token.length < 16) {
-        showLogin('Secret deve ter pelo menos 16 caracteres');
+      const user = $('admin-user').value.trim();
+      const pass = $('admin-pass').value;
+      if (!tryTempLogin(user, pass)) {
+        showLogin('Usuário ou senha inválidos.');
         return;
       }
-      setToken(token);
+      setToken(TEMP_ADMIN_TOKEN);
       await load();
+    });
+
+    $('admin-pass')?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') $('login-btn').click();
     });
 
     $('refresh-btn').addEventListener('click', () => load());
     $('logout-btn').addEventListener('click', () => {
       clearToken();
-      $('token').value = '';
+      $('admin-user').value = '';
+      $('admin-pass').value = '';
       showLogin();
     });
+
+    if (getToken() === TEMP_ADMIN_TOKEN) {
+      load();
+    }
 
     $('csv-btn').addEventListener('click', async () => {
       const res = await fetch('/api/admin/rsvps.csv', { headers: authHeaders() });
@@ -410,36 +1245,148 @@
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'rsvps-dani-carine.csv';
+      a.download = 'convidados-dani-carine.csv';
       a.click();
       URL.revokeObjectURL(url);
     });
 
-    $('save-mode-btn').addEventListener('click', async () => {
+    $('rsvp-mode').addEventListener('change', async () => {
       const rsvpMode = $('rsvp-mode').value;
-      const res = await fetch('/api/admin/guest-list', {
-        method: 'PATCH',
-        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rsvpMode }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.ok) {
-        $('panel-err').hidden = false;
-        $('panel-err').textContent = data.message || data.error || 'Falha ao salvar modo';
-        return;
+      const data = await patchGuestList({ rsvpMode });
+      if (data) await load();
+    });
+
+    function openModal(id) {
+      const el = $(id);
+      if (el?.showModal) el.showModal();
+      else if (el) el.setAttribute('open', '');
+    }
+
+    function closeModal(id) {
+      const el = $(id);
+      if (el?.close) el.close();
+      else if (el) el.removeAttribute('open');
+    }
+
+    function entertainmentGameUrl() {
+      const host = window.location.hostname;
+      if (host === 'casebem.com' || host === 'www.casebem.com') {
+        return 'https://game.casebem.com/';
       }
+      return new URL('/games/', window.location.origin).href;
+    }
+
+    async function openEntertainmentAccess() {
+      const url = entertainmentGameUrl();
+      const input = $('entertainment-access-url');
+      const link = $('open-entertainment-access-link');
+      const canvas = $('entertainment-access-qr');
+      if (input) input.value = url;
+      if (link) link.href = url;
+      if (canvas) {
+        try {
+          await QRCode.toCanvas(canvas, url, {
+            width: 220,
+            margin: 2,
+            color: { dark: '#2F4A40', light: '#ffffff' },
+          });
+        } catch {
+          const ctx = canvas.getContext('2d');
+          ctx?.clearRect(0, 0, canvas.width, canvas.height);
+        }
+      }
+      openModal('modal-entertainment-access');
+    }
+
+    $('open-entertainment-access')?.addEventListener('click', () => {
+      void openEntertainmentAccess();
+    });
+
+    $('close-entertainment-access')?.addEventListener('click', () => closeModal('modal-entertainment-access'));
+    $('close-entertainment-access-btn')?.addEventListener('click', () => closeModal('modal-entertainment-access'));
+    $('modal-entertainment-access')?.addEventListener('click', (ev) => {
+      if (ev.target === $('modal-entertainment-access')) closeModal('modal-entertainment-access');
+    });
+
+    $('copy-entertainment-access')?.addEventListener('click', async () => {
+      const url = $('entertainment-access-url')?.value || entertainmentGameUrl();
+      const btn = $('copy-entertainment-access');
+      try {
+        await navigator.clipboard.writeText(url);
+        if (btn) {
+          const prev = btn.textContent;
+          btn.textContent = 'Copiado';
+          setTimeout(() => {
+            btn.textContent = prev || 'Copiar';
+          }, 1600);
+        }
+      } catch {
+        $('entertainment-access-url')?.select();
+      }
+    });
+
+    $('open-create-group').addEventListener('click', () => {
+      $('group-name').value = '';
+      openModal('modal-create-group');
+      requestAnimationFrame(() => $('group-name').focus());
+    });
+
+    $('open-view-groups').addEventListener('click', () => {
+      $('groups-table').innerHTML = renderGroups(cachedGroups);
+      openModal('modal-view-groups');
+    });
+
+    $('close-view-groups').addEventListener('click', () => closeModal('modal-view-groups'));
+
+    $('modal-view-groups').addEventListener('click', (ev) => {
+      if (ev.target === $('modal-view-groups')) closeModal('modal-view-groups');
+    });
+
+    $('modal-create-group').addEventListener('click', (ev) => {
+      if (ev.target === $('modal-create-group')) closeModal('modal-create-group');
+    });
+
+    $('add-group-btn').addEventListener('click', async () => {
+      const name = $('group-name').value.trim();
+      if (!name) return;
+      const data = await patchGuestList({ createGroup: { name } });
+      if (!data) return;
+      $('group-name').value = '';
+      closeModal('modal-create-group');
       await load();
     });
 
+    $('group-name').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        $('add-group-btn').click();
+      }
+    });
+
+    $('groups-table').addEventListener('click', async (ev) => {
+      const btn = ev.target.closest('button[data-group-remove]');
+      if (!btn) return;
+      const data = await patchGuestList({ deleteGroupId: btn.getAttribute('data-group-remove') });
+      if (data) {
+        cachedGroups = data.groups || [];
+        fillDefaultGroupSelect();
+        $('groups-table').innerHTML = renderGroups(cachedGroups);
+        await load();
+      }
+    });
+
     $('add-guests-btn').addEventListener('click', async () => {
-      const names = $('guest-names').value
-        .split(/\n+/)
-        .map((n) => n.trim())
-        .filter(Boolean);
+      const names = parseGuestNamesInput($('guest-names').value);
+      if (!names.length) {
+        $('panel-err').hidden = false;
+        $('panel-err').textContent = 'Informe pelo menos um nome.';
+        return;
+      }
+      const groupId = $('default-group').value || null;
       const res = await fetch('/api/admin/guest-list', {
         method: 'POST',
         headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ names }),
+        body: JSON.stringify({ names, groupId }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) {
@@ -452,74 +1399,344 @@
     });
 
     $('guest-table').addEventListener('click', async (ev) => {
-      const btn = ev.target.closest('button[data-guest-remove]');
-      if (!btn) return;
-      const removeId = btn.getAttribute('data-guest-remove');
-      const res = await fetch('/api/admin/guest-list', {
-        method: 'PATCH',
-        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ removeId }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.ok) {
-        $('panel-err').hidden = false;
-        $('panel-err').textContent = data.message || data.error || 'Falha ao remover';
+      const statusBtn = ev.target.closest('button[data-guest-status]');
+      if (statusBtn) {
+        const raw = statusBtn.getAttribute('data-attending');
+        const attending = raw === '' ? null : raw === '1';
+        const data = await patchGuestList({
+          guestId: statusBtn.getAttribute('data-guest-status'),
+          attending,
+        });
+        if (data) {
+          applyGuestListSnapshot(data);
+          await load();
+        }
         return;
       }
-      await load();
+      const removeBtn = ev.target.closest('button[data-guest-remove]');
+      if (!removeBtn) return;
+      const data = await patchGuestList({ removeId: removeBtn.getAttribute('data-guest-remove') });
+      if (data) await load();
     });
 
-    $('catalog-table').addEventListener('click', async (ev) => {
-      const btn = ev.target.closest('button[data-cat-save]');
-      if (!btn) return;
-      const id = btn.getAttribute('data-cat-save');
-      const nameEl = $('catalog-table').querySelector(`input[data-cat-name="${CSS.escape(id)}"]`);
-      const priceEl = $('catalog-table').querySelector(`input[data-cat-price="${CSS.escape(id)}"]`);
-      const activeEl = $('catalog-table').querySelector(`input[data-cat-active="${CSS.escape(id)}"]`);
-      const res = await fetch('/api/admin/gifts', {
-        method: 'PATCH',
+    $('guest-table').addEventListener('change', async (ev) => {
+      const sel = ev.target.closest('select[data-guest-group]');
+      if (!sel) return;
+      const data = await patchGuestList({
+        guestId: sel.getAttribute('data-guest-group'),
+        groupId: sel.value || null,
+      });
+      if (data) await load();
+    });
+
+    function bindModalDismiss(modalId, closeBtnId) {
+      if (closeBtnId) $(closeBtnId)?.addEventListener('click', () => closeModal(modalId));
+      $(modalId)?.addEventListener('click', (ev) => {
+        if (ev.target === $(modalId)) closeModal(modalId);
+      });
+    }
+
+    bindModalDismiss('modal-create-gift');
+    bindModalDismiss('modal-create-stationery');
+    bindModalDismiss('modal-question');
+    bindModalDismiss('modal-photo-mission');
+    bindModalDismiss('modal-stamp-card');
+
+    $('open-create-question')?.addEventListener('click', () => openQuestionForm(null));
+    $('open-create-photo-mission')?.addEventListener('click', () => openPhotoMissionForm(null));
+    $('open-create-stamp-card')?.addEventListener('click', () => openStampCardForm(null));
+
+    $('questions-grid')?.addEventListener('click', async (ev) => {
+      const edit = ev.target.closest('[data-q-edit]');
+      const remove = ev.target.closest('[data-q-remove]');
+      if (edit) {
+        const q = cachedQuestions.find((x) => x.id === edit.getAttribute('data-q-edit'));
+        if (q) openQuestionForm(q);
+        return;
+      }
+      if (remove) {
+        const id = remove.getAttribute('data-q-remove');
+        if (!id || !confirm('Remover esta pergunta?')) return;
+        const res = await fetch(`/api/admin/challenges/questions?id=${encodeURIComponent(id)}`, {
+          method: 'DELETE',
+          headers: authHeaders(),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.ok) {
+          $('panel-err').hidden = false;
+          $('panel-err').textContent = data.message || data.error || 'Falha ao remover';
+          return;
+        }
+        await loadQuestions();
+      }
+    });
+
+    $('photo-missions-grid')?.addEventListener('click', async (ev) => {
+      const edit = ev.target.closest('[data-pm-edit]');
+      const remove = ev.target.closest('[data-pm-remove]');
+      if (edit) {
+        const m = cachedPhotoMissions.find((x) => x.id === edit.getAttribute('data-pm-edit'));
+        if (m) openPhotoMissionForm(m);
+        return;
+      }
+      if (remove) {
+        const id = remove.getAttribute('data-pm-remove');
+        if (!id || !confirm('Remover esta missão de foto?')) return;
+        const res = await fetch(`/api/admin/challenges/photo-missions?id=${encodeURIComponent(id)}`, {
+          method: 'DELETE',
+          headers: authHeaders(),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.ok) {
+          $('panel-err').hidden = false;
+          $('panel-err').textContent = data.message || data.error || 'Falha ao remover';
+          return;
+        }
+        await loadPhotoMissions();
+      }
+    });
+
+    $('stamp-cards-grid')?.addEventListener('click', async (ev) => {
+      const edit = ev.target.closest('[data-sc-edit]');
+      const remove = ev.target.closest('[data-sc-remove]');
+      if (edit) {
+        const c = cachedStampCards.find((x) => x.id === edit.getAttribute('data-sc-edit'));
+        if (c) openStampCardForm(c);
+        return;
+      }
+      if (remove) {
+        const id = remove.getAttribute('data-sc-remove');
+        if (!id || !confirm('Remover este cartão?')) return;
+        const res = await fetch(`/api/admin/challenges/stamp-cards?id=${encodeURIComponent(id)}`, {
+          method: 'DELETE',
+          headers: authHeaders(),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.ok) {
+          $('panel-err').hidden = false;
+          $('panel-err').textContent = data.message || data.error || 'Falha ao remover';
+          return;
+        }
+        await loadStampCards();
+      }
+    });
+
+    $('save-question-btn')?.addEventListener('click', async () => {
+      const editId = $('q-edit-id').value.trim();
+      const rawOptions = [0, 1, 2, 3].map((i) => ({
+        text: String($(`q-opt-${i}`)?.value || '').trim(),
+        slot: i,
+      }));
+      const filled = rawOptions.filter((o) => o.text);
+      const correctRadio = document.querySelector('input[name="q-correct"]:checked');
+      const selectedSlot = Number(correctRadio?.value || 0);
+      let correctIndex = filled.findIndex((o) => o.slot === selectedSlot);
+      if (correctIndex < 0) correctIndex = 0;
+      const body = {
+        prompt: $('q-prompt').value,
+        options: filled.map((o) => o.text),
+        correctIndex,
+        points: Number($('q-points').value),
+        active: $('q-active').checked,
+      };
+      const res = await fetch('/api/admin/challenges/questions', {
+        method: editId ? 'PATCH' : 'POST',
         headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id,
-          name: nameEl?.value,
-          priceInCents: Number(priceEl?.value),
-          active: Boolean(activeEl?.checked),
-        }),
+        body: JSON.stringify(editId ? { id: editId, ...body } : body),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) {
         $('panel-err').hidden = false;
-        $('panel-err').textContent = (data.details && data.details.join(', ')) || data.message || data.error || 'Falha ao salvar presente';
+        $('panel-err').textContent =
+          (data.details && data.details.join(', ')) || data.message || data.error || 'Falha ao salvar pergunta';
+        return;
+      }
+      closeModal('modal-question');
+      await loadQuestions();
+    });
+
+    $('save-photo-mission-btn')?.addEventListener('click', async () => {
+      const editId = $('pm-edit-id').value.trim();
+      const body = {
+        title: $('pm-title').value,
+        points: Number($('pm-points').value),
+        awardsStamp: $('pm-awards-stamp').checked,
+        active: $('pm-active').checked,
+      };
+      const res = await fetch('/api/admin/challenges/photo-missions', {
+        method: editId ? 'PATCH' : 'POST',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify(editId ? { id: editId, ...body } : body),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        $('panel-err').hidden = false;
+        $('panel-err').textContent =
+          (data.details && data.details.join(', ')) || data.message || data.error || 'Falha ao salvar missão';
+        return;
+      }
+      closeModal('modal-photo-mission');
+      await loadPhotoMissions();
+    });
+
+    $('save-stamp-card-btn')?.addEventListener('click', async () => {
+      const editId = $('sc-edit-id').value.trim();
+      const body = {
+        name: $('sc-name').value,
+        stampsRequired: Number($('sc-stamps').value),
+        rewardText: $('sc-reward').value,
+        active: $('sc-active').checked,
+      };
+      const res = await fetch('/api/admin/challenges/stamp-cards', {
+        method: editId ? 'PATCH' : 'POST',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify(editId ? { id: editId, ...body } : body),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        $('panel-err').hidden = false;
+        $('panel-err').textContent =
+          (data.details && data.details.join(', ')) || data.message || data.error || 'Falha ao salvar cartão';
+        return;
+      }
+      closeModal('modal-stamp-card');
+      await loadStampCards();
+    });
+
+    $('open-create-gift').addEventListener('click', () => openGiftForm(null));
+
+    $('gift-photo').addEventListener('change', async () => {
+      const file = $('gift-photo').files?.[0];
+      if (!file) return;
+      try {
+        pendingGiftImageData = await compressImageFile(file);
+        $('gift-image-url').value = '';
+        setGiftPhotoPreview(pendingGiftImageData);
+      } catch (err) {
+        pendingGiftImageData = null;
+        $('panel-err').hidden = false;
+        $('panel-err').textContent = err.message || 'Falha ao processar a foto';
+      }
+    });
+
+    $('gift-image-url').addEventListener('input', () => {
+      const url = $('gift-image-url').value.trim();
+      if (url) {
+        pendingGiftImageData = null;
+        setGiftPhotoPreview(url);
+      }
+    });
+
+    $('open-create-stationery').addEventListener('click', () => openStationeryForm(null));
+
+    $('create-gift-btn').addEventListener('click', async () => {
+      const editId = $('gift-edit-id').value.trim();
+      const name = $('gift-name').value.trim();
+      const description = $('gift-desc').value.trim();
+      const reais = Number(String($('gift-price').value).replace(',', '.'));
+      const priceInCents = Math.round(reais * 100);
+      const payload = {
+        name,
+        description: description || name,
+        priceInCents,
+        mode: $('gift-mode').value,
+        active: Boolean($('gift-active').checked),
+      };
+      if (pendingGiftImageData) payload.imageData = pendingGiftImageData;
+      else if ($('gift-image-url').value.trim()) payload.imageUrl = $('gift-image-url').value.trim();
+      else if (!editId) payload.imageUrl = '/images/gifts/mensagem.jpg';
+
+      const res = await fetch('/api/admin/gifts', {
+        method: editId ? 'PATCH' : 'POST',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify(editId ? { id: editId, ...payload } : payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        $('panel-err').hidden = false;
+        $('panel-err').textContent =
+          (data.details && data.details.join(', ')) || data.message || data.error || 'Falha ao salvar presente';
+        return;
+      }
+      closeModal('modal-create-gift');
+      pendingGiftImageData = null;
+      await loadCatalogEditor();
+    });
+
+    $('create-stationery-btn').addEventListener('click', async () => {
+      const editId = $('st-edit-id').value.trim();
+      const payload = {
+        title: $('st-title').value.trim(),
+        body: $('st-body').value.trim(),
+        kind: 'whatsapp',
+        active: Boolean($('st-active').checked),
+      };
+      const res = await fetch('/api/admin/stationery', {
+        method: editId ? 'PATCH' : 'POST',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify(editId ? { id: editId, ...payload } : payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        $('panel-err').hidden = false;
+        $('panel-err').textContent =
+          (data.details && data.details.join(', ')) || data.message || data.error || 'Falha ao salvar template';
+        return;
+      }
+      closeModal('modal-create-stationery');
+      await loadStationeryEditor();
+    });
+
+    $('catalog-grid').addEventListener('click', async (ev) => {
+      const editBtn = ev.target.closest('button[data-cat-edit]');
+      if (editBtn) {
+        const id = editBtn.getAttribute('data-cat-edit');
+        const gift = cachedGifts.find((g) => g.id === id);
+        if (gift) openGiftForm(gift);
+        return;
+      }
+
+      const removeBtn = ev.target.closest('button[data-cat-remove]');
+      if (!removeBtn) return;
+      const id = removeBtn.getAttribute('data-cat-remove');
+      const res = await fetch(`/api/admin/gifts?id=${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        headers: authHeaders(),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        $('panel-err').hidden = false;
+        $('panel-err').textContent = data.message || data.error || 'Falha ao remover presente';
         return;
       }
       await loadCatalogEditor();
     });
 
-    $('stationery-table').addEventListener('click', async (ev) => {
-      const btn = ev.target.closest('button[data-st-save]');
-      if (!btn) return;
-      const id = btn.getAttribute('data-st-save');
-      const titleEl = $('stationery-table').querySelector(`input[data-st-title="${CSS.escape(id)}"]`);
-      const bodyEl = $('stationery-table').querySelector(`textarea[data-st-body="${CSS.escape(id)}"]`);
-      const activeEl = $('stationery-table').querySelector(`input[data-st-active="${CSS.escape(id)}"]`);
-      const res = await fetch('/api/admin/stationery', {
-        method: 'PATCH',
-        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id,
-          title: titleEl?.value,
-          body: bodyEl?.value,
-          active: Boolean(activeEl?.checked),
-        }),
+    $('stationery-grid').addEventListener('click', async (ev) => {
+      const editBtn = ev.target.closest('button[data-st-edit]');
+      if (editBtn) {
+        const id = editBtn.getAttribute('data-st-edit');
+        const tpl = cachedStationery.find((t) => t.id === id);
+        if (tpl) openStationeryForm(tpl);
+        return;
+      }
+
+      const removeBtn = ev.target.closest('button[data-st-remove]');
+      if (!removeBtn) return;
+      const id = removeBtn.getAttribute('data-st-remove');
+      const res = await fetch(`/api/admin/stationery?id=${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        headers: authHeaders(),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) {
         $('panel-err').hidden = false;
-        $('panel-err').textContent = (data.details && data.details.join(', ')) || data.message || data.error || 'Falha ao salvar template';
+        $('panel-err').textContent = data.message || data.error || 'Falha ao remover template';
         return;
       }
       await loadStationeryEditor();
     });
+
 
     $('media-add-btn').addEventListener('click', async () => {
       const res = await fetch('/api/admin/media', {

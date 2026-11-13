@@ -1,2 +1,7 @@
-/              /landing-page-animada/   302
-/index.html   /landing-page-animada/   302
+# SPA CaseBem (React) — fallback de rotas client-side
+/app    /app/index.html   200
+/app/*  /app/index.html   200
+
+# SPA Games (React) — game.casebem.com → /games via middleware
+/games    /games/index.html   200
+/games/*  /games/index.html   200

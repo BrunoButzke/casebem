@@ -1,8 +1,9 @@
 /**
- * Admin guest list + RSVP mode
- * GET  — list guests + mode
- * POST — { names: string[] } add guests
- * PATCH — { rsvpMode: 'open'|'closed' } and/or { removeId }
+ * Admin guest list + mode + groups
+ * GET  — list guests + groups + mode
+ * POST — { names: string[], groupId?: string|null } add guests
+ * PATCH — rsvpMode | removeId | guestId+attending | guestId+groupId
+ *         | createGroup:{name} | deleteGroupId
  * Auth: Bearer ADMIN_PANEL_SECRET
  */
 
@@ -12,13 +13,27 @@ import {
   getRsvpMode,
   setRsvpMode,
   listGuestList,
+  listGroups,
   addGuests,
   removeGuest,
+  setGuestAttending,
+  setGuestGroup,
+  createGroup,
+  deleteGroup,
 } from '../../_lib/rsvp-guest-list.mjs';
 
 function json(headers, body, status = 200) {
   headers.set('Content-Type', 'application/json; charset=utf-8');
   return Response.json(body, { status, headers });
+}
+
+async function snapshot(db) {
+  const [rsvpMode, guests, groups] = await Promise.all([
+    getRsvpMode(db),
+    listGuestList(db),
+    listGroups(db),
+  ]);
+  return { rsvpMode, guests, groups, count: guests.length };
 }
 
 export async function onRequestOptions(context) {
@@ -32,8 +47,7 @@ export async function onRequestGet(context) {
   if (!auth.ok) return json(headers, { ok: false, error: auth.error, message: auth.message }, auth.status);
   if (!env.DB) return json(headers, { ok: false, error: 'DB_NOT_CONFIGURED' }, 503);
 
-  const [rsvpMode, guests] = await Promise.all([getRsvpMode(env.DB), listGuestList(env.DB)]);
-  return json(headers, { ok: true, rsvpMode, guests, count: guests.length });
+  return json(headers, { ok: true, ...(await snapshot(env.DB)) });
 }
 
 export async function onRequestPost(context) {
@@ -57,15 +71,19 @@ export async function onRequestPost(context) {
   }
 
   try {
-    const result = await addGuests(env.DB, body?.names || []);
-    const guests = await listGuestList(env.DB);
-    return json(headers, { ok: true, ...result, guests });
+    const result = await addGuests(env.DB, body?.names || [], {
+      groupId: body?.groupId || null,
+    });
+    return json(headers, { ok: true, ...result, ...(await snapshot(env.DB)) });
   } catch (err) {
     if (err.message === 'EMPTY_GUEST_LIST') {
       return json(headers, { ok: false, error: 'EMPTY_GUEST_LIST', message: 'Informe names: string[]' }, 400);
     }
     if (err.message === 'GUEST_LIST_TOO_LARGE') {
       return json(headers, { ok: false, error: 'GUEST_LIST_TOO_LARGE', message: 'Máximo 500 nomes por vez' }, 400);
+    }
+    if (err.message === 'GROUP_NOT_FOUND') {
+      return json(headers, { ok: false, error: 'GROUP_NOT_FOUND', message: 'Grupo não encontrado' }, 404);
     }
     return json(headers, { ok: false, error: 'ADD_FAILED', message: err.message }, 500);
   }
@@ -92,27 +110,48 @@ export async function onRequestPatch(context) {
   }
 
   try {
+    let modeResult = null;
+
+    if (body?.createGroup?.name) {
+      await createGroup(env.DB, body.createGroup.name);
+    }
+    if (body?.deleteGroupId) {
+      await deleteGroup(env.DB, String(body.deleteGroupId));
+    }
     if (body?.removeId) {
       await removeGuest(env.DB, String(body.removeId));
     }
-    let modeResult = null;
+    if (body?.guestId && Object.prototype.hasOwnProperty.call(body, 'attending')) {
+      await setGuestAttending(env.DB, String(body.guestId), body.attending);
+    }
+    if (body?.guestId && Object.prototype.hasOwnProperty.call(body, 'groupId')) {
+      await setGuestGroup(env.DB, String(body.guestId), body.groupId);
+    }
     if (body?.rsvpMode) {
       modeResult = await setRsvpMode(env.DB, body.rsvpMode);
     }
-    const [rsvpMode, guests] = await Promise.all([getRsvpMode(env.DB), listGuestList(env.DB)]);
+
     return json(headers, {
       ok: true,
-      rsvpMode,
-      guests,
+      ...(await snapshot(env.DB)),
       ...(modeResult ? { updatedAt: modeResult.updatedAt } : {}),
     });
   } catch (err) {
-    if (err.message === 'INVALID_RSVP_MODE') {
-      return json(headers, { ok: false, error: 'INVALID_RSVP_MODE' }, 400);
-    }
-    if (err.message === 'GUEST_NOT_FOUND') {
-      return json(headers, { ok: false, error: 'GUEST_NOT_FOUND' }, 404);
-    }
-    return json(headers, { ok: false, error: 'PATCH_FAILED', message: err.message }, 500);
+    const map = {
+      INVALID_RSVP_MODE: 400,
+      INVALID_GROUP_NAME: 400,
+      INVALID_ATTENDING: 400,
+      INVALID_GUEST_ID: 400,
+      INVALID_GROUP_ID: 400,
+      GROUP_EXISTS: 409,
+      GROUP_NOT_FOUND: 404,
+      GUEST_NOT_FOUND: 404,
+    };
+    const status = map[err.message] || 500;
+    return json(
+      headers,
+      { ok: false, error: err.message === 'PATCH_FAILED' ? 'PATCH_FAILED' : err.message, message: err.message },
+      status
+    );
   }
 }

@@ -132,7 +132,7 @@ class MockD1Statement {
       if (guestName.length < 2 || guestName.length > 100) {
         return { success: false, error: 'CHECK constraint: guest_name' };
       }
-      if (message.length < 3 || message.length > 500) {
+      if (message.length < 3 || message.length > 250) {
         return { success: false, error: 'CHECK constraint: message' };
       }
       if (consentGiven !== 1) {

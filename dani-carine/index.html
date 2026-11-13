@@ -59,14 +59,67 @@
         <a href="#convite">Convite</a>
         <a href="#playlist">Músicas</a>
       </nav>
-      <a
-        class="btn btn--sm magnetic"
-        href="https://www.google.com/maps/search/?api=1&query=Indai%C3%A1+Eventos+Canto+da+Lagoa+Florian%C3%B3polis"
-        target="_blank"
-        rel="noopener noreferrer"
-        >Como chegar</a
-      >
+      <div class="nav__actions">
+        <button type="button" class="nav__login" id="admin-login-open" aria-haspopup="dialog">
+          Login
+        </button>
+        <a
+          class="btn btn--sm magnetic"
+          href="https://www.google.com/maps/search/?api=1&query=Indai%C3%A1+Eventos+Canto+da+Lagoa+Florian%C3%B3polis"
+          target="_blank"
+          rel="noopener noreferrer"
+          >Como chegar</a
+        >
+      </div>
     </header>
+
+    <div class="admin-login" id="admin-login-modal" hidden>
+      <div class="admin-login__backdrop" data-admin-login-close></div>
+      <div
+        class="admin-login__dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="admin-login-title"
+      >
+        <button
+          type="button"
+          class="admin-login__close"
+          data-admin-login-close
+          aria-label="Fechar"
+        >
+          ×
+        </button>
+        <p class="eyebrow">Painel</p>
+        <h2 id="admin-login-title">Acesso dos noivos</h2>
+        <p class="admin-login__lead">Entre para gerenciar lista, mural e conteúdos do casamento.</p>
+        <form class="admin-login__form" id="admin-login-form" novalidate>
+          <div class="form-field">
+            <label for="admin-user">Usuário</label>
+            <input
+              id="admin-user"
+              name="user"
+              type="text"
+              autocomplete="username"
+              placeholder="login"
+              required
+            />
+          </div>
+          <div class="form-field">
+            <label for="admin-pass">Senha</label>
+            <input
+              id="admin-pass"
+              name="password"
+              type="password"
+              autocomplete="current-password"
+              placeholder="senha"
+              required
+            />
+          </div>
+          <p class="admin-login__error" id="admin-login-error" hidden role="alert"></p>
+          <button type="submit" class="btn magnetic">Entrar</button>
+        </form>
+      </div>
+    </div>
 
     <main id="topo">
       <section class="hero">
@@ -300,6 +353,7 @@
           </figure>
         </div>
       </section>
+
 
       <section class="lodging" id="hospedagem">
         <div class="container">
@@ -538,269 +592,53 @@
         </div>
       </section>
 
-      <section class="gifts" id="presentes">
+      <section class="gifts gifts--soon" id="presentes">
         <div class="container">
           <p class="eyebrow">Presentes</p>
-          <div class="gifts__intro">
-            <div class="gifts__intro-copy">
-              <h2>Nossa lista</h2>
-              <p class="gifts__lead">
-                Presentes simbólicos para a nossa nova vida juntos.
-              </p>
-            </div>
-
-            <button
-              type="button"
-              class="gifts__toggle reveal"
-              aria-expanded="false"
-              aria-controls="gifts-list"
-              id="gifts-toggle"
-            >
-              <span class="gifts__toggle-copy">
-                <strong>Abrir lista de presentes</strong>
-                <span>9 itens</span>
-              </span>
-              <span class="gifts__chevron" aria-hidden="true"></span>
-            </button>
-          </div>
-
-          <div class="gifts__collapse" id="gifts-list" role="region" aria-labelledby="gifts-toggle">
-            <div class="gifts__collapse-inner">
-              <div class="gifts__grid">
-                <button
-                  type="button"
-                  class="gift-card"
-                  data-gift="mensagem"
-                  data-title="Uma mensagem de carinho"
-                  data-desc="Mande um carinho no valor que quiser"
-                  data-image="/images/gifts/mensagem.jpg"
-                  data-mode="custom"
-                >
-                  <figure>
-                    <img src="/images/gifts/mensagem.jpg" alt="" width="800" height="800" loading="lazy" />
-                  </figure>
-                  <h3>Uma mensagem de carinho</h3>
-                  <p>Valor livre · a partir de R$&nbsp;0,99</p>
-                </button>
-                <button
-                  type="button"
-                  class="gift-card"
-                  data-gift="danca"
-                  data-title="Aula de dança"
-                  data-desc="Uma noite só nossa"
-                  data-image="/images/gifts/danca.jpg"
-                  data-price="150"
-                >
-                  <figure>
-                    <img src="/images/gifts/danca.jpg" alt="" width="800" height="800" loading="lazy" />
-                  </figure>
-                  <h3>Aula de dança</h3>
-                  <p>R$&nbsp;150</p>
-                </button>
-                <button
-                  type="button"
-                  class="gift-card"
-                  data-gift="churrasco"
-                  data-title="Churrasco do casal"
-                  data-desc="Carne, vinho e boa conversa"
-                  data-image="/images/gifts/churrasco.jpg"
-                  data-price="180"
-                >
-                  <figure>
-                    <img src="/images/gifts/churrasco.jpg" alt="" width="800" height="800" loading="lazy" />
-                  </figure>
-                  <h3>Churrasco do casal</h3>
-                  <p>R$&nbsp;180</p>
-                </button>
-                <button
-                  type="button"
-                  class="gift-card"
-                  data-gift="brunch"
-                  data-title="Brunch na Lagoa"
-                  data-desc="Manhã preguiçosa com vista"
-                  data-image="/images/gifts/brunch.jpg"
-                  data-price="200"
-                >
-                  <figure>
-                    <img src="/images/gifts/brunch.jpg" alt="" width="800" height="800" loading="lazy" />
-                  </figure>
-                  <h3>Brunch na Lagoa</h3>
-                  <p>R$&nbsp;200</p>
-                </button>
-                <button
-                  type="button"
-                  class="gift-card"
-                  data-gift="adega"
-                  data-title="Adega para dois"
-                  data-desc="Garrafas para brindar"
-                  data-image="/images/gifts/adega.jpg"
-                  data-price="220"
-                >
-                  <figure>
-                    <img src="/images/gifts/adega.jpg" alt="" width="800" height="800" loading="lazy" />
-                  </figure>
-                  <h3>Adega para dois</h3>
-                  <p>R$&nbsp;220</p>
-                </button>
-                <button
-                  type="button"
-                  class="gift-card"
-                  data-gift="jantar"
-                  data-title="Jantar romântico"
-                  data-desc="Mesa reservada, só nós"
-                  data-image="/images/gifts/jantar.jpg"
-                  data-price="250"
-                >
-                  <figure>
-                    <img src="/images/gifts/jantar.jpg" alt="" width="800" height="800" loading="lazy" />
-                  </figure>
-                  <h3>Jantar romântico</h3>
-                  <p>R$&nbsp;250</p>
-                </button>
-                <button
-                  type="button"
-                  class="gift-card"
-                  data-gift="spa"
-                  data-title="Experiência spa"
-                  data-desc="Massagem a quatro mãos"
-                  data-image="/images/gifts/spa.jpg"
-                  data-price="300"
-                >
-                  <figure>
-                    <img src="/images/gifts/spa.jpg" alt="" width="800" height="800" loading="lazy" />
-                  </figure>
-                  <h3>Experiência spa</h3>
-                  <p>R$&nbsp;300</p>
-                </button>
-                <button
-                  type="button"
-                  class="gift-card"
-                  data-gift="hotel"
-                  data-title="Noite de hotel"
-                  data-desc="Check-in e café da manhã"
-                  data-image="/images/gifts/hotel.jpg"
-                  data-price="400"
-                >
-                  <figure>
-                    <img src="/images/gifts/hotel.jpg" alt="" width="800" height="800" loading="lazy" />
-                  </figure>
-                  <h3>Noite de hotel</h3>
-                  <p>R$&nbsp;400</p>
-                </button>
-                <button
-                  type="button"
-                  class="gift-card"
-                  data-gift="lua"
-                  data-title="Lua de mel"
-                  data-desc="Um pedacinho da viagem"
-                  data-image="/images/gifts/lua.jpg"
-                  data-price="500"
-                >
-                  <figure>
-                    <img src="/images/gifts/lua.jpg" alt="" width="800" height="800" loading="lazy" />
-                  </figure>
-                  <h3>Lua de mel</h3>
-                  <p>R$&nbsp;500</p>
-                </button>
-              </div>
-            </div>
+          <div class="gifts__soon reveal">
+            <h2>Nossa lista</h2>
+            <p class="gifts__lead">
+              A lista de presentes com Pix está quase pronta. Em breve você poderá
+              presentear Dani &amp; Carine por aqui.
+            </p>
+            <p class="gifts__soon-badge" aria-label="Status">Em breve</p>
           </div>
         </div>
       </section>
 
-      <div class="gift-modal" id="gift-modal" hidden>
-        <div class="gift-modal__backdrop" data-close-gift></div>
-        <div
-          class="gift-modal__dialog"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="gift-modal-title"
-        >
-          <button type="button" class="gift-modal__close" data-close-gift aria-label="Fechar">
-            ×
-          </button>
-          <figure class="gift-modal__photo">
-            <img src="" alt="" width="800" height="800" />
-          </figure>
-          <div class="gift-modal__body">
-            <h3 id="gift-modal-title"></h3>
-            <p class="gift-modal__desc"></p>
-
-            <div class="gift-modal__amount gift-modal__amount--custom" hidden>
-              <label for="gift-amount">Valor do Pix (R$)</label>
-              <input
-                id="gift-amount"
-                type="number"
-                inputmode="decimal"
-                min="0.99"
-                step="0.01"
-                value="0.99"
-              />
-            </div>
-
-            <div class="gift-modal__amount gift-modal__amount--fixed" hidden>
-              <p class="gift-modal__amount-label">Quantidade</p>
-              <div class="gift-modal__multiples" role="group" aria-label="Múltiplos do valor">
-                <button type="button" class="gift-modal__mult is-active" data-mult="1">1×</button>
-                <button type="button" class="gift-modal__mult" data-mult="2">2×</button>
-                <button type="button" class="gift-modal__mult" data-mult="3">3×</button>
-              </div>
-              <p class="gift-modal__total">Total: <strong data-gift-total>R$&nbsp;0</strong></p>
-            </div>
-
-            <div class="gift-modal__form" data-gift-form>
-              <label class="gift-modal__message-label" for="gift-email">E-mail</label>
-              <input
-                id="gift-email"
-                type="email"
-                autocomplete="email"
-                required
-                placeholder="voce@email.com"
-              />
-
-              <label class="gift-modal__message-label" for="gift-message">
-                Mensagem
-                <span><span data-gift-count>0</span>/300</span>
-              </label>
-              <textarea
-                id="gift-message"
-                maxlength="300"
-                rows="3"
-                placeholder="Escreva um carinho para os noivos…"
-              ></textarea>
-
-              <p class="gift-modal__error" data-gift-error hidden></p>
-
-              <button type="button" class="btn gift-modal__pay" id="gift-pay">
-                Pagar com Pix
-              </button>
-            </div>
-
-            <div class="gift-modal__pix" data-gift-pix hidden>
-              <p class="gift-modal__pix-status" data-pix-status>Escaneie o QR ou copie o código Pix</p>
-              <img class="gift-modal__qr" data-pix-qr alt="QR Code Pix" hidden />
-              <label class="gift-modal__message-label" for="gift-pix-code">Pix copia e cola</label>
-              <textarea id="gift-pix-code" data-pix-code rows="3" readonly></textarea>
-              <button type="button" class="btn btn--ghost gift-modal__copy" data-pix-copy>
-                Copiar código
-              </button>
-              <button type="button" class="btn gift-modal__pay" data-pix-back hidden>
-                Voltar
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <section class="messages" id="mural-recados">
         <div class="container">
           <p class="eyebrow">Mural de recados</p>
-          <h2>Deixe uma mensagem</h2>
+          <h2>Mensagens com carinho</h2>
           <p class="messages__lead">
-            Compartilhe suas felicitações e bons desejos para o casal.
+            Recados dos convidados passando por aqui — deixe o seu também.
           </p>
+        </div>
 
+        <div
+          class="messages__marquee"
+          id="messages-marquee"
+          aria-label="Mensagens dos convidados"
+        >
+          <div class="messages__list" id="messages-list">
+            <noscript>
+              <p class="messages__noscript">O mural de recados requer JavaScript ativado.</p>
+            </noscript>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          class="btn btn--ghost magnetic messages__load-more"
+          id="load-more-btn"
+          style="display: none;"
+        >
+          Carregar mais mensagens
+        </button>
+
+        <div class="container">
           <div class="messages__form-container">
+            <h3 class="messages__form-title">Deixe uma mensagem</h3>
             <form class="messages__form" id="messages-form" novalidate>
               <div class="messages__status" id="messages-status"></div>
 
@@ -825,13 +663,13 @@
                     id="message-text"
                     name="message"
                     required
-                    maxlength="500"
+                    maxlength="250"
                     rows="4"
                     placeholder="Escreva suas felicitações para Dani e Carine..."
                     aria-describedby="message-text-hint message-text-error"
                   ></textarea>
                   <span class="form-hint" id="message-text-hint">
-                    <span id="message-text-count">0</span>/500 caracteres
+                    <span id="message-text-count">0</span>/250 caracteres
                   </span>
                   <span class="form-error" id="message-text-error" role="alert"></span>
                 </div>
@@ -858,23 +696,9 @@
               </div>
             </form>
           </div>
-
-          <div class="messages__list" id="messages-list">
-            <noscript>
-              <p class="messages__noscript">O mural de recados requer JavaScript ativado.</p>
-            </noscript>
-          </div>
-
-          <button 
-            type="button" 
-            class="btn btn--ghost magnetic messages__load-more" 
-            id="load-more-btn" 
-            style="display: none;"
-          >
-            Carregar mais mensagens
-          </button>
         </div>
       </section>
+
 
       <section class="playlist" id="playlist" hidden>
         <div class="container">

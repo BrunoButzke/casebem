@@ -10,21 +10,22 @@ import {
   extractMercadoPagoError,
 } from '../functions/_lib/mercadopago.mjs';
 
-test('resolvePixPayerEmail: token TEST- força @testuser.com', () => {
-  assert.equal(
-    resolvePixPayerEmail('eu@gmail.com', 'TEST-abc'),
-    'test_user_pix@testuser.com'
-  );
+test('resolvePixPayerEmail: token TEST- usa @testuser.com ou MP_TEST_PAYER_EMAIL', () => {
   assert.equal(
     resolvePixPayerEmail('ok@testuser.com', 'TEST-abc'),
     'ok@testuser.com'
   );
-  // APP_USR / placeholders de teste unitário NÃO reescrevem
   assert.equal(
-    resolvePixPayerEmail('eu@gmail.com', 'TEST_TOKEN'),
-    'eu@gmail.com'
+    resolvePixPayerEmail('eu@gmail.com', 'TEST-abc', {
+      MP_TEST_PAYER_EMAIL: 'buyer@testuser.com',
+    }),
+    'buyer@testuser.com'
   );
-})
+  // Sem conta de teste configurada, não inventa e-mail falso
+  assert.equal(resolvePixPayerEmail('eu@gmail.com', 'TEST-abc'), 'eu@gmail.com');
+  // APP_USR / placeholders de teste unitário NÃO reescrevem
+  assert.equal(resolvePixPayerEmail('eu@gmail.com', 'TEST_TOKEN'), 'eu@gmail.com');
+});
 
 test('resolvePixPayerEmail: produção mantém e-mail válido', () => {
   assert.equal(

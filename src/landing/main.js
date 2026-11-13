@@ -382,16 +382,14 @@ function initWaitlist() {
   const updatePayButton = () => {
     if (!payBtn) return;
     if (success.hidden) return;
+    // Checkout pausado — reativar quando MP estiver ok
+    payBtn.hidden = false;
+    payBtn.disabled = true;
+    payBtn.textContent = 'Pagamento em breve';
     if (savedPlan === 'basic') {
-      payBtn.hidden = true;
-      if (!payMsg.textContent.includes('gratuito')) {
-        payMsg.textContent = 'Plano Básico é gratuito. Entraremos em contato em breve!';
-      }
+      payMsg.textContent = 'Plano Básico é gratuito. Entraremos em contato em breve!';
     } else {
-      payBtn.hidden = false;
-      if (payMsg.textContent.includes('gratuito')) {
-        payMsg.textContent = '';
-      }
+      payMsg.textContent = 'Checkout temporariamente pausado — em breve liberamos.';
     }
   };
 
@@ -452,33 +450,8 @@ function initWaitlist() {
   });
 
   payBtn?.addEventListener('click', async () => {
-    if (!savedEmail) {
-      payMsg.textContent = 'Volte e preencha o formulário antes de pagar.';
-      return;
-    }
-    
-    if (savedPlan === 'basic') {
-      updatePayButton();
-      return;
-    }
-    
-    payBtn.disabled = true;
-    payMsg.textContent = 'Abrindo Mercado Pago…';
-    try {
-      const res = await fetch('/api/create-preference', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ planId: savedPlan, email: savedEmail }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Não foi possível iniciar o pagamento.');
-      const url = data.initPoint || data.sandboxInitPoint;
-      if (!url) throw new Error('Link de pagamento indisponível.');
-      location.href = url;
-    } catch (err) {
-      payMsg.textContent = err.message || 'Erro ao abrir o checkout.';
-      payBtn.disabled = false;
-    }
+    if (payBtn.disabled) return;
+    payMsg.textContent = 'Checkout temporariamente pausado — em breve liberamos.';
   });
 }
 

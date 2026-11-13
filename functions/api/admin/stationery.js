@@ -1,7 +1,9 @@
 /**
  * Admin papelaria
- * GET — lista completa + preview
- * PATCH — { id, title?, body?, kind?, active?, sortOrder? }
+ * GET — lista + preview
+ * POST — cria template
+ * PATCH — { id, ...fields }
+ * DELETE — ?id=
  */
 
 import { requireAdmin } from '../../_lib/admin-auth.mjs';
@@ -9,12 +11,33 @@ import { getCorsHeaders, validateOrigin } from '../../_lib/http-helpers.mjs';
 import {
   listStationeryAdmin,
   presentStationery,
+  createStationeryTemplate,
   updateStationeryTemplate,
+  deleteStationeryTemplate,
 } from '../../_lib/stationery-service.mjs';
 
 function json(headers, body, status = 200) {
   headers.set('Content-Type', 'application/json; charset=utf-8');
   return Response.json(body, { status, headers });
+}
+
+function mapWriteError(headers, err) {
+  if (err.message === 'TEMPLATE_NOT_FOUND') {
+    return json(headers, { ok: false, error: 'TEMPLATE_NOT_FOUND' }, 404);
+  }
+  if (err.message === 'TEMPLATE_EXISTS') {
+    return json(headers, { ok: false, error: 'TEMPLATE_EXISTS', message: 'Já existe um template com este id' }, 409);
+  }
+  if (err.message === 'VALIDATION') {
+    return json(headers, { ok: false, error: 'VALIDATION', details: err.details }, 400);
+  }
+  if (err.message === 'EMPTY_PATCH') {
+    return json(headers, { ok: false, error: 'EMPTY_PATCH' }, 400);
+  }
+  if (err.message === 'INVALID_ID') {
+    return json(headers, { ok: false, error: 'INVALID_ID' }, 400);
+  }
+  return json(headers, { ok: false, error: 'WRITE_FAILED', message: err.message }, 500);
 }
 
 export async function onRequestOptions(context) {
@@ -35,6 +58,37 @@ export async function onRequestGet(context) {
     return json(headers, { ok: true, templates });
   } catch (err) {
     return json(headers, { ok: false, error: 'LIST_FAILED', message: err.message }, 500);
+  }
+}
+
+export async function onRequestPost(context) {
+  const { request, env } = context;
+  const headers = getCorsHeaders(request);
+
+  const originCheck = validateOrigin(request);
+  if (!originCheck.valid) {
+    return json(headers, { ok: false, error: 'ORIGIN_DENIED', message: originCheck.error }, 403);
+  }
+
+  const auth = requireAdmin(request, env);
+  if (!auth.ok) return json(headers, { ok: false, error: auth.error, message: auth.message }, auth.status);
+  if (!env.DB) return json(headers, { ok: false, error: 'DB_NOT_CONFIGURED' }, 503);
+
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return json(headers, { ok: false, error: 'INVALID_JSON' }, 400);
+  }
+
+  try {
+    const origin = request.headers.get('Origin') || new URL(request.url).origin;
+    const template = await createStationeryTemplate(env.DB, body || {});
+    const [presented] = presentStationery([template], origin);
+    const templates = presentStationery(await listStationeryAdmin(env.DB), origin);
+    return json(headers, { ok: true, template: presented, templates }, 201);
+  } catch (err) {
+    return mapWriteError(headers, err);
   }
 }
 
@@ -68,15 +122,32 @@ export async function onRequestPatch(context) {
     const [presented] = presentStationery([template], origin);
     return json(headers, { ok: true, template: presented });
   } catch (err) {
-    if (err.message === 'TEMPLATE_NOT_FOUND') {
-      return json(headers, { ok: false, error: 'TEMPLATE_NOT_FOUND' }, 404);
-    }
-    if (err.message === 'VALIDATION') {
-      return json(headers, { ok: false, error: 'VALIDATION', details: err.details }, 400);
-    }
-    if (err.message === 'EMPTY_PATCH') {
-      return json(headers, { ok: false, error: 'EMPTY_PATCH' }, 400);
-    }
-    return json(headers, { ok: false, error: 'UPDATE_FAILED', message: err.message }, 500);
+    return mapWriteError(headers, err);
+  }
+}
+
+export async function onRequestDelete(context) {
+  const { request, env } = context;
+  const headers = getCorsHeaders(request);
+
+  const originCheck = validateOrigin(request);
+  if (!originCheck.valid) {
+    return json(headers, { ok: false, error: 'ORIGIN_DENIED', message: originCheck.error }, 403);
+  }
+
+  const auth = requireAdmin(request, env);
+  if (!auth.ok) return json(headers, { ok: false, error: auth.error, message: auth.message }, auth.status);
+  if (!env.DB) return json(headers, { ok: false, error: 'DB_NOT_CONFIGURED' }, 503);
+
+  const id = new URL(request.url).searchParams.get('id');
+  if (!id) return json(headers, { ok: false, error: 'MISSING_ID' }, 400);
+
+  try {
+    await deleteStationeryTemplate(env.DB, id);
+    const origin = request.headers.get('Origin') || new URL(request.url).origin;
+    const templates = presentStationery(await listStationeryAdmin(env.DB), origin);
+    return json(headers, { ok: true, removed: id, templates });
+  } catch (err) {
+    return mapWriteError(headers, err);
   }
 }

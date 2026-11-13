@@ -21,7 +21,8 @@ export function getAllowedOrigins(request) {
       'https://casebem.pages.dev',
       'https://www.casebem.pages.dev',
       'https://casebem.com',
-      'https://www.casebem.com'
+      'https://www.casebem.com',
+      'https://game.casebem.com'
     );
     const requestOriginParsed = request.headers.get('Origin');
     if (requestOriginParsed && requestOriginParsed.startsWith('https://') && 
@@ -30,11 +31,16 @@ export function getAllowedOrigins(request) {
     }
   }
   
-  // Production: casebem.com apex/www
-  if (hostname === 'casebem.com' || hostname === 'www.casebem.com') {
+  // Production: casebem.com apex/www + game subdomain
+  if (
+    hostname === 'casebem.com' ||
+    hostname === 'www.casebem.com' ||
+    hostname === 'game.casebem.com'
+  ) {
     allowedOrigins.push(
       'https://casebem.com',
       'https://www.casebem.com',
+      'https://game.casebem.com',
       'https://casebem.pages.dev'
     );
   }

@@ -1,16 +1,17 @@
 /**
- * GET /api/admin/summary — RSVPs, messages, gifts for noivos panel
+ * GET /api/admin/summary — painel dos noivos
  * Auth: Authorization: Bearer $ADMIN_PANEL_SECRET
  * Free-tier: Pages Function + D1 only
  */
 
 import { requireAdmin } from '../../_lib/admin-auth.mjs';
+import { listMessagesAdmin, listGiftsAdmin } from '../../_lib/admin-service.mjs';
 import {
-  listRsvps,
-  listMessagesAdmin,
-  listGiftsAdmin,
-} from '../../_lib/admin-service.mjs';
-import { getRsvpMode, listGuestList } from '../../_lib/rsvp-guest-list.mjs';
+  getRsvpMode,
+  listGuestList,
+  listGroups,
+  summarizeGuestList,
+} from '../../_lib/rsvp-guest-list.mjs';
 import { getCorsHeaders } from '../../_lib/http-helpers.mjs';
 
 export async function onRequestOptions(context) {
@@ -38,17 +39,15 @@ export async function onRequestGet(context) {
   }
 
   try {
-    const [rsvps, messages, gifts, rsvpMode, guestList] = await Promise.all([
-      listRsvps(env.DB),
+    const [messages, gifts, rsvpMode, guestList, groups] = await Promise.all([
       listMessagesAdmin(env.DB),
       listGiftsAdmin(env.DB),
       getRsvpMode(env.DB),
       listGuestList(env.DB),
+      listGroups(env.DB),
     ]);
 
-    const attending = rsvps.filter((r) => r.attending);
-    const adults = attending.reduce((s, r) => s + (r.adultsCount || 0), 0);
-    const children = attending.reduce((s, r) => s + (r.childrenCount || 0), 0);
+    const guestStats = summarizeGuestList(guestList);
     const paidGifts = gifts.filter((g) => g.paid);
     const paidCents = paidGifts.reduce((s, g) => s + (g.amountCents || 0), 0);
 
@@ -56,21 +55,21 @@ export async function onRequestGet(context) {
       {
         ok: true,
         summary: {
-          rsvpTotal: rsvps.length,
-          attendingCount: attending.length,
-          adults,
-          children,
+          attendingCount: guestStats.attendingCount,
+          declinedCount: guestStats.declinedCount,
+          pendingCount: guestStats.pendingCount,
           messagesVisible: messages.filter((m) => !m.hidden).length,
           messagesHidden: messages.filter((m) => m.hidden).length,
           giftsPending: gifts.filter((g) => !g.paid && g.status === 'pending').length,
           giftsPaid: paidGifts.length,
           giftsPaidCents: paidCents,
           rsvpMode,
-          guestListCount: guestList.length,
+          guestListCount: guestStats.guestListCount,
+          groupsCount: groups.length,
         },
         rsvpMode,
         guestList,
-        rsvps,
+        groups,
         messages,
         gifts,
       },

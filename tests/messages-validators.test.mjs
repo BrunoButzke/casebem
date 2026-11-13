@@ -25,7 +25,7 @@ test('LIMITS are defined correctly', () => {
   assert.equal(LIMITS.NAME_MIN, 2);
   assert.equal(LIMITS.NAME_MAX, 100);
   assert.equal(LIMITS.MESSAGE_MIN, 3);
-  assert.equal(LIMITS.MESSAGE_MAX, 500);
+  assert.equal(LIMITS.MESSAGE_MAX, 250);
   assert.equal(LIMITS.IDEMPOTENCY_KEY_MAX, 128);
   assert.equal(LIMITS.BODY_SIZE_MAX, 8192);
 });
@@ -121,13 +121,13 @@ test('validateMessage rejects empty message', () => {
 test('validateMessage rejects message too short', () => {
   const result = validateMessage('OK');
   assert.equal(result.valid, false);
-  assert.match(result.error, /3-500/);
+  assert.match(result.error, /3-250/);
 });
 
 test('validateMessage rejects message too long', () => {
-  const result = validateMessage('A'.repeat(501));
+  const result = validateMessage('A'.repeat(251));
   assert.equal(result.valid, false);
-  assert.match(result.error, /3-500/);
+  assert.match(result.error, /3-250/);
 });
 
 test('validateMessage accepts exactly 3 chars', () => {
@@ -136,10 +136,10 @@ test('validateMessage accepts exactly 3 chars', () => {
   assert.equal(result.value, 'ABC');
 });
 
-test('validateMessage accepts exactly 500 chars', () => {
-  const result = validateMessage('A'.repeat(500));
+test('validateMessage accepts exactly 250 chars', () => {
+  const result = validateMessage('A'.repeat(250));
   assert.equal(result.valid, true);
-  assert.equal(result.value, 'A'.repeat(500));
+  assert.equal(result.value, 'A'.repeat(250));
 });
 
 test('validateMessage rejects non-string', () => {

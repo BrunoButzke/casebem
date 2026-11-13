@@ -14,6 +14,12 @@ import {
   resetMemoryGuestsForTests,
   markGuestResponse,
   listGuestList,
+  parseGuestNamesInput,
+  createGroup,
+  listGroups,
+  setGuestAttending,
+  setGuestGroup,
+  summarizeGuestList,
 } from '../functions/_lib/rsvp-guest-list.mjs';
 
 test('nameKey: normaliza espaços e case', () => {
@@ -150,4 +156,37 @@ test('markGuestResponse: atualiza status na lista (memória)', async () => {
   await markGuestResponse(null, target.displayName, false);
   const declined = (await listGuestList(null)).find((g) => g.id === target.id);
   assert.equal(declined.attending, false);
+});
+
+test('parseGuestNamesInput: vírgula, ponto-e-vírgula e Enter', () => {
+  assert.deepEqual(parseGuestNamesInput('Ana, Bruno; Carla\nDuda'), [
+    'Ana',
+    'Bruno',
+    'Carla',
+    'Duda',
+  ]);
+});
+
+test('grupos + status manual (memória)', async () => {
+  resetMemoryGuestsForTests();
+  const group = await createGroup(null, 'Família');
+  const groups = await listGroups(null);
+  assert.equal(groups.length, 1);
+  assert.equal(groups[0].name, 'Família');
+
+  await addGuests(null, ['Zé Teste'], { groupId: group.id });
+  const listed = await listGuestList(null);
+  const guest = listed.find((g) => g.displayName === 'Zé Teste');
+  assert.ok(guest);
+  assert.equal(guest.groupId, group.id);
+  assert.equal(guest.groupName, 'Família');
+
+  await setGuestAttending(null, guest.id, true);
+  await setGuestGroup(null, guest.id, null);
+  const after = (await listGuestList(null)).find((g) => g.id === guest.id);
+  assert.equal(after.attending, true);
+  assert.equal(after.groupId, null);
+
+  const stats = summarizeGuestList(await listGuestList(null));
+  assert.ok(stats.attendingCount >= 1);
 });

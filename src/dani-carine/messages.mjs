@@ -1,14 +1,12 @@
 /**
- * Messages UI (Mural de Recados)
- * Public guestbook for Dani & Carine wedding
+ * Messages UI (Mural de Recados) — trilha rolante infinita + formulário
  */
 
 const API_URL = '/api/messages';
 let currentCursor = null;
 
 /**
- * Initialize messages system
- * @param {Window} windowContext - Window object (for testing)
+ * @param {Window} windowContext
  */
 export function initMessages(windowContext = window) {
   const doc = windowContext.document;
@@ -21,23 +19,20 @@ export function initMessages(windowContext = window) {
   const messageCount = doc.getElementById('message-text-count');
 
   if (!form || !messagesListEl) {
-    return; // Elements not found
+    return;
   }
 
-  // Character counter for message
   if (messageTextarea && messageCount) {
     messageTextarea.addEventListener('input', () => {
       messageCount.textContent = messageTextarea.value.length;
     });
   }
 
-  // Load initial messages
   loadMessages(windowContext, messagesListEl, statusEl, loadMoreBtn, false);
 
-  // Handle form submission
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    
+
     if (submitBtn.disabled) return;
 
     const nameInput = doc.getElementById('guest-name');
@@ -48,7 +43,6 @@ export function initMessages(windowContext = window) {
     const message = messageInput.value.trim();
     const consentGiven = consentCheckbox.checked;
 
-    // Client-side validation
     if (!guestName || guestName.length < 2) {
       showStatus(statusEl, 'Nome deve ter pelo menos 2 caracteres.', 'error');
       return;
@@ -64,7 +58,6 @@ export function initMessages(windowContext = window) {
       return;
     }
 
-    // Disable submit button
     submitBtn.disabled = true;
     submitBtn.textContent = 'Enviando...';
 
@@ -85,22 +78,19 @@ export function initMessages(windowContext = window) {
       const data = await response.json();
 
       if (response.ok) {
-        // Success - add message to top of list
         prependMessage(windowContext, messagesListEl, data);
-        
-        // Clear form
+
         nameInput.value = '';
         messageInput.value = '';
         consentCheckbox.checked = false;
         if (messageCount) messageCount.textContent = '0';
-        
+
         showStatus(statusEl, 'Mensagem enviada com sucesso! ✨', 'success');
       } else {
-        // Error
-        const errorMsg = data.details 
+        const errorMsg = data.details
           ? Object.values(data.details).join(', ')
           : data.error;
-        showStatus(statusEl, errorMsg, 'error');
+        showStatus(statusEl, errorMsg || 'Não foi possível enviar a mensagem.', 'error');
       }
     } catch (error) {
       console.error('Failed to send message:', error);
@@ -111,7 +101,6 @@ export function initMessages(windowContext = window) {
     }
   });
 
-  // Handle load more button
   if (loadMoreBtn) {
     loadMoreBtn.addEventListener('click', () => {
       loadMessages(windowContext, messagesListEl, statusEl, loadMoreBtn, true);
@@ -119,47 +108,51 @@ export function initMessages(windowContext = window) {
   }
 }
 
-/**
- * Load messages from API
- */
 async function loadMessages(windowContext, messagesListEl, statusEl, loadMoreBtn, isLoadMore) {
   if (!isLoadMore) {
     showStatus(statusEl, 'Carregando mensagens...', 'loading');
   }
 
   try {
-    const url = currentCursor && isLoadMore
-      ? `${API_URL}?limit=12&cursor=${encodeURIComponent(currentCursor)}`
-      : `${API_URL}?limit=12`;
-    
+    const url =
+      currentCursor && isLoadMore
+        ? `${API_URL}?limit=50&cursor=${encodeURIComponent(currentCursor)}`
+        : `${API_URL}?limit=50`;
+
     const response = await windowContext.fetch(url);
     const data = await response.json();
 
     if (response.ok) {
       if (data.messages.length === 0 && !isLoadMore) {
-        messagesListEl.innerHTML = '<p class="messages__empty">Seja o primeiro a deixar um recado!</p>';
+        clearMarqueeClones(messagesListEl);
+        messagesListEl.innerHTML =
+          '<p class="messages__empty">Seja o primeiro a deixar um recado!</p>';
+        messagesListEl.classList.remove('is-animated');
         showStatus(statusEl, '', 'success');
       } else {
         if (isLoadMore) {
-          data.messages.forEach(msg => appendMessage(windowContext, messagesListEl, msg));
+          data.messages.forEach((msg) => appendMessage(windowContext, messagesListEl, msg));
         } else {
+          clearMarqueeClones(messagesListEl);
           messagesListEl.innerHTML = '';
-          data.messages.forEach(msg => appendMessage(windowContext, messagesListEl, msg));
+          data.messages.forEach((msg) => appendMessage(windowContext, messagesListEl, msg, false));
         }
+        refreshMarquee(messagesListEl);
         showStatus(statusEl, '', 'success');
       }
 
-      // Update cursor and show/hide load more button
       currentCursor = data.nextCursor;
       if (loadMoreBtn) {
         loadMoreBtn.style.display = data.nextCursor ? 'block' : 'none';
       }
+    } else if (response.status === 503) {
+      showStatus(
+        statusEl,
+        'Mural temporariamente indisponível. Tente novamente mais tarde.',
+        'error'
+      );
     } else {
-      if (response.status === 503) {
-        showStatus(statusEl, 'Mural temporariamente indisponível. Tente novamente mais tarde.', 'error');
-      } else {
-        showStatus(statusEl, data.error || 'Erro ao carregar mensagens.', 'error');
-      }
+      showStatus(statusEl, data.error || 'Erro ao carregar mensagens.', 'error');
     }
   } catch (error) {
     console.error('Failed to load messages:', error);
@@ -167,47 +160,66 @@ async function loadMessages(windowContext, messagesListEl, statusEl, loadMoreBtn
   }
 }
 
-/**
- * Prepend message to list (for newly created)
- */
+function originalMessageIds(listEl) {
+  return Array.from(listEl.querySelectorAll('.message-item:not([data-marquee-clone])')).map((el) =>
+    el.getAttribute('data-message-id')
+  );
+}
+
 function prependMessage(windowContext, listEl, messageData) {
-  // Check for duplicates by data-message-id
-  const existingIds = Array.from(listEl.querySelectorAll('[data-message-id]'))
-    .map(el => el.getAttribute('data-message-id'));
-  
-  if (existingIds.includes(messageData.id)) {
-    return; // Already exists, skip
+  if (originalMessageIds(listEl).includes(messageData.id)) {
+    return;
   }
-  
+
   const messageEl = createMessageElement(windowContext, messageData);
   if (listEl.querySelector('.messages__empty')) {
     listEl.innerHTML = '';
   }
+  clearMarqueeClones(listEl);
   listEl.insertBefore(messageEl, listEl.firstChild);
+  refreshMarquee(listEl);
 }
 
-/**
- * Append message to list (for loaded)
- */
-function appendMessage(windowContext, listEl, messageData) {
-  // Check for duplicates by data-message-id
-  const existingIds = Array.from(listEl.querySelectorAll('[data-message-id]'))
-    .map(el => el.getAttribute('data-message-id'));
-  
-  if (existingIds.includes(messageData.id)) {
-    return; // Already exists, skip
+function appendMessage(windowContext, listEl, messageData, syncMarquee = true) {
+  if (originalMessageIds(listEl).includes(messageData.id)) {
+    return;
   }
-  
+
+  clearMarqueeClones(listEl);
   const messageEl = createMessageElement(windowContext, messageData);
   listEl.appendChild(messageEl);
+  if (syncMarquee) refreshMarquee(listEl);
+}
+
+function clearMarqueeClones(listEl) {
+  listEl.querySelectorAll('[data-marquee-clone]').forEach((el) => el.remove());
 }
 
 /**
- * Create message DOM element
+ * Duplica os cards para loop CSS contínuo (translateX -50%).
  */
+function refreshMarquee(listEl) {
+  clearMarqueeClones(listEl);
+  const items = Array.from(listEl.querySelectorAll('.message-item:not([data-marquee-clone])'));
+
+  if (items.length === 0) {
+    listEl.classList.remove('is-animated');
+    return;
+  }
+
+  items.forEach((item) => {
+    const clone = item.cloneNode(true);
+    clone.setAttribute('data-marquee-clone', 'true');
+    clone.setAttribute('aria-hidden', 'true');
+    listEl.appendChild(clone);
+  });
+
+  listEl.classList.add('is-animated');
+}
+
 function createMessageElement(windowContext, messageData) {
   const doc = windowContext.document;
-  
+
   const article = doc.createElement('article');
   article.className = 'message-item';
   article.setAttribute('data-message-id', messageData.id);
@@ -229,7 +241,7 @@ function createMessageElement(windowContext, messageData) {
 
   const content = doc.createElement('p');
   content.className = 'message-content';
-  content.textContent = messageData.message; // XSS safe: textContent, not innerHTML
+  content.textContent = messageData.message;
 
   article.appendChild(header);
   article.appendChild(content);
@@ -237,37 +249,30 @@ function createMessageElement(windowContext, messageData) {
   return article;
 }
 
-/**
- * Format date for display
- */
 function formatDate(isoString) {
   const date = new Date(isoString);
   const now = new Date();
   const diffMs = now - date;
   const diffMins = Math.floor(diffMs / 60000);
-  
+
   if (diffMins < 1) return 'Agora mesmo';
   if (diffMins < 60) return `Há ${diffMins} min`;
-  
+
   const diffHours = Math.floor(diffMins / 60);
   if (diffHours < 24) return `Há ${diffHours}h`;
-  
+
   const diffDays = Math.floor(diffHours / 24);
   if (diffDays < 7) return `Há ${diffDays} dia${diffDays > 1 ? 's' : ''}`;
-  
-  // More than a week: show date
+
   return date.toLocaleDateString('pt-BR', { day: 'numeric', month: 'short' });
 }
 
-/**
- * Show status message
- */
 function showStatus(statusEl, message, type) {
   if (!statusEl) return;
-  
+
   statusEl.textContent = message;
   statusEl.className = `messages__status ${type ? `messages__status--${type}` : ''}`;
-  
+
   if (message) {
     statusEl.style.display = 'block';
   } else {

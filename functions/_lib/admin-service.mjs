@@ -108,15 +108,22 @@ export async function setMessageHidden(db, messageId, hidden) {
   return { id: messageId, hidden: Boolean(flag) };
 }
 
-export async function listGiftsAdmin(db, { limit = 200 } = {}) {
+export async function listGiftsAdmin(db, { limit = 200, paidOnly = false } = {}) {
   const safeLimit = Math.min(Math.max(Number(limit) || 200, 1), 500);
   const rows = await db
     .prepare(
-      `SELECT intent_key, gifter_name, amount_cents, payment_method, status,
-              provider_reference, canonical_items, created_at, updated_at, paid_at
-       FROM checkout_intents
-       ORDER BY created_at DESC
-       LIMIT ?`
+      paidOnly
+        ? `SELECT intent_key, gifter_name, amount_cents, payment_method, status,
+                  provider_reference, canonical_items, created_at, updated_at, paid_at
+           FROM checkout_intents
+           WHERE paid_at IS NOT NULL
+           ORDER BY paid_at DESC
+           LIMIT ?`
+        : `SELECT intent_key, gifter_name, amount_cents, payment_method, status,
+                  provider_reference, canonical_items, created_at, updated_at, paid_at
+           FROM checkout_intents
+           ORDER BY created_at DESC
+           LIMIT ?`
     )
     .bind(safeLimit)
     .all();
@@ -142,6 +149,61 @@ export async function listGiftsAdmin(db, { limit = 200 } = {}) {
       updatedAt: g.updated_at,
     };
   });
+}
+
+/**
+ * CSV de presentes (checkouts) — Free-tier export no painel.
+ * @param {Array} gifts
+ */
+export function giftsToCsv(gifts) {
+  const header = [
+    'intent_key',
+    'gifter_name',
+    'amount_cents',
+    'amount_brl',
+    'payment_method',
+    'status',
+    'paid',
+    'paid_at',
+    'provider_reference',
+    'items',
+    'created_at',
+    'updated_at',
+  ];
+  const escape = (v) => {
+    const s = String(v ?? '');
+    if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+    return s;
+  };
+  const formatItems = (items) => {
+    if (!Array.isArray(items) || items.length === 0) return '';
+    return items
+      .map((it) => `${it.giftId || it.id || '?'}x${it.quantity || 1}`)
+      .join(';');
+  };
+  const lines = [header.join(',')];
+  for (const g of gifts || []) {
+    const cents = Number(g.amountCents || 0);
+    lines.push(
+      [
+        g.intentKey,
+        g.gifterName,
+        cents,
+        (cents / 100).toFixed(2),
+        g.paymentMethod,
+        g.status,
+        g.paid ? 'yes' : 'no',
+        g.paidAt || '',
+        g.providerReference || '',
+        formatItems(g.items),
+        g.createdAt,
+        g.updatedAt,
+      ]
+        .map(escape)
+        .join(',')
+    );
+  }
+  return lines.join('\n') + '\n';
 }
 
 /**

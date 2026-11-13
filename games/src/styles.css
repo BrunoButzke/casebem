@@ -1,0 +1,92 @@
+:root {
+  --sand: #f3ebe1;
+  --lagoon: #2f4a40;
+  --ink: #1c1917;
+  --cream: #faf7f2;
+  --muted: #6b6560;
+  --line: color-mix(in srgb, var(--ink) 12%, transparent);
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-body: 'Outfit', system-ui, sans-serif;
+  --radius: 18px;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-body);
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  background:
+    radial-gradient(ellipse 70% 40% at 10% 0%, rgba(47, 74, 64, 0.12), transparent 55%),
+    radial-gradient(ellipse 50% 35% at 100% 10%, rgba(212, 132, 106, 0.14), transparent 50%),
+    var(--sand);
+}
+
+.eyebrow {
+  margin: 0 0 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--lagoon);
+}
+
+.muted {
+  margin: 0;
+  color: var(--muted);
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.games-soon {
+  min-height: 100svh;
+  padding: 1.5rem 1.25rem 2.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+}
+
+.games-soon__brand {
+  font-family: var(--font-display);
+  font-size: 1.45rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.games-soon__brand em {
+  font-style: italic;
+  color: var(--lagoon);
+}
+
+.games-soon__card {
+  width: min(420px, 100%);
+  padding: 1.75rem 1.5rem;
+  border-radius: calc(var(--radius) + 6px);
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid var(--line);
+  box-shadow: 0 20px 50px color-mix(in srgb, var(--ink) 8%, transparent);
+  text-align: left;
+}
+
+.games-soon__card h1 {
+  margin: 0 0 0.65rem;
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 6vw, 2.45rem);
+  font-weight: 500;
+  line-height: 1.1;
+}

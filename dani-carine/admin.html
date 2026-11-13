@@ -393,7 +393,7 @@
       </div>
       <div class="admin-modal__actions">
         <button type="button" class="btn btn--ghost" id="close-entertainment-access-btn">Fechar</button>
-        <a class="btn" id="open-entertainment-access-link" href="/app/desafios" target="_blank" rel="noopener">Abrir link</a>
+        <a class="btn" id="open-entertainment-access-link" href="/games/" target="_blank" rel="noopener">Abrir link</a>
       </div>
     </div>
   </dialog>
@@ -1269,7 +1269,11 @@
     }
 
     function entertainmentGameUrl() {
-      return new URL('/app/desafios', window.location.origin).href;
+      const host = window.location.hostname;
+      if (host === 'casebem.com' || host === 'www.casebem.com') {
+        return 'https://game.casebem.com/';
+      }
+      return new URL('/games/', window.location.origin).href;
     }
 
     async function openEntertainmentAccess() {

@@ -750,14 +750,15 @@ export default defineConfig(({ mode }) => {
           daniCarineLista: resolve(rootDir, 'dani-carine/lista.html'),
           lista: resolve(rootDir, 'lista/index.html'),
           casebemApp: resolve(rootDir, 'app/index.html'),
+          casebemGames: resolve(rootDir, 'games/index.html'),
         },
       },
     },
     server: {
-      open: '/app/',
+      open: '/games/',
     },
     preview: {
-      open: '/app/',
+      open: '/games/',
     },
   };
 });

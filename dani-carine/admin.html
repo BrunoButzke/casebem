@@ -70,6 +70,14 @@
             <span class="hub-tile__title">Papelaria</span>
             <span class="hub-tile__lead" id="hub-stationery-summary">Templates WhatsApp</span>
           </button>
+          <button type="button" class="hub-tile" data-goto="media">
+            <span class="hub-tile__title">Playlist / vídeo</span>
+            <span class="hub-tile__lead" id="hub-media-summary">YouTube no site</span>
+          </button>
+          <button type="button" class="hub-tile" data-goto="lodging">
+            <span class="hub-tile__title">Hospedagem</span>
+            <span class="hub-tile__lead" id="hub-lodging-summary">Dicas para convidados</span>
+          </button>
           <button type="button" class="hub-tile" data-goto="messages">
             <span class="hub-tile__title">Mural de recados</span>
             <span class="hub-tile__lead">Moderar mensagens</span>
@@ -230,6 +238,41 @@
                 </div>
               </div>
               <div id="stamp-cards-grid" class="admin-challenges-grid"></div>
+            </article>
+
+            <article class="admin-card admin-section" data-section="media" hidden>
+              <div class="admin-card__head">
+                <div>
+                  <h2>Playlist / vídeo (YouTube)</h2>
+                  <p class="admin-card__lead">Seção #playlist no site · /api/media (migration 0010). O primeiro ativo vira o embed.</p>
+                  <p class="sub" id="media-summary">Carregando…</p>
+                </div>
+              </div>
+              <div class="toolbar" style="flex-direction:column;align-items:stretch;gap:0.5rem;max-width:640px;margin-bottom:1rem">
+                <input id="media-title" type="text" placeholder="Título" maxlength="120" style="max-width:100%" />
+                <input id="media-url" type="url" placeholder="https://www.youtube.com/watch?v=..." maxlength="500" style="max-width:100%" />
+                <button type="button" class="btn" id="media-add-btn">Adicionar vídeo</button>
+              </div>
+              <div id="media-table"></div>
+            </article>
+
+            <article class="admin-card admin-section" data-section="lodging" hidden>
+              <div class="admin-card__head">
+                <div>
+                  <h2>Hospedagem / dicas</h2>
+                  <p class="admin-card__lead">Lista em /dani-carine/#hospedagem · API /api/lodging (migration 0008).</p>
+                  <p class="sub" id="lodging-summary">Carregando…</p>
+                </div>
+              </div>
+              <div class="toolbar" style="flex-direction:column;align-items:stretch;gap:0.5rem;max-width:640px;margin-bottom:1rem">
+                <input id="lodge-name" type="text" placeholder="Nome (ex.: Pousada X)" maxlength="120" style="max-width:100%" />
+                <input id="lodge-area" type="text" placeholder="Área (ex.: Lagoa da Conceição)" maxlength="80" style="max-width:100%" />
+                <textarea id="lodge-desc" placeholder="Descrição / dica" maxlength="500"></textarea>
+                <input id="lodge-maps" type="url" placeholder="URL Maps (https://...)" maxlength="500" style="max-width:100%" />
+                <input id="lodge-web" type="url" placeholder="Site (opcional)" maxlength="500" style="max-width:100%" />
+                <button type="button" class="btn" id="lodge-add-btn">Adicionar dica</button>
+              </div>
+              <div id="lodging-table"></div>
             </article>
 
             <article class="admin-card admin-section" data-section="album" hidden>
@@ -662,6 +705,8 @@
       $('messages-table').innerHTML = renderMessages(data.messages || []);
       await loadCatalogEditor();
       await loadStationeryEditor();
+      await loadMediaEditor();
+      await loadLodgingEditor();
     }
 
     let cachedGifts = [];
@@ -936,6 +981,76 @@
         </article>`;
         })
         .join('');
+    }
+
+
+    async function loadMediaEditor() {
+      const res = await fetch('/api/admin/media', { headers: authHeaders() });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        const msg = data.message || data.error || 'Falha ao carregar mídia (rode migration 0010?)';
+        $('media-summary').textContent = msg;
+        $('media-table').innerHTML = `<p class="err">${escapeHtml(msg)}</p>`;
+        $('hub-media-summary').textContent = 'Indisponível';
+        return;
+      }
+      const items = data.items || [];
+      const active = items.filter((t) => t.active).length;
+      $('media-summary').textContent =
+        items.length === 0 ? 'Nenhum vídeo — a seção fica oculta no site.' : `${items.length} vídeo(s) · ${active} ativo(s)`;
+      $('hub-media-summary').textContent =
+        items.length === 0 ? 'Nenhum vídeo' : `${items.length} vídeo(s)`;
+      $('media-table').innerHTML = renderMedia(items);
+    }
+
+    function renderMedia(rows) {
+      if (!rows.length) return '<p class="sub">Nenhum vídeo — a seção fica oculta no site até você adicionar.</p>';
+      return `<table><thead><tr>
+        <th>Título</th><th>URL</th><th>Ativo</th><th></th>
+      </tr></thead><tbody>
+      ${rows.map((t) => `<tr class="${t.active ? '' : 'hidden'}">
+        <td><input data-media-title="${escapeHtml(t.id)}" value="${escapeHtml(t.title)}" style="width:100%;max-width:140px;padding:0.35rem" /></td>
+        <td><input data-media-url="${escapeHtml(t.id)}" value="${escapeHtml(t.youtubeUrl)}" style="width:100%;min-width:180px;padding:0.35rem" /></td>
+        <td><input data-media-active="${escapeHtml(t.id)}" type="checkbox" ${t.active ? 'checked' : ''} /></td>
+        <td><button type="button" class="btn btn--ghost btn--sm" data-media-save="${escapeHtml(t.id)}">Salvar</button></td>
+      </tr>`).join('')}
+      </tbody></table>`;
+    }
+
+    async function loadLodgingEditor() {
+      const res = await fetch('/api/admin/lodging', { headers: authHeaders() });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        const msg = data.message || data.error || 'Falha ao carregar hospedagem (rode migration 0008?)';
+        $('lodging-summary').textContent = msg;
+        $('lodging-table').innerHTML = `<p class="err">${escapeHtml(msg)}</p>`;
+        $('hub-lodging-summary').textContent = 'Indisponível';
+        return;
+      }
+      const tips = data.tips || [];
+      const active = tips.filter((t) => t.active).length;
+      $('lodging-summary').textContent =
+        tips.length === 0 ? 'Nenhuma dica ainda.' : `${tips.length} dica(s) · ${active} ativa(s)`;
+      $('hub-lodging-summary').textContent =
+        tips.length === 0 ? 'Nenhuma dica' : `${tips.length} dica(s)`;
+      $('lodging-table').innerHTML = renderLodging(tips);
+    }
+
+    function renderLodging(rows) {
+      if (!rows.length) return '<p class="sub">Nenhuma dica ainda.</p>';
+      return `<table><thead><tr>
+        <th>Nome</th><th>Área</th><th>Descrição</th><th>Ativo</th><th></th>
+      </tr></thead><tbody>
+      ${rows.map((t) => `<tr class="${t.active ? '' : 'hidden'}">
+        <td><input data-lodge-name="${escapeHtml(t.id)}" value="${escapeHtml(t.name)}" style="width:100%;max-width:160px;padding:0.35rem" /></td>
+        <td><input data-lodge-area="${escapeHtml(t.id)}" value="${escapeHtml(t.area || '')}" style="width:100%;max-width:120px;padding:0.35rem" /></td>
+        <td><input data-lodge-desc="${escapeHtml(t.id)}" value="${escapeHtml(t.description)}" style="width:100%;min-width:180px;padding:0.35rem" /></td>
+        <td><input data-lodge-active="${escapeHtml(t.id)}" type="checkbox" ${t.active ? 'checked' : ''} /></td>
+        <td class="row-actions">
+          <button type="button" class="btn btn--ghost btn--sm" data-lodge-save="${escapeHtml(t.id)}">Salvar</button>
+        </td>
+      </tr>`).join('')}
+      </tbody></table>`;
     }
 
     function openStationeryForm(tpl) {
@@ -1616,6 +1731,107 @@
         return;
       }
       await loadStationeryEditor();
+    });
+
+
+    $('media-add-btn').addEventListener('click', async () => {
+      const res = await fetch('/api/admin/media', {
+        method: 'POST',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: $('media-title').value,
+          youtubeUrl: $('media-url').value,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        $('panel-err').hidden = false;
+        $('panel-err').textContent = (data.details && data.details.join(', ')) || data.message || data.error || 'Falha ao adicionar vídeo';
+        return;
+      }
+      $('media-title').value = '';
+      $('media-url').value = '';
+      await loadMediaEditor();
+    });
+
+    $('media-table').addEventListener('click', async (ev) => {
+      const btn = ev.target.closest('button[data-media-save]');
+      if (!btn) return;
+      const id = btn.getAttribute('data-media-save');
+      const titleEl = $('media-table').querySelector(`input[data-media-title="${CSS.escape(id)}"]`);
+      const urlEl = $('media-table').querySelector(`input[data-media-url="${CSS.escape(id)}"]`);
+      const activeEl = $('media-table').querySelector(`input[data-media-active="${CSS.escape(id)}"]`);
+      const res = await fetch('/api/admin/media', {
+        method: 'PATCH',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id,
+          title: titleEl?.value,
+          youtubeUrl: urlEl?.value,
+          active: Boolean(activeEl?.checked),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        $('panel-err').hidden = false;
+        $('panel-err').textContent = (data.details && data.details.join(', ')) || data.message || data.error || 'Falha ao salvar vídeo';
+        return;
+      }
+      await loadMediaEditor();
+    });
+
+    $('lodge-add-btn').addEventListener('click', async () => {
+      const res = await fetch('/api/admin/lodging', {
+        method: 'POST',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: $('lodge-name').value,
+          area: $('lodge-area').value,
+          description: $('lodge-desc').value,
+          mapsUrl: $('lodge-maps').value,
+          websiteUrl: $('lodge-web').value,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        $('panel-err').hidden = false;
+        $('panel-err').textContent = (data.details && data.details.join(', ')) || data.message || data.error || 'Falha ao adicionar dica';
+        return;
+      }
+      $('lodge-name').value = '';
+      $('lodge-area').value = '';
+      $('lodge-desc').value = '';
+      $('lodge-maps').value = '';
+      $('lodge-web').value = '';
+      await loadLodgingEditor();
+    });
+
+    $('lodging-table').addEventListener('click', async (ev) => {
+      const btn = ev.target.closest('button[data-lodge-save]');
+      if (!btn) return;
+      const id = btn.getAttribute('data-lodge-save');
+      const nameEl = $('lodging-table').querySelector(`input[data-lodge-name="${CSS.escape(id)}"]`);
+      const areaEl = $('lodging-table').querySelector(`input[data-lodge-area="${CSS.escape(id)}"]`);
+      const descEl = $('lodging-table').querySelector(`input[data-lodge-desc="${CSS.escape(id)}"]`);
+      const activeEl = $('lodging-table').querySelector(`input[data-lodge-active="${CSS.escape(id)}"]`);
+      const res = await fetch('/api/admin/lodging', {
+        method: 'PATCH',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id,
+          name: nameEl?.value,
+          area: areaEl?.value,
+          description: descEl?.value,
+          active: Boolean(activeEl?.checked),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        $('panel-err').hidden = false;
+        $('panel-err').textContent = (data.details && data.details.join(', ')) || data.message || data.error || 'Falha ao salvar dica';
+        return;
+      }
+      await loadLodgingEditor();
     });
 
     $('messages-table').addEventListener('click', async (ev) => {

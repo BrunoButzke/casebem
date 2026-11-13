@@ -35,6 +35,7 @@ Abre em `/landing-page-animada/`.
 10. Migration `0007_gifts_catalog.sql` — catálogo editável no painel (`/api/gifts/catalog`)
 11. Migration `0008_lodging_tips.sql` — hospedagem/dicas no site + painel (`/api/lodging`)
 12. Migration `0009_stationery.sql` — papelaria / convite WhatsApp (`/api/stationery`)
+13. Migration `0010_media_playlist.sql` — playlist/vídeo YouTube (`/api/media`)
 
 **Custo:** mantenha **Workers/Pages Free**. Não ative Workers Paid. E-mail é opcional e externo. Subdomínio `casal.casebem.com` fica para depois (Cloudflare for SaaS).
 

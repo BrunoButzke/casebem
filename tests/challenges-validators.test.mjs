@@ -69,9 +69,39 @@ test('stamp card create ok', () => {
     name: 'Drink',
     stampsRequired: 5,
     rewardText: 'Drink do casamento',
+    cardBg: '#ffffff',
+    cardAccent: '#d9708b',
   });
   assert.equal(r.valid, true);
   assert.equal(r.data.stampsRequired, 5);
+  assert.equal(r.data.cardBg, '#ffffff');
+  assert.equal(r.data.cardAccent, '#d9708b');
+  assert.equal(r.data.fillMode, 'stamp');
+  assert.equal(r.data.pointsPerSlot, 10);
+  assert.ok(r.data.barHint);
+});
+
+test('stamp card create by points', () => {
+  const r = validateStampCardCreate({
+    name: 'Pontos',
+    stampsRequired: 4,
+    rewardText: 'Brinde',
+    fillMode: 'points',
+    pointsPerSlot: 15,
+  });
+  assert.equal(r.valid, true);
+  assert.equal(r.data.fillMode, 'points');
+  assert.equal(r.data.pointsPerSlot, 15);
+});
+
+test('stamp card rejects invalid fillMode', () => {
+  const r = validateStampCardCreate({
+    name: 'Pontos',
+    stampsRequired: 4,
+    rewardText: 'Brinde',
+    fillMode: 'misto',
+  });
+  assert.equal(r.valid, false);
 });
 
 test('stamp card rejects stampsRequired 0', () => {

@@ -2,6 +2,7 @@ import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { mpaSpaFallbackPlugin } from './dev/mpa-spa-fallback.mjs';
 import {
   createPixPayment,
   createPlanPreference,
@@ -53,7 +54,22 @@ import {
   createStampCard,
   updateStampCard,
   deleteStampCard,
+  listChallengesPublic,
+  gradeQuestion,
 } from './functions/_lib/challenges-service.mjs';
+import {
+  listGalleryPhotos,
+  getGalleryPhoto,
+  getGalleryImage,
+  parseGalleryUpload,
+  upsertGalleryPhoto,
+  deleteGalleryPhoto,
+} from './functions/_lib/gallery-service.mjs';
+import {
+  getDesafioTheme,
+  updateDesafioTheme,
+  themeToCssVars,
+} from './functions/_lib/desafio-theme-service.mjs';
 
 const rootDir = dirname(fileURLToPath(import.meta.url));
 
@@ -114,6 +130,26 @@ const localMessages = [
 ];
 const localMessageIdempotency = new Map();
 
+async function nodeRequestToFetch(req) {
+  const chunks = [];
+  for await (const chunk of req) chunks.push(chunk);
+  const headers = new Headers();
+  for (const [key, value] of Object.entries(req.headers)) {
+    if (value == null) continue;
+    headers.set(key, Array.isArray(value) ? value.join(', ') : String(value));
+  }
+  const method = req.method || 'GET';
+  const body = method === 'GET' || method === 'HEAD' ? undefined : Buffer.concat(chunks);
+  return new Request(`http://localhost${req.url}`, { method, headers, body });
+}
+
+function sendBytes(res, status, bytes, contentType) {
+  res.statusCode = status;
+  res.setHeader('Content-Type', contentType || 'application/octet-stream');
+  res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+  res.end(Buffer.from(bytes));
+}
+
 function guestListApiPlugin() {
   return {
     name: 'guest-list-api',
@@ -123,6 +159,92 @@ function guestListApiPlugin() {
           const rawUrl = req.url || '/';
           const parsed = new URL(rawUrl, 'http://localhost');
           const path = parsed.pathname;
+
+          if (path === '/api/desafio/theme' && req.method === 'GET') {
+            const theme = await getDesafioTheme(null);
+            return sendJson(res, 200, { ok: true, theme, cssVars: themeToCssVars(theme) });
+          }
+
+          if (path === '/api/desafio/challenges' && req.method === 'GET') {
+            const catalog = await listChallengesPublic(null);
+            return sendJson(res, 200, { ok: true, ...catalog });
+          }
+
+          if (path === '/api/desafio/gallery' && req.method === 'GET') {
+            return sendJson(res, 200, { ok: true, photos: await listGalleryPhotos(null) });
+          }
+
+          if (path === '/api/desafio/gallery' && req.method === 'POST') {
+            try {
+              const request = await nodeRequestToFetch(req);
+              const payload = await parseGalleryUpload(request);
+              const photo = await upsertGalleryPhoto(null, payload, null);
+              return sendJson(res, 201, { ok: true, photo });
+            } catch (err) {
+              const map = { VALIDATION: 400, GALLERY_UNAVAILABLE: 503 };
+              return sendJson(res, map[err.message] || 500, {
+                ok: false,
+                error: err.message,
+                details: err.details,
+                message: err.message,
+              });
+            }
+          }
+
+          if (path === '/api/desafio/gallery' && req.method === 'DELETE') {
+            try {
+              await deleteGalleryPhoto(
+                null,
+                {
+                  id: parsed.searchParams.get('id'),
+                  guestName: parsed.searchParams.get('guestName'),
+                  missionId: parsed.searchParams.get('missionId'),
+                },
+                null
+              );
+              return sendJson(res, 200, { ok: true, removed: true });
+            } catch (err) {
+              const map = { NOT_FOUND: 404, INVALID_ID: 400 };
+              return sendJson(res, map[err.message] || 500, { ok: false, error: err.message });
+            }
+          }
+
+          const galleryImage = path.match(/^\/api\/desafio\/gallery\/([^/]+)\/image$/);
+          if (galleryImage && req.method === 'GET') {
+            try {
+              const image = await getGalleryImage(null, decodeURIComponent(galleryImage[1]), null);
+              return sendBytes(res, 200, image.bytes, image.contentType);
+            } catch (err) {
+              const map = { NOT_FOUND: 404, INVALID_ID: 400 };
+              return sendJson(res, map[err.message] || 500, { ok: false, error: err.message });
+            }
+          }
+
+          const galleryOne = path.match(/^\/api\/desafio\/gallery\/([^/]+)$/);
+          if (galleryOne && req.method === 'GET') {
+            try {
+              const photo = await getGalleryPhoto(null, decodeURIComponent(galleryOne[1]));
+              return sendJson(res, 200, { ok: true, photo });
+            } catch (err) {
+              const map = { NOT_FOUND: 404, INVALID_ID: 400 };
+              return sendJson(res, map[err.message] || 500, { ok: false, error: err.message });
+            }
+          }
+
+          if (path === '/api/desafio/answer' && req.method === 'POST') {
+            const body = await readJsonBody(req);
+            try {
+              const result = await gradeQuestion(null, String(body?.questionId || ''), body?.selectedIndex);
+              return sendJson(res, 200, { ok: true, ...result });
+            } catch (err) {
+              const map = { NOT_FOUND: 404, INVALID_ID: 400, VALIDATION: 400 };
+              return sendJson(res, map[err.message] || 500, {
+                ok: false,
+                error: err.message,
+                details: err.details,
+              });
+            }
+          }
 
           if (path === '/api/rsvp' && req.method === 'POST') {
             const idem = req.headers['idempotency-key'];
@@ -616,6 +738,21 @@ function adminApiPlugin(env) {
             }
           }
 
+          if (path === '/api/admin/challenges/theme') {
+            try {
+              if (req.method === 'GET') {
+                return sendJson(res, 200, { ok: true, theme: await getDesafioTheme(null) });
+              }
+              if (req.method === 'PATCH') {
+                const body = await readJsonBody(req);
+                const theme = await updateDesafioTheme(null, body || {});
+                return sendJson(res, 200, { ok: true, theme });
+              }
+            } catch (err) {
+              return mapChallengeErr(err);
+            }
+          }
+
           if (path === '/api/admin/challenges/stamp-cards') {
             try {
               if (req.method === 'GET') {
@@ -738,7 +875,7 @@ export default defineConfig(({ mode }) => {
   return {
     root: '.',
     publicDir: 'public',
-    plugins: [react(), guestListApiPlugin(), adminApiPlugin(env), mercadopagoApiPlugin(env)],
+    plugins: [mpaSpaFallbackPlugin(), react(), guestListApiPlugin(), adminApiPlugin(env), mercadopagoApiPlugin(env)],
     build: {
       outDir: 'dist',
       emptyOutDir: true,

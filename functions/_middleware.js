@@ -20,18 +20,27 @@ export async function onRequest(context) {
     return context.next();
   }
 
-  // Static/SPA under /games
+  // Already under /games — serve normally (static + _redirects SPA fallback).
   if (url.pathname === '/games' || url.pathname.startsWith('/games/')) {
     return context.next();
   }
 
-  // Map desafio.* root (and unknown paths) onto the games SPA.
-  const rewritten = new URL(context.request.url);
-  rewritten.pathname = url.pathname === '/' || url.pathname === '' ? '/games/' : `/games${url.pathname}`;
-
-  if (context.env?.ASSETS) {
-    return context.env.ASSETS.fetch(new Request(rewritten.toString(), context.request));
+  // Root and unknown paths → games SPA.
+  // Prefer an explicit 302 to /games/ (proven 200 in production) so we never
+  // depend on ASSETS.fetch path quirks for the host apex.
+  if (url.pathname === '/' || url.pathname === '') {
+    return Response.redirect(new URL('/games/', url).toString(), 302);
   }
 
-  return Response.redirect(rewritten.toString(), 302);
+  const assetPath =
+    url.pathname.includes('.') ? `/games${url.pathname}` : `/games/index.html`;
+
+  if (context.env?.ASSETS) {
+    const assetUrl = new URL(assetPath, url.origin);
+    const res = await context.env.ASSETS.fetch(new Request(assetUrl.toString(), context.request));
+    if (res.status !== 404) return res;
+    return context.env.ASSETS.fetch(new Request(new URL('/games/index.html', url.origin).toString(), context.request));
+  }
+
+  return Response.redirect(new URL('/games/', url).toString(), 302);
 }

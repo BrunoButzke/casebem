@@ -2,6 +2,6 @@
 /app    /app/index.html   200
 /app/*  /app/index.html   200
 
-# SPA Games (React) — game.casebem.com → /games via middleware
+# SPA Games (React) — desafio.casebem.com → /games via middleware (path interno /games/)
 /games    /games/index.html   200
 /games/*  /games/index.html   200

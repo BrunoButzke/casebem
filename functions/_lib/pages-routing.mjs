@@ -53,6 +53,10 @@ export function resolvePagesRoute(hostname, pathname) {
     return { action: 'rewrite', assetPath: '/games/' };
   }
 
+  if (path === '/' || path === '') {
+    return { action: 'redirect', pathname: '/landing-page-animada/' };
+  }
+
   const spaIndex = spaIndexForPath(path);
   if (spaIndex) return { action: 'rewrite', assetPath: spaIndex };
 

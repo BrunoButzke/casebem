@@ -41,10 +41,9 @@ test('nested /games routes on casebem.com rewrite to the games directory, not in
   });
 });
 
-test('existing /games and / on casebem.com are served as static files', () => {
+test('existing /games on casebem.com is served as a static file', () => {
   assert.deepEqual(resolvePagesRoute('casebem.com', '/games'), { action: 'next' });
   assert.deepEqual(resolvePagesRoute('casebem.com', '/games/'), { action: 'next' });
-  assert.deepEqual(resolvePagesRoute('casebem.com', '/'), { action: 'next' });
   assert.deepEqual(resolvePagesRoute('casebem.com', '/games/index.html'), { action: 'next' });
   assert.deepEqual(resolvePagesRoute('casebem.com', '/assets/casebemGames.js'), { action: 'next' });
   assert.deepEqual(resolvePagesRoute('casebem.com', '/api/desafio/gallery'), { action: 'next' });
@@ -87,6 +86,17 @@ test('desafio.casebem.com strips the leftover /games prefix', () => {
   });
 });
 
+test('casebem.com root redirects to the product landing', () => {
+  assert.deepEqual(resolvePagesRoute('casebem.com', '/'), {
+    action: 'redirect',
+    pathname: '/landing-page-animada/',
+  });
+  assert.deepEqual(resolvePagesRoute('www.casebem.com', '/'), {
+    action: 'redirect',
+    pathname: '/landing-page-animada/',
+  });
+});
+
 test('games router basename is / on the desafio host and /games elsewhere', () => {
   assert.equal(gamesRouterBasename('desafio.casebem.com'), '/');
   assert.equal(gamesRouterBasename('www.desafio.casebem.com'), '/');
@@ -108,6 +118,12 @@ test('middleware serves games HTML at desafio.casebem.com root and nested paths'
   assert.equal((await onRequest(nested.context)).status, 200);
   assert.deepEqual(root.fetched, ['/games/']);
   assert.deepEqual(nested.fetched, ['/games/']);
+});
+
+test('middleware redirects casebem.com / to the landing page', async () => {
+  const res = await onRequest(mockContext('https://casebem.com/').context);
+  assert.equal(res.status, 302);
+  assert.equal(res.headers.get('location'), 'https://casebem.com/landing-page-animada/');
 });
 
 test('middleware redirects /games on desafio.casebem.com to the host root path', async () => {

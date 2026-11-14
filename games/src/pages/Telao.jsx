@@ -13,6 +13,14 @@ function prevId(playlist, currentId) {
   return playlist[(i - 1 + playlist.length) % playlist.length];
 }
 
+function markOrientation(img) {
+  if (!img) return;
+  const ready = img.naturalWidth > 0 && img.naturalHeight > 0;
+  const portrait = ready && img.naturalHeight > img.naturalWidth;
+  img.classList.toggle('is-portrait', portrait);
+  img.classList.toggle('is-landscape', ready && !portrait);
+}
+
 function fullscreenEl() {
   return document.fullscreenElement || document.webkitFullscreenElement || null;
 }
@@ -192,7 +200,14 @@ export default function Telao() {
       <div className="telao-stage">
         {photo?.preview ? (
           <figure className="telao-slide">
-            <img src={photo.preview} alt={photo.title} />
+            <img
+              src={photo.preview}
+              alt={photo.title}
+              onLoad={(e) => markOrientation(e.currentTarget)}
+              ref={(el) => {
+                if (el?.complete) markOrientation(el);
+              }}
+            />
             <figcaption>
               <strong>{photo.title}</strong>
               <span>{photo.guestName}</span>

@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link
-    href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Outfit:wght@300;400;500;600;700&display=swap"
+    href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Great+Vibes&family=Outfit:wght@300;400;500;600;700&display=swap"
     rel="stylesheet"
   />
   <link rel="stylesheet" href="/src/dani-carine/admin.css" />
@@ -182,7 +182,7 @@
               <div class="admin-entertainment-grid" id="entertainment-grid">
                 <button type="button" class="admin-entertainment-card" id="open-challenges-section">
                   <h3 class="admin-entertainment-card__title">Desafios</h3>
-                  <p class="admin-entertainment-card__lead">Quiz, fotos e cartões de selos</p>
+                  <p class="admin-entertainment-card__lead">Quiz e missões de foto</p>
                   <p class="sub">Abrir cadastro</p>
                 </button>
                 <article class="admin-entertainment-card">
@@ -190,19 +190,108 @@
                   <p class="admin-entertainment-card__lead">Placar ao vivo da festa</p>
                   <p class="sub">Em breve</p>
                 </article>
+                <button type="button" class="admin-entertainment-card" id="open-game-section">
+                  <h3 class="admin-entertainment-card__title">Visual</h3>
+                  <p class="admin-entertainment-card__lead">Paleta e cartões de selos</p>
+                  <p class="sub">Abrir</p>
+                </button>
                 <article class="admin-entertainment-card">
-                  <h3 class="admin-entertainment-card__title">Jogos</h3>
-                  <p class="admin-entertainment-card__lead">Dinâmicas rápidas para animar a pista</p>
+                  <h3 class="admin-entertainment-card__title">Vendas e sorteios</h3>
+                  <p class="admin-entertainment-card__lead">Loja e rifas da festa</p>
                   <p class="sub">Em breve</p>
                 </article>
               </div>
+            </article>
+
+            <article class="admin-card admin-section" data-section="game-visual" hidden>
+              <div class="admin-card__head">
+                <div>
+                  <h2>Visual</h2>
+                  <p class="admin-card__lead">Paleta do app e cartões fidelidade</p>
+                </div>
+                <div class="card-actions">
+                  <button type="button" class="btn" id="save-desafio-theme">Salvar paleta</button>
+                </div>
+              </div>
+              <p class="desafio-theme-label">Paleta do app</p>
+              <div class="desafio-theme-colors" id="desafio-theme-app-colors">
+                <label>Fundo 1 <input type="color" data-theme-key="appBgFrom" /></label>
+                <label>Fundo 2 <input type="color" data-theme-key="appBgMid" /></label>
+                <label>Fundo 3 <input type="color" data-theme-key="appBgTo" /></label>
+                <label>Rosa <input type="color" data-theme-key="appRose" /></label>
+                <label>Rosa escuro <input type="color" data-theme-key="appRoseDeep" /></label>
+                <label>Texto <input type="color" data-theme-key="appInk" /></label>
+                <label>Suave <input type="color" data-theme-key="appMuted" /></label>
+              </div>
+
+              <div class="admin-card__head admin-card__head--sub">
+                <div>
+                  <h3 class="admin-subhead">Cartão</h3>
+                  <p class="admin-card__lead">Enche por selo de foto ou por pontos do jogo</p>
+                </div>
+                <div class="card-actions">
+                  <button type="button" class="btn" id="save-stamp-card">Salvar cartão</button>
+                  <button type="button" class="btn btn--icon" id="open-create-stamp-card" title="Novo cartão" aria-label="Novo cartão">+</button>
+                </div>
+              </div>
+              <input type="hidden" id="theme-stamp-card-id" value="" />
+              <input type="hidden" id="theme-card-fill-mode" value="stamp" />
+              <div class="desafio-theme-layout">
+                <div class="desafio-theme-fields">
+                  <div class="card-mode" role="group" aria-label="Como o cartão enche">
+                    <button type="button" class="card-mode__btn is-active" data-fill-mode="stamp">Por selo</button>
+                    <button type="button" class="card-mode__btn" data-fill-mode="points">Por ponto</button>
+                  </div>
+                  <p class="stamp-card-hint" id="theme-card-mode-hint">Cada foto que vale selo preenche 1 bolinha</p>
+                  <div class="admin-field">
+                    <label for="theme-card-title">Título do cartão</label>
+                    <input id="theme-card-title" type="text" maxlength="80" placeholder="Ex.: Cartão vale drink" />
+                  </div>
+                  <div class="stamp-card-grid">
+                    <div class="admin-field">
+                      <label for="theme-card-slots">Bolinhas (1–12)</label>
+                      <input id="theme-card-slots" type="number" min="1" max="12" step="1" />
+                    </div>
+                    <div class="admin-field" id="theme-card-points-wrap" hidden>
+                      <label for="theme-card-points-per-slot">Pontos por bolinha</label>
+                      <input id="theme-card-points-per-slot" type="number" min="1" max="999" step="1" value="10" />
+                    </div>
+                  </div>
+                  <p class="desafio-theme-label">Cores do cartão</p>
+                  <div class="desafio-theme-colors">
+                    <label>Fundo <input type="color" data-card-key="cardBg" /></label>
+                    <label>Destaque <input type="color" data-card-key="cardAccent" /></label>
+                    <label>Destaque suave <input type="color" data-card-key="cardAccentSoft" /></label>
+                    <label>Texto <input type="color" data-card-key="cardText" /></label>
+                    <label>Borda <input type="color" data-card-key="cardBorder" /></label>
+                  </div>
+                  <div class="admin-field">
+                    <label for="theme-card-reward">Texto do prêmio</label>
+                    <input id="theme-card-reward" type="text" maxlength="120" placeholder="Ex.: drinks secretos liberados!" />
+                  </div>
+                  <div class="admin-field">
+                    <label for="theme-card-bar">Dica do bar</label>
+                    <input id="theme-card-bar" type="text" maxlength="120" />
+                  </div>
+                  <div class="admin-field">
+                    <label for="theme-card-footer" id="theme-card-footer-label">Rodapé (use {n} para o que falta)</label>
+                    <input id="theme-card-footer" type="text" maxlength="160" />
+                  </div>
+                </div>
+                <div class="desafio-theme-preview-wrap">
+                  <p class="desafio-theme-label">Prévia</p>
+                  <div id="desafio-loyalty-preview" class="loyalty-card" aria-live="polite"></div>
+                  <p class="sub" id="loyalty-preview-caption">Prévia com 1 bolinha preenchida</p>
+                </div>
+              </div>
+              <div id="stamp-cards-grid" class="admin-challenges-grid"></div>
             </article>
 
             <article class="admin-card admin-section" data-section="challenges" hidden>
               <div class="admin-card__head">
                 <div>
                   <h2>Desafios</h2>
-                  <p class="admin-card__lead">Perguntas, missões de foto e cartões de selos</p>
+                  <p class="admin-card__lead">Perguntas e missões de foto</p>
                 </div>
               </div>
 
@@ -227,17 +316,6 @@
                 </div>
               </div>
               <div id="photo-missions-grid" class="admin-challenges-grid"></div>
-
-              <div class="admin-card__head admin-card__head--sub">
-                <div>
-                  <h3 class="admin-subhead">Cartões de selos</h3>
-                  <p class="admin-card__lead">Meta de selos e prêmio ao completar</p>
-                </div>
-                <div class="card-actions">
-                  <button type="button" class="btn btn--icon" id="open-create-stamp-card" title="Novo cartão" aria-label="Novo cartão">+</button>
-                </div>
-              </div>
-              <div id="stamp-cards-grid" class="admin-challenges-grid"></div>
             </article>
 
             <article class="admin-card admin-section" data-section="media" hidden>
@@ -473,36 +551,6 @@
     </form>
   </dialog>
 
-  <dialog class="admin-modal" id="modal-stamp-card">
-    <form method="dialog" class="admin-modal__panel">
-      <header class="admin-modal__head">
-        <h3 id="sc-modal-title">Novo cartão de selos</h3>
-        <button type="submit" class="admin-modal__close" value="cancel" aria-label="Fechar">×</button>
-      </header>
-      <input type="hidden" id="sc-edit-id" value="" />
-      <div class="admin-field">
-        <label for="sc-name">Nome</label>
-        <input id="sc-name" type="text" maxlength="80" placeholder="Ex.: Drink do casamento" />
-      </div>
-      <div class="admin-field">
-        <label for="sc-stamps">Selos para completar</label>
-        <input id="sc-stamps" type="number" min="1" max="50" step="1" placeholder="5" />
-      </div>
-      <div class="admin-field">
-        <label for="sc-reward">Prêmio</label>
-        <input id="sc-reward" type="text" maxlength="200" placeholder="Ex.: Um drink no bar" />
-      </div>
-      <label class="gift-active-row">
-        <input id="sc-active" type="checkbox" checked />
-        <span>Ativo</span>
-      </label>
-      <div class="admin-modal__actions">
-        <button type="submit" class="btn btn--ghost" value="cancel">Cancelar</button>
-        <button type="button" class="btn" id="save-stamp-card-btn">Salvar</button>
-      </div>
-    </form>
-  </dialog>
-
   <dialog class="admin-modal" id="modal-create-stationery">
     <form method="dialog" class="admin-modal__panel">
       <header class="admin-modal__head">
@@ -611,6 +659,7 @@
       card?.classList.add('admin-section--enter');
       window.scrollTo({ top: 0, behavior: 'smooth' });
       if (id === 'challenges') void loadChallengesEditor();
+      if (id === 'game-visual') void loadGameVisualEditor();
       if (id === 'catalog') void loadCatalogEditor();
       if (id === 'stationery') void loadStationeryEditor();
     }
@@ -622,6 +671,7 @@
     });
 
     $('open-challenges-section')?.addEventListener('click', () => openSection('challenges'));
+    $('open-game-section')?.addEventListener('click', () => openSection('game-visual'));
 
     $('hub-back')?.addEventListener('click', () => showHub());
 
@@ -833,8 +883,154 @@
       </tbody></table></div>`;
     }
 
+    let cachedDesafioTheme = null;
+
     async function loadChallengesEditor() {
-      await Promise.all([loadQuestions(), loadPhotoMissions(), loadStampCards()]);
+      await Promise.all([loadQuestions(), loadPhotoMissions()]);
+    }
+
+    async function loadGameVisualEditor() {
+      await loadDesafioTheme();
+      await loadStampCards();
+      const editId = $('theme-stamp-card-id')?.value?.trim();
+      const selected =
+        (editId && cachedStampCards.find((c) => c.id === editId)) || cachedStampCards[0] || null;
+      if (selected) applyStampCardToForm(selected);
+      else startNewStampCardForm(false);
+    }
+
+    function cardProgress(card, scores = {}) {
+      const slots = Math.max(1, Math.min(12, Number(card?.stampsRequired) || 5));
+      const fillMode = card?.fillMode === 'points' ? 'points' : 'stamp';
+      const pointsPerSlot = Math.max(1, Math.min(999, Number(card?.pointsPerSlot) || 10));
+      if (fillMode === 'points') {
+        const points = Math.max(0, Number(scores.points) || 0);
+        const filled = Math.min(slots, Math.floor(points / pointsPerSlot));
+        return { slots, filled, remaining: Math.max(0, slots * pointsPerSlot - points), fillMode, pointsPerSlot };
+      }
+      const stamps = Math.max(0, Number(scores.stamps) || 0);
+      const filled = Math.min(slots, stamps);
+      return { slots, filled, remaining: Math.max(0, slots - filled), fillMode, pointsPerSlot };
+    }
+
+    function syncCardModeUi() {
+      const mode = $('theme-card-fill-mode')?.value === 'points' ? 'points' : 'stamp';
+      document.querySelectorAll('[data-fill-mode]').forEach((btn) => {
+        btn.classList.toggle('is-active', btn.getAttribute('data-fill-mode') === mode);
+      });
+      const pointsWrap = $('theme-card-points-wrap');
+      if (pointsWrap) pointsWrap.hidden = mode !== 'points';
+      const slots = Math.max(1, Number($('theme-card-slots')?.value || 5));
+      const pps = Math.max(1, Number($('theme-card-points-per-slot')?.value || 10));
+      const hint = $('theme-card-mode-hint');
+      if (hint) {
+        hint.textContent =
+          mode === 'points'
+            ? `${slots} bolinhas × ${pps} pts = ${slots * pps} pts para o brinde`
+            : 'Cada foto que vale selo preenche 1 bolinha';
+      }
+      const footerLabel = $('theme-card-footer-label');
+      if (footerLabel) {
+        footerLabel.textContent =
+          mode === 'points' ? 'Rodapé (use {n} para os pontos que faltam)' : 'Rodapé (use {n} para os selos que faltam)';
+      }
+      const caption = $('loyalty-preview-caption');
+      if (caption) {
+        caption.textContent =
+          mode === 'points'
+            ? `Prévia com 1 bolinha (${pps} pts) e nome de exemplo`
+            : 'Prévia com 1 selo preenchido e nome de exemplo';
+      }
+    }
+
+    function setFillMode(mode) {
+      const value = mode === 'points' ? 'points' : 'stamp';
+      if ($('theme-card-fill-mode')) $('theme-card-fill-mode').value = value;
+      syncCardModeUi();
+      renderLoyaltyPreview();
+    }
+
+    function renderLoyaltyPreview() {
+      const el = $('desafio-loyalty-preview');
+      if (!el) return;
+      const card = readCardForm();
+      const guestName = 'Bruno';
+      const scores = card.fillMode === 'points' ? { points: card.pointsPerSlot } : { stamps: 1 };
+      const progress = cardProgress(card, scores);
+      el.style.setProperty('--lc-bg', card.cardBg);
+      el.style.setProperty('--lc-accent', card.cardAccent);
+      el.style.setProperty('--lc-accent-soft', card.cardAccentSoft);
+      el.style.setProperty('--lc-text', card.cardText);
+      el.style.setProperty('--lc-border', card.cardBorder);
+      const footer = String(card.footerTemplate || '').replace('{n}', String(progress.remaining));
+      el.innerHTML = `
+        <p class="loyalty-card__title">${escapeHtml(card.name || 'Título do cartão')}</p>
+        <p class="loyalty-card__name">${escapeHtml(guestName)}</p>
+        <div class="loyalty-card__slots">
+          ${Array.from({ length: progress.slots }, (_, i) => {
+            const on = i < progress.filled;
+            return `<span class="loyalty-card__slot ${on ? 'is-filled' : ''}">${on ? '♥♥♥' : i + 1}</span>`;
+          }).join('')}
+        </div>
+        <div class="loyalty-card__banner">
+          <strong>🥂 ${progress.filled} ${escapeHtml(card.rewardText || 'prêmio')}</strong>
+          <span>${escapeHtml(card.barHint)}</span>
+        </div>
+        <p class="loyalty-card__footer">${escapeHtml(footer)}</p>
+      `;
+    }
+
+    const DEFAULT_CARD_PALETTE = {
+      cardBg: '#fdfbf8',
+      cardAccent: '#d66d81',
+      cardAccentSoft: '#f9e4e8',
+      cardText: '#7d6e6a',
+      cardBorder: '#e8b4bc',
+      barHint: 'Mostre este cartão no bar',
+      footerTemplate: 'Faltam {n} pontos para o próximo drink 🍸',
+    };
+
+    function readCardForm() {
+      const card = {};
+      document.querySelectorAll('[data-card-key]').forEach((input) => {
+        card[input.getAttribute('data-card-key')] = input.value;
+      });
+      card.name = $('theme-card-title')?.value?.trim() || '';
+      card.stampsRequired = Number($('theme-card-slots')?.value || 5);
+      card.rewardText = $('theme-card-reward')?.value?.trim() || '';
+      card.barHint = $('theme-card-bar')?.value?.trim() || DEFAULT_CARD_PALETTE.barHint;
+      card.footerTemplate = $('theme-card-footer')?.value?.trim() || DEFAULT_CARD_PALETTE.footerTemplate;
+      card.fillMode = $('theme-card-fill-mode')?.value === 'points' ? 'points' : 'stamp';
+      card.pointsPerSlot = Number($('theme-card-points-per-slot')?.value || 10);
+      return card;
+    }
+
+    function readThemeForm() {
+      const theme = { ...(cachedDesafioTheme || {}) };
+      document.querySelectorAll('[data-theme-key]').forEach((input) => {
+        theme[input.getAttribute('data-theme-key')] = input.value;
+      });
+      return theme;
+    }
+
+    function fillAppThemeForm(theme) {
+      cachedDesafioTheme = theme;
+      document.querySelectorAll('[data-theme-key]').forEach((input) => {
+        const key = input.getAttribute('data-theme-key');
+        if (theme[key]) input.value = theme[key];
+      });
+    }
+
+    function fillThemeForm(theme) {
+      fillAppThemeForm(theme);
+      renderLoyaltyPreview();
+    }
+
+    async function loadDesafioTheme() {
+      const res = await fetch('/api/admin/challenges/theme', { headers: authHeaders() });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) return;
+      fillThemeForm(data.theme);
     }
 
     async function loadQuestions() {
@@ -876,6 +1072,55 @@
       grid.innerHTML = renderStampCards(cachedStampCards);
     }
 
+    function stampCardSummary(c) {
+      if (c.fillMode === 'points') {
+        const pps = Number(c.pointsPerSlot) || 10;
+        return `Por ponto · ${c.stampsRequired} bolinhas · ${pps} pts cada · ${c.stampsRequired * pps} pts no total`;
+      }
+      return `Por selo · ${c.stampsRequired} bolinhas`;
+    }
+
+    function applyStampCardToForm(c) {
+      if ($('theme-stamp-card-id')) $('theme-stamp-card-id').value = c?.id || '';
+      if ($('theme-card-title')) $('theme-card-title').value = c?.name || '';
+      if ($('theme-card-slots')) $('theme-card-slots').value = String(c?.stampsRequired || 5);
+      if ($('theme-card-reward')) $('theme-card-reward').value = c?.rewardText || '';
+      if ($('theme-card-bar')) $('theme-card-bar').value = c?.barHint || DEFAULT_CARD_PALETTE.barHint;
+      if ($('theme-card-footer')) $('theme-card-footer').value = c?.footerTemplate || DEFAULT_CARD_PALETTE.footerTemplate;
+      if ($('theme-card-points-per-slot')) {
+        $('theme-card-points-per-slot').value = String(c?.pointsPerSlot || 10);
+      }
+      document.querySelectorAll('[data-card-key]').forEach((input) => {
+        const key = input.getAttribute('data-card-key');
+        input.value = c?.[key] || DEFAULT_CARD_PALETTE[key] || input.value;
+      });
+      if ($('theme-card-fill-mode')) $('theme-card-fill-mode').value = c?.fillMode === 'points' ? 'points' : 'stamp';
+      syncCardModeUi();
+      renderLoyaltyPreview();
+      const grid = $('stamp-cards-grid');
+      if (grid) grid.innerHTML = renderStampCards(cachedStampCards);
+    }
+
+    function startNewStampCardForm(focus = true) {
+      if ($('theme-stamp-card-id')) $('theme-stamp-card-id').value = '';
+      if ($('theme-card-title')) $('theme-card-title').value = '';
+      if ($('theme-card-slots')) $('theme-card-slots').value = '5';
+      if ($('theme-card-reward')) $('theme-card-reward').value = '';
+      if ($('theme-card-bar')) $('theme-card-bar').value = DEFAULT_CARD_PALETTE.barHint;
+      if ($('theme-card-footer')) $('theme-card-footer').value = DEFAULT_CARD_PALETTE.footerTemplate;
+      if ($('theme-card-points-per-slot')) $('theme-card-points-per-slot').value = '10';
+      document.querySelectorAll('[data-card-key]').forEach((input) => {
+        const key = input.getAttribute('data-card-key');
+        if (DEFAULT_CARD_PALETTE[key]) input.value = DEFAULT_CARD_PALETTE[key];
+      });
+      if ($('theme-card-fill-mode')) $('theme-card-fill-mode').value = 'stamp';
+      syncCardModeUi();
+      renderLoyaltyPreview();
+      const grid = $('stamp-cards-grid');
+      if (grid) grid.innerHTML = renderStampCards(cachedStampCards);
+      if (focus) requestAnimationFrame(() => $('theme-card-title')?.focus());
+    }
+
     function renderQuestions(rows) {
       if (!rows.length) return '<p class="sub">Nenhuma pergunta — use + para adicionar.</p>';
       return rows
@@ -910,17 +1155,21 @@
     }
 
     function renderStampCards(rows) {
-      if (!rows.length) return '<p class="sub">Nenhum cartão — use + para adicionar.</p>';
+      if (!rows.length) return '<p class="sub">Nenhum cartão — preencha o formulário e salve, ou use +.</p>';
+      const selectedId = $('theme-stamp-card-id')?.value?.trim() || '';
       return rows
-        .map((c) => `<article class="admin-challenge-card ${c.active ? '' : 'is-inactive'}" data-sc-id="${escapeHtml(c.id)}">
+        .map((c) => {
+          const selected = c.id === selectedId ? ' is-selected' : '';
+          return `<article class="admin-challenge-card${selected}${c.active ? '' : ' is-inactive'}" data-sc-id="${escapeHtml(c.id)}">
           <h3>${escapeHtml(c.name)}</h3>
-          <p class="admin-challenge-card__meta">${c.stampsRequired} selos → ${escapeHtml(c.rewardText)}</p>
+          <p class="admin-challenge-card__meta">${escapeHtml(stampCardSummary(c))}</p>
           ${c.active ? '' : '<span class="pill muted">inativo</span>'}
           <div class="row-actions admin-challenge-card__actions">
             <button type="button" class="btn btn--ghost btn--sm" data-sc-edit="${escapeHtml(c.id)}">Editar</button>
             <button type="button" class="btn btn--ghost btn--sm" data-sc-remove="${escapeHtml(c.id)}">Remover</button>
           </div>
-        </article>`)
+        </article>`;
+        })
         .join('');
     }
 
@@ -951,17 +1200,6 @@
       $('pm-active').checked = m ? Boolean(m.active) : true;
       openModal('modal-photo-mission');
       requestAnimationFrame(() => $('pm-title').focus());
-    }
-
-    function openStampCardForm(c) {
-      $('sc-edit-id').value = c?.id || '';
-      $('sc-modal-title').textContent = c ? 'Editar cartão' : 'Novo cartão de selos';
-      $('sc-name').value = c?.name || '';
-      $('sc-stamps').value = c ? String(c.stampsRequired) : '5';
-      $('sc-reward').value = c?.rewardText || '';
-      $('sc-active').checked = c ? Boolean(c.active) : true;
-      openModal('modal-stamp-card');
-      requestAnimationFrame(() => $('sc-name').focus());
     }
 
     function renderStationery(rows) {
@@ -1440,11 +1678,103 @@
     bindModalDismiss('modal-create-stationery');
     bindModalDismiss('modal-question');
     bindModalDismiss('modal-photo-mission');
-    bindModalDismiss('modal-stamp-card');
 
     $('open-create-question')?.addEventListener('click', () => openQuestionForm(null));
     $('open-create-photo-mission')?.addEventListener('click', () => openPhotoMissionForm(null));
-    $('open-create-stamp-card')?.addEventListener('click', () => openStampCardForm(null));
+    $('open-create-stamp-card')?.addEventListener('click', () => startNewStampCardForm(true));
+
+    document
+      .querySelectorAll(
+        '[data-theme-key], [data-card-key], #theme-card-title, #theme-card-slots, #theme-card-points-per-slot, #theme-card-reward, #theme-card-bar, #theme-card-footer'
+      )
+      .forEach((el) => {
+        el?.addEventListener('input', () => {
+          syncCardModeUi();
+          renderLoyaltyPreview();
+          const grid = $('stamp-cards-grid');
+          if (grid && cachedStampCards.length) grid.innerHTML = renderStampCards(cachedStampCards);
+        });
+      });
+
+    document.querySelectorAll('[data-fill-mode]').forEach((btn) => {
+      btn.addEventListener('click', () => setFillMode(btn.getAttribute('data-fill-mode')));
+    });
+
+    $('save-desafio-theme')?.addEventListener('click', async () => {
+      const themeRes = await fetch('/api/admin/challenges/theme', {
+        method: 'PATCH',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify(readThemeForm()),
+      });
+      const themeData = await themeRes.json().catch(() => ({}));
+      if (!themeRes.ok || !themeData.ok) {
+        $('panel-err').hidden = false;
+        $('panel-err').textContent =
+          (themeData.details && themeData.details.join(', ')) ||
+          themeData.message ||
+          themeData.error ||
+          'Falha ao salvar paleta';
+        return;
+      }
+      fillAppThemeForm(themeData.theme);
+      $('panel-err').hidden = true;
+    });
+
+    async function saveStampCard() {
+      const editId = $('theme-stamp-card-id')?.value?.trim() || '';
+      const card = readCardForm();
+      const cardBody = {
+        name: card.name,
+        stampsRequired: Number(card.stampsRequired) || 5,
+        rewardText: card.rewardText,
+        fillMode: card.fillMode,
+        pointsPerSlot: Number(card.pointsPerSlot) || 10,
+        cardBg: card.cardBg,
+        cardAccent: card.cardAccent,
+        cardAccentSoft: card.cardAccentSoft,
+        cardText: card.cardText,
+        cardBorder: card.cardBorder,
+        barHint: card.barHint,
+        footerTemplate: card.footerTemplate,
+        active: true,
+      };
+      const cardRes = await fetch('/api/admin/challenges/stamp-cards', {
+        method: editId ? 'PATCH' : 'POST',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify(editId ? { id: editId, ...cardBody } : cardBody),
+      });
+      const cardData = await cardRes.json().catch(() => ({}));
+      if (!cardRes.ok || !cardData.ok) {
+        $('panel-err').hidden = false;
+        $('panel-err').textContent =
+          (cardData.details && cardData.details.join(', ')) ||
+          cardData.message ||
+          cardData.error ||
+          'Falha ao salvar cartão';
+        return;
+      }
+      const saved = cardData.stampCard;
+      if (saved?.id && $('theme-stamp-card-id')) $('theme-stamp-card-id').value = saved.id;
+      if (cardData.stampCards) {
+        cachedStampCards = cardData.stampCards;
+      } else if (saved) {
+        const idx = cachedStampCards.findIndex((c) => c.id === saved.id);
+        if (idx >= 0) cachedStampCards[idx] = saved;
+        else cachedStampCards.push(saved);
+      } else {
+        await loadStampCards();
+      }
+      if (saved) applyStampCardToForm(saved);
+      else {
+        const grid = $('stamp-cards-grid');
+        if (grid) grid.innerHTML = renderStampCards(cachedStampCards);
+      }
+      $('panel-err').hidden = true;
+    }
+
+    $('save-stamp-card')?.addEventListener('click', () => {
+      void saveStampCard();
+    });
 
     $('questions-grid')?.addEventListener('click', async (ev) => {
       const edit = ev.target.closest('[data-q-edit]');
@@ -1501,7 +1831,7 @@
       const remove = ev.target.closest('[data-sc-remove]');
       if (edit) {
         const c = cachedStampCards.find((x) => x.id === edit.getAttribute('data-sc-edit'));
-        if (c) openStampCardForm(c);
+        if (c) applyStampCardToForm(c);
         return;
       }
       if (remove) {
@@ -1517,7 +1847,14 @@
           $('panel-err').textContent = data.message || data.error || 'Falha ao remover';
           return;
         }
-        await loadStampCards();
+        cachedStampCards = data.stampCards || cachedStampCards.filter((c) => c.id !== id);
+        if ($('theme-stamp-card-id')?.value === id) {
+          if (cachedStampCards[0]) applyStampCardToForm(cachedStampCards[0]);
+          else startNewStampCardForm(false);
+        } else {
+          const grid = $('stamp-cards-grid');
+          if (grid) grid.innerHTML = renderStampCards(cachedStampCards);
+        }
       }
     });
 
@@ -1577,30 +1914,6 @@
       }
       closeModal('modal-photo-mission');
       await loadPhotoMissions();
-    });
-
-    $('save-stamp-card-btn')?.addEventListener('click', async () => {
-      const editId = $('sc-edit-id').value.trim();
-      const body = {
-        name: $('sc-name').value,
-        stampsRequired: Number($('sc-stamps').value),
-        rewardText: $('sc-reward').value,
-        active: $('sc-active').checked,
-      };
-      const res = await fetch('/api/admin/challenges/stamp-cards', {
-        method: editId ? 'PATCH' : 'POST',
-        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify(editId ? { id: editId, ...body } : body),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.ok) {
-        $('panel-err').hidden = false;
-        $('panel-err').textContent =
-          (data.details && data.details.join(', ')) || data.message || data.error || 'Falha ao salvar cartão';
-        return;
-      }
-      closeModal('modal-stamp-card');
-      await loadStampCards();
     });
 
     $('open-create-gift').addEventListener('click', () => openGiftForm(null));

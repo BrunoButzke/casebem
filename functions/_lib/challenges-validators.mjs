@@ -15,6 +15,10 @@ export const CHALLENGE_LIMITS = {
   NAME_MAX: 80,
   REWARD_MIN: 2,
   REWARD_MAX: 200,
+  BAR_HINT_MIN: 2,
+  BAR_HINT_MAX: 120,
+  FOOTER_MIN: 2,
+  FOOTER_MAX: 160,
   OPTIONS_MIN: 2,
   OPTIONS_MAX: 4,
   POINTS_MIN: 1,
@@ -24,6 +28,80 @@ export const CHALLENGE_LIMITS = {
   ID_MIN: 2,
   ID_MAX: 40,
 };
+
+export const DEFAULT_STAMP_CARD_PALETTE = {
+  cardBg: '#fdfbf8',
+  cardAccent: '#d66d81',
+  cardAccentSoft: '#f9e4e8',
+  cardText: '#7d6e6a',
+  cardBorder: '#e8b4bc',
+  barHint: 'Mostre este cartão no bar',
+  footerTemplate: 'Faltam {n} pontos para o próximo drink 🍸',
+};
+
+export const DEFAULT_FILL_MODE = 'stamp';
+export const DEFAULT_POINTS_PER_SLOT = 10;
+
+function parseFillMode(raw) {
+  if (raw === undefined || raw === null || String(raw).trim() === '') return DEFAULT_FILL_MODE;
+  const v = String(raw).trim();
+  if (v === 'stamp' || v === 'points') return v;
+  return null;
+}
+
+function parsePointsPerSlot(raw, errors, { fallback = false } = {}) {
+  if (raw === undefined || raw === null || String(raw).trim() === '') {
+    return fallback ? DEFAULT_POINTS_PER_SLOT : undefined;
+  }
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < CHALLENGE_LIMITS.POINTS_MIN || n > CHALLENGE_LIMITS.POINTS_MAX) {
+    errors.push('pointsPerSlot inválido');
+    return null;
+  }
+  return n;
+}
+
+const HEX = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+
+function isHex(v) {
+  return typeof v === 'string' && HEX.test(v.trim());
+}
+
+function parsePaletteFields(body, { required = false } = {}) {
+  const errors = [];
+  const out = {};
+  const colorKeys = ['cardBg', 'cardAccent', 'cardAccentSoft', 'cardText', 'cardBorder'];
+
+  for (const key of colorKeys) {
+    if (body?.[key] !== undefined) {
+      const v = String(body[key] || '').trim();
+      if (!isHex(v)) errors.push(`${key} inválido (use #RGB ou #RRGGBB)`);
+      else out[key] = v.toLowerCase();
+    } else if (required) {
+      out[key] = DEFAULT_STAMP_CARD_PALETTE[key];
+    }
+  }
+
+  if (body?.barHint !== undefined) {
+    const t = String(body.barHint || '').trim();
+    if (t.length < CHALLENGE_LIMITS.BAR_HINT_MIN || t.length > CHALLENGE_LIMITS.BAR_HINT_MAX) {
+      errors.push('barHint inválido');
+    } else out.barHint = t;
+  } else if (required) {
+    out.barHint = DEFAULT_STAMP_CARD_PALETTE.barHint;
+  }
+
+  if (body?.footerTemplate !== undefined) {
+    const t = String(body.footerTemplate || '').trim();
+    if (t.length < CHALLENGE_LIMITS.FOOTER_MIN || t.length > CHALLENGE_LIMITS.FOOTER_MAX) {
+      errors.push('footerTemplate inválido');
+    } else out.footerTemplate = t;
+  } else if (required) {
+    out.footerTemplate = DEFAULT_STAMP_CARD_PALETTE.footerTemplate;
+  }
+
+  return { errors, data: out };
+}
 
 function normalizeOptions(raw) {
   return (Array.isArray(raw) ? raw : [])
@@ -216,6 +294,7 @@ export function validateStampCardCreate(body) {
   const rewardText = String(body?.rewardText || '').trim();
   const stampsRequired = Number(body?.stampsRequired);
   const id = parseId(body, name);
+  const palette = parsePaletteFields(body, { required: true });
 
   validateId(id, errors);
   if (name.length < CHALLENGE_LIMITS.NAME_MIN || name.length > CHALLENGE_LIMITS.NAME_MAX) {
@@ -231,6 +310,11 @@ export function validateStampCardCreate(body) {
   if (rewardText.length < CHALLENGE_LIMITS.REWARD_MIN || rewardText.length > CHALLENGE_LIMITS.REWARD_MAX) {
     errors.push('rewardText inválido');
   }
+  errors.push(...palette.errors);
+
+  const fillMode = parseFillMode(body?.fillMode);
+  if (!fillMode) errors.push('fillMode inválido');
+  const pointsPerSlot = parsePointsPerSlot(body?.pointsPerSlot, errors, { fallback: true });
 
   return {
     valid: errors.length === 0,
@@ -240,6 +324,9 @@ export function validateStampCardCreate(body) {
       name,
       stampsRequired,
       rewardText,
+      fillMode: fillMode || DEFAULT_FILL_MODE,
+      pointsPerSlot: pointsPerSlot ?? DEFAULT_POINTS_PER_SLOT,
+      ...palette.data,
       active: body?.active !== false,
       sortOrder: parseSortOrder(body),
     },
@@ -249,6 +336,7 @@ export function validateStampCardCreate(body) {
 export function validateStampCardPatch(body) {
   const errors = [];
   const out = {};
+  const palette = parsePaletteFields(body, { required: false });
 
   if (body.name !== undefined) {
     const name = String(body.name || '').trim();
@@ -275,6 +363,17 @@ export function validateStampCardPatch(body) {
     } else out.rewardText = rewardText;
   }
 
+  if (body.fillMode !== undefined) {
+    const fillMode = parseFillMode(body.fillMode);
+    if (!fillMode) errors.push('fillMode inválido');
+    else out.fillMode = fillMode;
+  }
+
+  if (body.pointsPerSlot !== undefined) {
+    const pointsPerSlot = parsePointsPerSlot(body.pointsPerSlot, errors);
+    if (pointsPerSlot != null) out.pointsPerSlot = pointsPerSlot;
+  }
+
   if (body.active !== undefined) {
     if (typeof body.active !== 'boolean') errors.push('active deve ser boolean');
     else out.active = body.active;
@@ -286,6 +385,9 @@ export function validateStampCardPatch(body) {
       errors.push('sortOrder inválido');
     } else out.sortOrder = sortOrder;
   }
+
+  errors.push(...palette.errors);
+  Object.assign(out, palette.data);
 
   return { valid: errors.length === 0, errors, data: out };
 }

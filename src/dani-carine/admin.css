@@ -533,6 +533,11 @@ button.admin-entertainment-card:focus-visible {
   opacity: 0.55;
 }
 
+.admin-challenge-card.is-selected {
+  border-color: color-mix(in srgb, var(--green, #2f4a3c) 55%, var(--line));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--green, #2f4a3c) 18%, transparent);
+}
+
 .admin-challenge-options {
   margin: 0.85rem 0 0;
   padding: 0;
@@ -559,6 +564,191 @@ button.admin-entertainment-card:focus-visible {
 
 .admin-challenge-option input[type='text'] {
   width: 100%;
+}
+
+.desafio-theme-layout {
+  display: grid;
+  gap: 1.25rem;
+  margin: 0.75rem 0 1.5rem;
+}
+
+@media (min-width: 900px) {
+  .desafio-theme-layout {
+    grid-template-columns: 1.1fr 0.9fr;
+    align-items: start;
+  }
+}
+
+.card-mode {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.35rem;
+  margin: 0.15rem 0 0.35rem;
+  padding: 0.28rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ink) 6%, white);
+}
+
+.card-mode__btn {
+  appearance: none;
+  border: 0;
+  border-radius: 999px;
+  padding: 0.65rem 0.85rem;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.card-mode__btn.is-active {
+  background: #fff;
+  color: var(--ink);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--ink) 8%, transparent);
+}
+
+.stamp-card-hint {
+  margin: 0.45rem 0 0.9rem;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.stamp-card-grid {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0 0 0.85rem;
+}
+
+@media (min-width: 640px) {
+  .stamp-card-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.desafio-theme-label {
+  margin: 0.85rem 0 0.45rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.desafio-theme-colors {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 0.55rem;
+}
+
+.desafio-theme-colors label {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.desafio-theme-colors input[type='color'] {
+  width: 100%;
+  height: 2.4rem;
+  padding: 0.15rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.desafio-theme-preview-wrap {
+  position: sticky;
+  top: 1rem;
+}
+
+.loyalty-card {
+  --lc-bg: #fdfbf8;
+  --lc-accent: #d66d81;
+  --lc-accent-soft: #f9e4e8;
+  --lc-text: #7d6e6a;
+  --lc-border: #e8b4bc;
+  width: min(100%, 360px);
+  margin: 0 auto;
+  padding: 1.35rem 1.2rem 1.2rem;
+  border-radius: 1.35rem;
+  border: 2px dashed var(--lc-border);
+  background: var(--lc-bg);
+  color: var(--lc-text);
+  text-align: center;
+  box-shadow: 0 16px 40px color-mix(in srgb, var(--ink) 8%, transparent);
+}
+
+.loyalty-card__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.loyalty-card__name {
+  margin: 0.35rem 0 1rem;
+  font-family: 'Great Vibes', var(--font-display), cursive;
+  font-size: 2.4rem;
+  line-height: 1;
+  color: var(--lc-accent);
+}
+
+.loyalty-card__slots {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-bottom: 1rem;
+}
+
+.loyalty-card__slot {
+  width: 2.55rem;
+  height: 2.55rem;
+  border-radius: 50%;
+  border: 2px dashed color-mix(in srgb, var(--lc-accent) 55%, white);
+  display: grid;
+  place-items: center;
+  font-size: 0.85rem;
+  color: color-mix(in srgb, var(--lc-text) 70%, white);
+  background: color-mix(in srgb, var(--lc-accent-soft) 55%, white);
+}
+
+.loyalty-card__slot.is-filled {
+  border-style: solid;
+  background: var(--lc-accent);
+  color: #fff;
+  font-size: 0.55rem;
+  letter-spacing: -0.05em;
+}
+
+.loyalty-card__banner {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.85rem 1rem;
+  border-radius: 1rem;
+  background: linear-gradient(180deg, var(--lc-accent), color-mix(in srgb, var(--lc-accent) 75%, #6b3038));
+  color: #fff;
+  margin-bottom: 0.85rem;
+}
+
+.loyalty-card__banner strong {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 600;
+  font-style: italic;
+}
+
+.loyalty-card__banner span {
+  font-size: 0.82rem;
+  opacity: 0.95;
+}
+
+.loyalty-card__footer {
+  margin: 0;
+  font-size: 0.9rem;
 }
 
 .admin-entertainment-card__title {

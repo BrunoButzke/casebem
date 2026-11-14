@@ -1,8 +1,14 @@
 import { useEffect, useState } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import Welcome from './pages/Welcome.jsx';
-import MissoesSoon from './pages/MissoesSoon.jsx';
 import Splash from './pages/Splash.jsx';
+import PlayShell from './pages/PlayShell.jsx';
+import Quiz from './pages/Quiz.jsx';
+import Desafios from './pages/Desafios.jsx';
+import Selo from './pages/Selo.jsx';
+import Ranking from './pages/Ranking.jsx';
+import Galeria from './pages/Galeria.jsx';
+import Telao from './pages/Telao.jsx';
 import { getGuestName } from './guest.js';
 
 const SPLASH_MS = 2600;
@@ -42,7 +48,16 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<Welcome />} />
-      <Route path="/missoes" element={<MissoesSoon />} />
+      <Route element={<PlayShell />}>
+        <Route path="/quiz" element={<Quiz />} />
+        <Route path="/desafios" element={<Desafios />} />
+        <Route path="/selo" element={<Selo />} />
+        <Route path="/ranking" element={<Ranking />} />
+        <Route path="/galeria" element={<Galeria />} />
+        <Route path="/galeria/telao" element={<Telao />} />
+      </Route>
+      <Route path="/home" element={<Navigate to="/quiz" replace />} />
+      <Route path="/missoes" element={<Navigate to="/quiz" replace />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

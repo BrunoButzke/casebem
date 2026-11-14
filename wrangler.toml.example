@@ -16,3 +16,11 @@ database_id = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"  # Replace with actual UUID
 # Settings -> Functions -> D1 database bindings
 # Variable name: DB
 # D1 database: casebem-rsvps-production
+
+# R2 — fotos da galeria / telão
+# Dashboard: Settings -> Bindings -> R2 bucket bindings
+# Variable name: GALLERY
+# Bucket: casebem-gallery
+[[r2_buckets]]
+binding = "GALLERY"
+bucket_name = "casebem-gallery"

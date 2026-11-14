@@ -13,6 +13,8 @@ import {
   createPhotoMission,
   createStampCard,
   listStampCardsAdmin,
+  listChallengesPublic,
+  gradeQuestion,
 } from '../functions/_lib/challenges-service.mjs';
 
 beforeEach(() => resetMemoryChallengesForTests());
@@ -69,6 +71,33 @@ test('stamp card create list', async () => {
   });
   const list = await listStampCardsAdmin(null);
   assert.equal(list[0].stampsRequired, 3);
+});
+
+test('public stamp cards expose fillMode and pointsPerSlot', async () => {
+  await createStampCard(null, {
+    name: 'Por ponto',
+    stampsRequired: 4,
+    rewardText: 'Brinde',
+    fillMode: 'points',
+    pointsPerSlot: 15,
+  });
+  const catalog = await listChallengesPublic(null);
+  const card = catalog.stampCards.find((c) => c.name === 'Por ponto');
+  assert.equal(card.fillMode, 'points');
+  assert.equal(card.pointsPerSlot, 15);
+});
+
+test('public catalog omits gabarito and grades answers', async () => {
+  const catalog = await listChallengesPublic(null);
+  assert.ok(catalog.questions.length >= 19);
+  assert.equal(catalog.questions[0].correctIndex, undefined);
+  const first = catalog.questions[0];
+  const right = await gradeQuestion(null, first.id, 0);
+  assert.equal(right.correct, true);
+  assert.equal(right.points, 10);
+  const wrong = await gradeQuestion(null, first.id, 1);
+  assert.equal(wrong.correct, false);
+  assert.equal(wrong.points, 0);
 });
 
 test('duplicate id throws EXISTS', async () => {

@@ -1,17 +1,37 @@
 const STORAGE_KEY = 'casebem_desafio_guest_name';
 
-export function getGuestName() {
+function readStore(store) {
   try {
-    return sessionStorage.getItem(STORAGE_KEY) || '';
+    return store.getItem(STORAGE_KEY) || '';
   } catch {
     return '';
   }
 }
 
+function writeStore(store, value) {
+  try {
+    if (value) store.setItem(STORAGE_KEY, value);
+    else store.removeItem(STORAGE_KEY);
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
+
+export function getGuestName() {
+  const local = readStore(localStorage);
+  if (local) return local;
+  const session = readStore(sessionStorage);
+  if (session) writeStore(localStorage, session);
+  return session;
+}
+
 export function setGuestName(name) {
-  sessionStorage.setItem(STORAGE_KEY, String(name || '').trim());
+  const value = String(name || '').trim();
+  writeStore(localStorage, value);
+  writeStore(sessionStorage, value);
 }
 
 export function clearGuestName() {
-  sessionStorage.removeItem(STORAGE_KEY);
+  writeStore(localStorage, '');
+  writeStore(sessionStorage, '');
 }

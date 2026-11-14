@@ -1172,8 +1172,8 @@ body {
 
 .telao {
   position: relative;
-  display: flex;
-  flex-direction: column;
+  display: block;
+  width: 100%;
   height: 100svh;
   min-height: 100svh;
   background: #0c0b0b;
@@ -1181,12 +1181,26 @@ body {
   overflow: hidden;
 }
 
+.telao::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 7.5rem;
+  z-index: 2;
+  pointer-events: none;
+  background: linear-gradient(to bottom, rgb(12 11 11 / 58%), transparent);
+}
+
 .telao-bars {
-  position: relative;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
   z-index: 3;
   display: flex;
   gap: 0.28rem;
-  padding: 0.7rem 1rem 0;
+  padding: calc(0.7rem + env(safe-area-inset-top, 0px)) 1rem 0;
+  pointer-events: none;
 }
 
 .telao-bar {
@@ -1213,13 +1227,16 @@ body {
 }
 
 .telao-top {
-  position: relative;
+  position: absolute;
+  top: calc(1.15rem + env(safe-area-inset-top, 0px));
+  left: 0;
+  right: 0;
   z-index: 3;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: 0.7rem 1rem 0.4rem;
+  padding: 0.35rem 1rem 0.4rem;
   font-family: var(--font-script);
   font-size: 1.6rem;
 }
@@ -1234,7 +1251,7 @@ body {
   z-index: 1;
   appearance: none;
   border: 0;
-  background: color-mix(in srgb, #fff 12%, transparent);
+  background: color-mix(in srgb, #0c0b0b 42%, transparent);
   color: #fff;
   border-radius: 999px;
   padding: 0.4rem 0.8rem;
@@ -1246,29 +1263,49 @@ body {
 }
 
 .telao-stage {
-  position: relative;
-  flex: 1;
-  min-height: 0;
+  position: absolute;
+  inset: 0;
+  z-index: 0;
 }
 
 .telao-slide {
   position: relative;
   margin: 0;
+  width: 100%;
   height: 100%;
   display: grid;
   place-items: center;
 }
 
 .telao-slide img {
-  width: min(100%, 1100px);
-  max-height: 78svh;
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  min-width: 0;
+  min-height: 0;
   object-fit: contain;
+  object-position: center;
   border-radius: 0.4rem;
+}
+
+.telao-slide img.is-portrait {
+  height: 100%;
+  width: auto;
+  max-width: 100%;
+}
+
+.telao-slide img.is-landscape {
+  width: 100%;
+  height: auto;
+  max-height: 100%;
 }
 
 .telao.is-cinema,
 .telao:fullscreen,
 .telao:-webkit-full-screen {
+  width: 100%;
   height: 100%;
   min-height: 100%;
   background: #000;
@@ -1283,11 +1320,6 @@ body {
 .telao.is-cinema .telao-slide img,
 .telao:fullscreen .telao-slide img,
 .telao:-webkit-full-screen .telao-slide img {
-  width: 100%;
-  max-width: none;
-  max-height: 100%;
-  height: 100%;
-  object-fit: contain;
   border-radius: 0;
 }
 
@@ -1319,7 +1351,7 @@ body {
 }
 
 .telao-empty {
-  min-height: 70svh;
+  height: 100%;
   display: grid;
   place-items: center;
   margin: 0;

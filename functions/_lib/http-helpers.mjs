@@ -22,7 +22,7 @@ export function getAllowedOrigins(request) {
       'https://www.casebem.pages.dev',
       'https://casebem.com',
       'https://www.casebem.com',
-      'https://game.casebem.com'
+      'https://desafio.casebem.com'
     );
     const requestOriginParsed = request.headers.get('Origin');
     if (requestOriginParsed && requestOriginParsed.startsWith('https://') && 
@@ -31,16 +31,18 @@ export function getAllowedOrigins(request) {
     }
   }
   
-  // Production: casebem.com apex/www + game subdomain
+  // Production: casebem.com apex/www + desafio subdomain
   if (
     hostname === 'casebem.com' ||
     hostname === 'www.casebem.com' ||
-    hostname === 'game.casebem.com'
+    hostname === 'desafio.casebem.com' ||
+    hostname === 'www.desafio.casebem.com'
   ) {
     allowedOrigins.push(
       'https://casebem.com',
       'https://www.casebem.com',
-      'https://game.casebem.com',
+      'https://desafio.casebem.com',
+      'https://www.desafio.casebem.com',
       'https://casebem.pages.dev'
     );
   }

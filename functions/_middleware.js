@@ -1,10 +1,11 @@
 /**
- * Host-based routing: game.casebem.com → /games SPA
+ * Host-based routing: desafio.casebem.com → /games SPA
  * Same Pages project shares Functions + D1.
+ * Local/dev path remains /games/; production host is desafio.casebem.com.
  */
 
 function isGameHost(hostname) {
-  return hostname === 'game.casebem.com' || hostname === 'games.casebem.com';
+  return hostname === 'desafio.casebem.com' || hostname === 'www.desafio.casebem.com';
 }
 
 export async function onRequest(context) {
@@ -24,7 +25,7 @@ export async function onRequest(context) {
     return context.next();
   }
 
-  // Map game.* root (and unknown paths) onto the games SPA.
+  // Map desafio.* root (and unknown paths) onto the games SPA.
   const rewritten = new URL(context.request.url);
   rewritten.pathname = url.pathname === '/' || url.pathname === '' ? '/games/' : `/games${url.pathname}`;
 

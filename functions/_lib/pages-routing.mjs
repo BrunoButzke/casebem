@@ -1,7 +1,7 @@
 const GAME_HOSTS = new Set(['desafio.casebem.com', 'www.desafio.casebem.com']);
 const SPA_INDEX = {
-  '/games': '/games/index.html',
-  '/app': '/app/index.html',
+  '/games': '/games/',
+  '/app': '/app/',
 };
 
 export function isGameHost(hostname) {
@@ -23,10 +23,9 @@ function isFilePath(pathname) {
 
 function spaIndexForPath(pathname) {
   const path = String(pathname || '/');
-  for (const prefix of Object.keys(SPA_INDEX)) {
-    if (path === prefix || path === `${prefix}/` || path.startsWith(`${prefix}/`)) {
-      return SPA_INDEX[prefix];
-    }
+  for (const [prefix, asset] of Object.entries(SPA_INDEX)) {
+    if (path === prefix || path === `${prefix}/`) return null;
+    if (path.startsWith(`${prefix}/`)) return asset;
   }
   return null;
 }
@@ -34,6 +33,8 @@ function spaIndexForPath(pathname) {
 /**
  * Decide how Pages middleware should handle a request.
  * Functions skip `_redirects`, so nested SPA routes must be rewritten here.
+ * Rewrite to the directory (`/games/`), never `/games/index.html` — Pages 308s
+ * index.html onto the pretty URL and that dropped the original path.
  *
  * @returns {{ action: 'next' } | { action: 'rewrite', assetPath: string } | { action: 'redirect', pathname: string }}
  */
@@ -49,7 +50,7 @@ export function resolvePagesRoute(hostname, pathname) {
       const stripped = path.slice('/games'.length) || '/';
       return { action: 'redirect', pathname: stripped.startsWith('/') ? stripped : `/${stripped}` };
     }
-    return { action: 'rewrite', assetPath: '/games/index.html' };
+    return { action: 'rewrite', assetPath: '/games/' };
   }
 
   const spaIndex = spaIndexForPath(path);

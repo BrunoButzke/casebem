@@ -6,14 +6,14 @@ export default function Welcome() {
   const navigate = useNavigate();
   const [name, setName] = useState('');
 
-  if (getGuestName()) return <Navigate to="/quiz" replace />;
+  if (getGuestName()) return <Navigate to="quiz" replace />;
 
   function onSubmit(e) {
     e.preventDefault();
     const trimmed = name.trim();
     if (trimmed.length < 2) return;
     setGuestName(trimmed);
-    navigate('/quiz', { replace: true });
+    navigate('quiz', { replace: true });
   }
 
   const canEnter = name.trim().length >= 2;

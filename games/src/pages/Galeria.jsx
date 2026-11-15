@@ -25,7 +25,7 @@ export default function Galeria() {
     <div className="play-page">
       <h1 className="play-script">Galeria</h1>
       <p className="play-sub">As fotos dos desafios ficam públicas para toda a festa</p>
-      <Link className="desafio__cta" to="/galeria/telao">
+      <Link className="desafio__cta" to="telao">
         Modo telão
       </Link>
       {items.length ? (

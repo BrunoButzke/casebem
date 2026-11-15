@@ -84,6 +84,23 @@ test('App.jsx declares /casal/:slug and CoupleSite has no admin login', () => {
   assert.match(page, /Página não encontrada/);
 });
 
+test('App.jsx nests games under /casal/:slug/game/*', () => {
+  const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8');
+  assert.match(app, /path="\/casal\/:slug\/game\/\*"/);
+  const gamesApp = readFileSync(new URL('../games/src/App.jsx', import.meta.url), 'utf8');
+  assert.match(gamesApp, /path="quiz"/);
+  assert.doesNotMatch(gamesApp, /path="\/quiz"/);
+});
+
+test('PlayShell keeps relative tab ids and prefixes couple game URLs with gameTo', () => {
+  const src = readFileSync(new URL('../games/src/pages/PlayShell.jsx', import.meta.url), 'utf8');
+  assert.match(src, /to: 'quiz'/);
+  assert.doesNotMatch(src, /to: '\/quiz'/);
+  assert.match(src, /endsWith\(['"]\/galeria\/telao['"]\)/);
+  assert.match(src, /gameTo\(/);
+  assert.match(src, /gameSlugFromPathname/);
+});
+
 test('CoupleSite sets partner document title and restores CaseBem', () => {
   const page = readFileSync(new URL('../src/pages/casal/CoupleSite.jsx', import.meta.url), 'utf8');
   assert.match(page, /document\.title/);

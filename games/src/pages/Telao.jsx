@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { gameSlugFromPathname, gameTo } from '../../../src/lib/game-paths.mjs';
 import { galleryImageUrl, listGallery, prefetchGalleryImage } from '../gallery-api.js';
 import { mergePlaylist, nextId } from '../telao-queue.js';
 
@@ -37,6 +38,8 @@ function leaveFullscreen() {
 
 export default function Telao() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const slug = gameSlugFromPathname(location.pathname);
   const rootRef = useRef(null);
   const cinemaRef = useRef(false);
   const ignoreEscRef = useRef(0);
@@ -158,7 +161,7 @@ export default function Telao() {
           toggleCinema();
           return;
         }
-        navigate('/galeria');
+        navigate(gameTo('galeria', slug));
       }
       if (e.key === 'ArrowRight') setCurrent(nextId(playlistRef.current, currentIdRef.current));
       if (e.key === 'ArrowLeft') setCurrent(prevId(playlistRef.current, currentIdRef.current));
@@ -166,7 +169,7 @@ export default function Telao() {
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [navigate]);
+  }, [navigate, slug]);
 
   const currentIndex = Math.max(0, playlist.indexOf(currentId));
 
@@ -190,7 +193,7 @@ export default function Telao() {
             onClick={() => {
               if (fullscreenEl()) void leaveFullscreen();
               setCinemaMode(false);
-              navigate('/galeria');
+              navigate(gameTo('galeria', slug));
             }}
           >
             Sair

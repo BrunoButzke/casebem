@@ -13,6 +13,7 @@ import Entertainment from './pages/admin/Entertainment.jsx';
 import Album from './pages/admin/Album.jsx';
 
 const CoupleSite = lazy(() => import('./pages/casal/CoupleSite.jsx'));
+const CoupleGames = lazy(() => import('./pages/casal/CoupleGames.jsx'));
 
 function RequireAuth({ children }) {
   const [status, setStatus] = useState('loading');
@@ -48,6 +49,14 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<Landing />} />
+      <Route
+        path="/casal/:slug/game/*"
+        element={
+          <Suspense fallback={<p>Carregando…</p>}>
+            <CoupleGames />
+          </Suspense>
+        }
+      />
       <Route
         path="/casal/:slug"
         element={

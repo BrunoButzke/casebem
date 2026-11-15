@@ -47,18 +47,18 @@ export default function App() {
 
   return (
     <Routes>
-      <Route path="/" element={<Welcome />} />
+      <Route index element={<Welcome />} />
       <Route element={<PlayShell />}>
-        <Route path="/quiz" element={<Quiz />} />
-        <Route path="/desafios" element={<Desafios />} />
-        <Route path="/selo" element={<Selo />} />
-        <Route path="/ranking" element={<Ranking />} />
-        <Route path="/galeria" element={<Galeria />} />
-        <Route path="/galeria/telao" element={<Telao />} />
+        <Route path="quiz" element={<Quiz />} />
+        <Route path="desafios" element={<Desafios />} />
+        <Route path="selo" element={<Selo />} />
+        <Route path="ranking" element={<Ranking />} />
+        <Route path="galeria" element={<Galeria />} />
+        <Route path="galeria/telao" element={<Telao />} />
       </Route>
-      <Route path="/home" element={<Navigate to="/quiz" replace />} />
-      <Route path="/missoes" element={<Navigate to="/quiz" replace />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="home" element={<Navigate to="quiz" replace />} />
+      <Route path="missoes" element={<Navigate to="quiz" replace />} />
+      <Route path="*" element={<Navigate to="." replace />} />
     </Routes>
   );
 }

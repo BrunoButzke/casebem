@@ -1,4 +1,5 @@
 import { NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { gameSlugFromPathname, gameTo } from '../../../src/lib/game-paths.mjs';
 import { clearGuestName, getGuestName } from '../guest.js';
 import { PlayProvider, usePlay } from '../PlayContext.jsx';
 
@@ -57,18 +58,19 @@ function IconGaleria() {
 }
 
 const TABS = [
-  { to: '/quiz', label: 'Quiz', icon: IconQuiz },
-  { to: '/desafios', label: 'Desafios', icon: IconDesafios },
-  { to: '/selo', label: 'Selo', icon: IconSelo },
-  { to: '/ranking', label: 'Ranking', icon: IconRanking },
-  { to: '/galeria', label: 'Galeria', icon: IconGaleria },
+  { to: 'quiz', label: 'Quiz', icon: IconQuiz },
+  { to: 'desafios', label: 'Desafios', icon: IconDesafios },
+  { to: 'selo', label: 'Selo', icon: IconSelo },
+  { to: 'ranking', label: 'Ranking', icon: IconRanking },
+  { to: 'galeria', label: 'Galeria', icon: IconGaleria },
 ];
 
 function ShellFrame() {
   const navigate = useNavigate();
   const location = useLocation();
+  const slug = gameSlugFromPathname(location.pathname);
   const { guestName, scores } = usePlay();
-  const telao = location.pathname === '/galeria/telao';
+  const telao = location.pathname.endsWith('/galeria/telao');
 
   function leave() {
     clearGuestName();
@@ -77,13 +79,13 @@ function ShellFrame() {
     } catch {
       /* ignore */
     }
-    navigate('/', { replace: true });
+    navigate(gameTo('/', slug), { replace: true });
   }
 
   return (
     <div className={`play${telao ? ' is-telao' : ''}`}>
       <header className="play-top">
-        <button type="button" className="play-top__brand" onClick={() => navigate('/quiz')}>
+        <button type="button" className="play-top__brand" onClick={() => navigate(gameTo('quiz', slug))}>
           <span className="play-top__names">Dani &amp; Carine</span>
           <span className="play-top__hello">Olá, {guestName} 💕</span>
         </button>
@@ -103,7 +105,7 @@ function ShellFrame() {
         {TABS.map((tab) => {
           const Icon = tab.icon;
           return (
-            <NavLink key={tab.to} to={tab.to} className={({ isActive }) => `play-tab${isActive ? ' is-active' : ''}`}>
+            <NavLink key={tab.to} to={gameTo(tab.to, slug)} className={({ isActive }) => `play-tab${isActive ? ' is-active' : ''}`}>
               <Icon />
               <span>{tab.label}</span>
             </NavLink>
@@ -116,7 +118,9 @@ function ShellFrame() {
 
 export default function PlayShell() {
   const guest = getGuestName();
-  if (!guest) return <Navigate to="/" replace />;
+  const location = useLocation();
+  const slug = gameSlugFromPathname(location.pathname);
+  if (!guest) return <Navigate to={gameTo('/', slug)} replace />;
 
   return (
     <PlayProvider guestName={guest}>

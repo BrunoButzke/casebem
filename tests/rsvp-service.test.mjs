@@ -74,10 +74,14 @@ class MockD1 {
         }
 
         if (sql.includes('UPDATE rsvps')) {
-          const tokenHash = bindings[bindings.length - 2];
-          const weddingKey = bindings[bindings.length - 1];
+          const tokenHash = sql.includes('wedding_key')
+            ? bindings[bindings.length - 2]
+            : bindings[bindings.length - 1];
+          const weddingKey = sql.includes('wedding_key')
+            ? bindings[bindings.length - 1]
+            : null;
           const rsvp = mock.data.rsvps.find(
-            r => r.manage_token_hash === tokenHash && r.wedding_key === weddingKey
+            r => r.manage_token_hash === tokenHash && (weddingKey == null || r.wedding_key === weddingKey)
           );
           if (rsvp) {
             let bindIndex = 0;
@@ -147,7 +151,7 @@ class MockD1 {
           } else {
             const [tokenHash, weddingKey] = bindings;
             return mock.data.rsvps.find(
-              r => r.manage_token_hash === tokenHash && r.wedding_key === weddingKey
+              r => r.manage_token_hash === tokenHash && (!sql.includes('wedding_key') || r.wedding_key === weddingKey)
             ) || null;
           }
         }

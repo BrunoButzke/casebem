@@ -90,7 +90,9 @@ describe('RSVP Security Tests', () => {
               ) || null;
             } else {
               const [tokenHash, weddingKey] = this.bindings;
-              return mock.data.rsvps.find(r => r.manage_token_hash === tokenHash && r.wedding_key === weddingKey) || null;
+              return mock.data.rsvps.find(
+                r => r.manage_token_hash === tokenHash && (!this.sql.includes('wedding_key') || r.wedding_key === weddingKey)
+              ) || null;
             }
           }
           if (this.sql.includes('RETURNING request_count')) {

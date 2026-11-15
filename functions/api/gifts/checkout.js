@@ -33,6 +33,25 @@ export async function onRequestPost(context) {
     return errorResponse403(originValidation.error);
   }
 
+  // Parse request body
+  let body = {};
+  try {
+    body = await request.json();
+  } catch {
+    return errorResponse400('JSON inválido');
+  }
+
+  const slug = slugFromRequest(request, body);
+  const resolved = await resolvePublicSlugOrPartner(env.DB || null, slug);
+  if (!resolved.ok) {
+    const headers = getCorsHeaders(request);
+    headers.set('Content-Type', 'application/json');
+    return new Response(JSON.stringify({ error: resolved.error }), {
+      status: resolved.status,
+      headers,
+    });
+  }
+
   // Verificar D1 disponível (crítico para idempotência)
   if (!env.DB) {
     const headers = getCorsHeaders(request);
@@ -48,29 +67,10 @@ export async function onRequestPost(context) {
     );
   }
 
-  // Parse request body
-  let body = {};
-  try {
-    body = await request.json();
-  } catch {
-    return errorResponse400('JSON inválido');
-  }
-
   // Get client IP address
   const ipAddress = request.headers.get('CF-Connecting-IP') || 
                     request.headers.get('X-Forwarded-For')?.split(',')[0] ||
                     '0.0.0.0';
-
-  const slug = slugFromRequest(request, body);
-  const resolved = await resolvePublicSlugOrPartner(env.DB || null, slug);
-  if (!resolved.ok) {
-    const headers = getCorsHeaders(request);
-    headers.set('Content-Type', 'application/json');
-    return new Response(JSON.stringify({ error: resolved.error }), {
-      status: resolved.status,
-      headers,
-    });
-  }
 
   try {
     const origin = request.headers.get('Origin') || new URL(request.url).origin;

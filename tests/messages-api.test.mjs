@@ -11,6 +11,7 @@ class MockD1Database {
   constructor() {
     this.data = new Map();
     this.rateLimits = new Map();
+    this.accounts = [];
   }
 
   prepare(sql) {
@@ -35,6 +36,11 @@ class MockD1Statement {
   }
 
   async first() {
+    if (this.sql.includes('FROM accounts')) {
+      const [slug] = this.params;
+      return this.db.accounts.find((a) => a.slug === slug) || null;
+    }
+
     // Idempotency lookup (account_id, idempotency_key)
     if (this.sql.includes('idempotency_key')) {
       const [accountId, idempotencyKey] = this.params;
@@ -268,6 +274,29 @@ test('POST creates message successfully', async () => {
   assert.equal(data.idempotency_key, undefined);
   assert.equal(data.idempotency_fingerprint, undefined);
   assert.equal(data.consent_given, undefined);
+  assert.equal(JSON.stringify(data).includes('partner-dani-carine'), false);
+  assert.ok(data.weddingKey === undefined || data.weddingKey === 'dani-carine');
+});
+
+test('POST 201 for non-partner slug does not leak account UUID', async () => {
+  const env = createMockEnv();
+  const accountId = crypto.randomUUID();
+  env.DB.accounts.push({ id: accountId, slug: 'msg-api-np', is_partner: 0 });
+
+  const request = createRequest('POST', {
+    slug: 'msg-api-np',
+    guestName: 'João Silva',
+    message: 'Felicidades ao casal!',
+    consentGiven: true,
+  }, {
+    'Idempotency-Key': 'test-key-np-uuid',
+  });
+
+  const response = await onRequest({ request, env });
+  assert.equal(response.status, 201);
+  const data = await response.json();
+  assert.equal(JSON.stringify(data).includes(accountId), false);
+  assert.ok(data.weddingKey === undefined || data.weddingKey === 'msg-api-np');
 });
 
 test('POST requires Idempotency-Key header', async () => {

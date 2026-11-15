@@ -211,7 +211,8 @@ async function handlePost(request, env) {
       /* ignore */
     }
     
-    return jsonResponse(request, message, 201);
+    const { weddingKey: _weddingKey, ...publicMessage } = message;
+    return jsonResponse(request, publicMessage, 201);
   } catch (error) {
     console.error('Failed to create message:', error);
     

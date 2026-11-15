@@ -197,20 +197,19 @@ export async function getRsvpByToken(db, token) {
   const tokenHash = await hashToken(token);
   const result = await db
     .prepare(
-      `SELECT id, wedding_key, guest_name, attending,
+      `SELECT id, guest_name, attending,
               adults_count, children_count, observations,
               created_at, updated_at
        FROM rsvps
-       WHERE manage_token_hash = ? AND wedding_key = ?`
+       WHERE manage_token_hash = ?`
     )
-    .bind(tokenHash, WEDDING_KEY)
+    .bind(tokenHash)
     .first();
 
   if (!result) return null;
 
   return {
     id: result.id,
-    weddingKey: result.wedding_key,
     guestName: result.guest_name,
     attending: result.attending === 1,
     adultsCount: result.adults_count,
@@ -256,12 +255,12 @@ export async function updateRsvpByToken(db, token, data) {
   const timestamp = now();
   fields.push('updated_at = ?');
   values.push(timestamp);
-  values.push(tokenHash, WEDDING_KEY);
+  values.push(tokenHash);
 
   const result = await db
     .prepare(
       `UPDATE rsvps SET ${fields.join(', ')}
-       WHERE manage_token_hash = ? AND wedding_key = ?`
+       WHERE manage_token_hash = ?`
     )
     .bind(...values)
     .run();

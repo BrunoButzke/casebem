@@ -15,6 +15,7 @@ class MockD1 {
     this.data = {
       rsvps: [],
       rate_limits: [],
+      accounts: [],
     };
   }
 
@@ -61,10 +62,14 @@ class MockD1 {
         }
 
         if (sql.includes('UPDATE rsvps')) {
-          const tokenHash = bindings[bindings.length - 2];
-          const weddingKey = bindings[bindings.length - 1];
+          const tokenHash = sql.includes('wedding_key')
+            ? bindings[bindings.length - 2]
+            : bindings[bindings.length - 1];
+          const weddingKey = sql.includes('wedding_key')
+            ? bindings[bindings.length - 1]
+            : null;
           const rsvp = mock.data.rsvps.find(
-            r => r.manage_token_hash === tokenHash && r.wedding_key === weddingKey
+            r => r.manage_token_hash === tokenHash && (weddingKey == null || r.wedding_key === weddingKey)
           );
           if (rsvp) {
             let bindIndex = 0;
@@ -118,6 +123,11 @@ class MockD1 {
           return { rsvp_mode: 'open' };
         }
 
+        if (sql.includes('FROM accounts')) {
+          const [slug] = bindings;
+          return mock.data.accounts.find(a => a.slug === slug) || null;
+        }
+
         if (sql.includes('FROM rsvps')) {
           // Check if it's idempotency lookup or token lookup
           if (bindings.length === 2 && sql.includes('idempotency_key')) {
@@ -128,7 +138,7 @@ class MockD1 {
           } else {
             const [tokenHash, weddingKey] = bindings;
             return mock.data.rsvps.find(
-              r => r.manage_token_hash === tokenHash && r.wedding_key === weddingKey
+              r => r.manage_token_hash === tokenHash && (!sql.includes('wedding_key') || r.wedding_key === weddingKey)
             ) || null;
           }
         }
@@ -217,6 +227,8 @@ describe('RSVP API - POST /api/rsvp', () => {
     assert.equal(parsed.body.guestName, 'Maria Silva');
     assert.equal(parsed.body.attending, true);
     assert.ok(parsed.body.manageToken);
+    assert.equal(JSON.stringify(parsed.body).includes('partner-dani-carine'), false);
+    assert.ok(parsed.body.weddingKey === undefined || parsed.body.weddingKey === 'dani-carine');
   });
 
   it('should reject invalid JSON', async () => {
@@ -444,6 +456,43 @@ describe('RSVP API - Unsupported methods', () => {
     const parsed = await parseResponse(response);
 
     assert.equal(parsed.status, 405);
+  });
+});
+
+describe('RSVP API - non-partner slug', () => {
+  it('GET by manage token finds RSVP stored with account wedding_key', async () => {
+    const db = new MockD1();
+    const accountId = crypto.randomUUID();
+    db.data.accounts.push({ id: accountId, slug: 'casal-api', is_partner: 0 });
+
+    const createRequest = createMockRequest('POST', {
+      slug: 'casal-api',
+      guestName: 'Ana Lima',
+      attending: true,
+      adultsCount: 1,
+      childrenCount: 0,
+      consentGiven: true,
+    });
+    const createResponse = await onRequest({
+      request: createRequest,
+      env: { DB: db, RSVP_SECRET: TEST_SECRET },
+    });
+    const created = await parseResponse(createResponse);
+    assert.equal(created.status, 201);
+    assert.equal(JSON.stringify(created.body).includes(accountId), false);
+    assert.ok(created.body.manageToken);
+
+    const getRequest = createMockRequest('GET', null, {
+      Authorization: `Bearer ${created.body.manageToken}`,
+    });
+    const getResponse = await onRequest({
+      request: getRequest,
+      env: { DB: db, RSVP_SECRET: TEST_SECRET },
+    });
+    const parsed = await parseResponse(getResponse);
+    assert.equal(parsed.status, 200);
+    assert.equal(parsed.body.guestName, 'Ana Lima');
+    assert.equal(JSON.stringify(parsed.body).includes(accountId), false);
   });
 });
 

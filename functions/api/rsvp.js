@@ -114,6 +114,12 @@ function jsonResponse(request, data, status = 200) {
   });
 }
 
+function publicRsvpPayload(rsvp) {
+  if (!rsvp || typeof rsvp !== 'object') return rsvp;
+  const { weddingKey: _weddingKey, ...rest } = rsvp;
+  return rest;
+}
+
 function errorResponse(request, error, status = 400, details = null) {
   const body = { error };
   if (details) body.details = details;
@@ -258,7 +264,7 @@ async function handlePost(request, env) {
       /* ignore */
     }
 
-    return jsonResponse(request, rsvp, 201);
+    return jsonResponse(request, publicRsvpPayload(rsvp), 201);
   } catch (error) {
     console.error('Failed to create RSVP:', error);
     
@@ -293,7 +299,7 @@ async function handleGet(request, env) {
       return errorResponse(request, 'Token de autorização inválido', 401);
     }
 
-    return jsonResponse(request, rsvp, 200);
+    return jsonResponse(request, publicRsvpPayload(rsvp), 200);
   } catch (error) {
     console.error('Failed to get RSVP:', error);
     return errorResponse(request, 'Erro ao buscar confirmação', 500);
@@ -361,7 +367,7 @@ async function handlePut(request, env) {
       /* lista oculta: best-effort */
     }
 
-    return jsonResponse(request, rsvp, 200);
+    return jsonResponse(request, publicRsvpPayload(rsvp), 200);
   } catch (error) {
     console.error('Failed to update RSVP:', error);
     return errorResponse(request, 'Erro ao atualizar confirmação', 500);

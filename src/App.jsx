@@ -4,7 +4,7 @@ import { meRequest, parseMe } from './lib/session-api.mjs';
 import Landing from './pages/Landing.jsx';
 import Login from './pages/Login.jsx';
 import AdminHub from './pages/AdminHub.jsx';
-import ComingSoon from './pages/admin/ComingSoon.jsx';
+import MinhaPagina from './pages/admin/MinhaPagina.jsx';
 import Guests from './pages/admin/Guests.jsx';
 import Gifts from './pages/admin/Gifts.jsx';
 import Stationery from './pages/admin/Stationery.jsx';
@@ -85,7 +85,7 @@ export default function App() {
         path="/admin/minha-pagina"
         element={
           <RequireAuth>
-            <ComingSoon />
+            <MinhaPagina />
           </RequireAuth>
         }
       />

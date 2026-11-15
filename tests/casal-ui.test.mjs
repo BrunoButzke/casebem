@@ -341,3 +341,14 @@ test('CoupleGames 404 copy matches CoupleSite', () => {
   assert.doesNotMatch(src, /admin-login|Acesso dos noivos/);
   assert.match(src, /fetchCouplePage/);
 });
+
+test('App.jsx mounts MinhaPagina instead of ComingSoon on /admin/minha-pagina', () => {
+  const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8');
+  assert.match(app, /MinhaPagina/);
+  assert.doesNotMatch(app, /path="\/admin\/minha-pagina"[\s\S]*ComingSoon/);
+  const page = readFileSync(new URL('../src/pages/admin/MinhaPagina.jsx', import.meta.url), 'utf8');
+  assert.match(page, /Página publicada/);
+  assert.match(page, /Este endereço já está em uso/);
+  assert.match(page, /putAdminPage|\/api\/admin\/page/);
+  assert.match(page, /Adicionar etapa/);
+});

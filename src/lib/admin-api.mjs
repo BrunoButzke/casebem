@@ -85,3 +85,11 @@ export function deleteQuestionAdmin(id) {
 export function listGalleryAdmin() {
   return api('/api/admin/gallery');
 }
+
+export function getAdminPage() {
+  return api('/api/admin/page');
+}
+
+export function putAdminPage(body) {
+  return api('/api/admin/page', { method: 'PUT', body: JSON.stringify(body) });
+}

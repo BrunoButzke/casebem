@@ -352,3 +352,14 @@ test('App.jsx mounts MinhaPagina instead of ComingSoon on /admin/minha-pagina', 
   assert.match(page, /putAdminPage|\/api\/admin\/page/);
   assert.match(page, /Adicionar etapa/);
 });
+
+test('CoupleSite uses CoupleHome for non-partner pages', () => {
+  const site = readFileSync(new URL('../src/pages/casal/CoupleSite.jsx', import.meta.url), 'utf8');
+  assert.match(site, /CoupleHome/);
+  assert.doesNotMatch(site, /<h1>Em breve<\/h1>/);
+  const home = readFileSync(new URL('../src/pages/casal/CoupleHome.jsx', import.meta.url), 'utf8');
+  assert.match(home, /id="o-dia"/);
+  assert.match(home, /RsvpSection/);
+  const partner = readFileSync(new URL('../src/pages/casal/PartnerHome.jsx', import.meta.url), 'utf8');
+  assert.match(partner, /page\./);
+});

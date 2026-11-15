@@ -2,10 +2,17 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { fetchCouplePage } from '../../lib/casal-api.mjs';
 import { coupleNavItems } from './couple-nav.mjs';
+import CoupleHome from './CoupleHome.jsx';
 import PartnerHome from './PartnerHome.jsx';
+import '../../dani-carine/style.css';
 
 const DEFAULT_TITLE = 'CaseBem';
 const PARTNER_TITLE = 'Dani & Carine';
+
+function publicTitle(page, slug) {
+  const names = (page?.names || []).filter(Boolean);
+  return names.join(' & ') || slug || DEFAULT_TITLE;
+}
 
 export default function CoupleSite() {
   const { slug } = useParams();
@@ -22,7 +29,7 @@ export default function CoupleSite() {
           setState({ kind: result.status === 404 ? 'not-found' : 'error' });
           return;
         }
-        setState({ kind: 'ok', slug: result.slug, isPartner: result.isPartner });
+        setState({ kind: 'ok', slug: result.slug, isPartner: result.isPartner, page: result.page });
       })
       .catch(() => {
         if (cancelled) return;
@@ -34,12 +41,12 @@ export default function CoupleSite() {
   }, [slug, retry]);
 
   useEffect(() => {
-    if (state.kind !== 'ok' || !state.isPartner) return undefined;
-    document.title = PARTNER_TITLE;
+    if (state.kind !== 'ok') return undefined;
+    document.title = state.isPartner ? PARTNER_TITLE : publicTitle(state.page, state.slug);
     return () => {
       document.title = DEFAULT_TITLE;
     };
-  }, [state.kind, state.isPartner]);
+  }, [state.kind, state.isPartner, state.page, state.slug]);
 
   if (state.kind === 'loading') {
     return (
@@ -78,10 +85,10 @@ export default function CoupleSite() {
           </a>
         ))}
       </nav>
-      {state.isPartner ? <PartnerHome slug={state.slug} /> : (
-        <main>
-          <h1>Em breve</h1>
-        </main>
+      {state.isPartner ? (
+        <PartnerHome slug={state.slug} page={state.page} />
+      ) : (
+        <CoupleHome slug={state.slug} page={state.page} />
       )}
     </div>
   );

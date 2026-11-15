@@ -98,10 +98,33 @@ const MARQUEE_ITEMS = [
   '·',
 ];
 
-export default function PartnerHome({ slug }) {
+function pageFieldsFrom(page) {
+  if (!page || typeof page !== 'object') return {};
+  const fields = {};
+  if (Array.isArray(page.names) && page.names.filter(Boolean).length) {
+    fields.names = page.names.filter(Boolean);
+  }
+  if (page.dateLine) fields.dateLine = page.dateLine;
+  if (page.city) fields.city = page.city;
+  if (page.welcomeTitle) fields.welcomeTitle = page.welcomeTitle;
+  return fields;
+}
+
+function momentsFrom(page) {
+  if (!page?.etapas?.length) return PARTNER_COPY.moments;
+  return page.etapas.map((etapa, index) => ({
+    n: PARTNER_COPY.moments[index]?.n ?? String(index + 1).padStart(2, '0'),
+    title: etapa.title,
+    detail: etapa.detail,
+    image: PARTNER_COPY.moments[index]?.image,
+  }));
+}
+
+export default function PartnerHome({ slug, page }) {
   const [activeMoment, setActiveMoment] = useState(0);
   const [madrinha, setMadrinha] = useState(MADRINHA_LOOKS[0]);
-  const copy = PARTNER_COPY;
+  const copy = { ...PARTNER_COPY, ...pageFieldsFrom(page) };
+  const moments = momentsFrom(page);
   const [dani, carine] = copy.names;
 
   return (
@@ -251,7 +274,7 @@ export default function PartnerHome({ slug }) {
               <p className="eyebrow">O dia</p>
               <h2 className="how__title">Três momentos</h2>
               <ul className="how__steps" role="list">
-                {copy.moments.map((moment, index) => (
+                {moments.map((moment, index) => (
                   <li
                     key={moment.n}
                     className={index === activeMoment ? 'how__step is-active' : 'how__step'}
@@ -271,13 +294,13 @@ export default function PartnerHome({ slug }) {
               </ul>
             </div>
             <div className="how__visual" aria-hidden="true">
-              {copy.moments.map((moment, index) => (
+              {moments.map((moment, index) => (
                 <figure
-                  key={moment.image}
+                  key={moment.image || moment.n}
                   className={index === activeMoment ? 'how__frame is-active' : 'how__frame'}
                   data-frame={String(index)}
                 >
-                  <img src={moment.image} alt="" />
+                  {moment.image ? <img src={moment.image} alt="" /> : null}
                 </figure>
               ))}
             </div>

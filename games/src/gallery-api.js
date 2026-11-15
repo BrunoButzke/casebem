@@ -11,7 +11,7 @@ export async function listGallery() {
   if (!res.ok || !data.ok) throw new Error(data.message || 'Não deu para carregar a galeria');
   return (data.photos || []).map((photo) => ({
     ...photo,
-    preview: photo.preview || galleryImageUrl(photo.id),
+    preview: galleryImageUrl(photo.id),
   }));
 }
 
@@ -24,7 +24,7 @@ export async function loadGalleryPhoto(id) {
   if (!res.ok || !data.ok) throw new Error(data.message || 'Não deu para abrir a foto');
   return {
     ...data.photo,
-    preview: data.photo?.preview || galleryImageUrl(id),
+    preview: galleryImageUrl(id),
   };
 }
 

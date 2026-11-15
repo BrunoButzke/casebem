@@ -41,6 +41,17 @@ test('nested /games routes on casebem.com rewrite to the games directory, not in
   });
 });
 
+test('legacy games host and /games stay on the games SPA', () => {
+  assert.deepEqual(resolvePagesRoute('casebem.com', '/games/quiz'), {
+    action: 'rewrite',
+    assetPath: '/games/',
+  });
+  assert.deepEqual(resolvePagesRoute('desafio.casebem.com', '/quiz'), {
+    action: 'rewrite',
+    assetPath: '/games/',
+  });
+});
+
 test('existing /games on casebem.com is served as a static file', () => {
   assert.deepEqual(resolvePagesRoute('casebem.com', '/games'), { action: 'next' });
   assert.deepEqual(resolvePagesRoute('casebem.com', '/games/'), { action: 'next' });

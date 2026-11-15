@@ -334,3 +334,10 @@ test('CoupleGames calls loadAndApplyDesafioTheme on mount', () => {
   assert.match(src, /loadAndApplyDesafioTheme/);
   assert.match(src, /useEffect[\s\S]*loadAndApplyDesafioTheme/);
 });
+
+test('CoupleGames 404 copy matches CoupleSite', () => {
+  const src = readFileSync(new URL('../src/pages/casal/CoupleGames.jsx', import.meta.url), 'utf8');
+  assert.match(src, /Página não encontrada/);
+  assert.doesNotMatch(src, /admin-login|Acesso dos noivos/);
+  assert.match(src, /fetchCouplePage/);
+});

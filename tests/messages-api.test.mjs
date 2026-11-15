@@ -35,11 +35,14 @@ class MockD1Statement {
   }
 
   async first() {
-    // Idempotency lookup
+    // Idempotency lookup (account_id, idempotency_key)
     if (this.sql.includes('idempotency_key')) {
-      const [weddingKey, idempotencyKey] = this.params;
+      const [accountId, idempotencyKey] = this.params;
       for (const record of this.db.data.values()) {
-        if (record.wedding_key === weddingKey && record.idempotency_key === idempotencyKey) {
+        if (
+          (record.account_id === accountId || record.wedding_key === accountId) &&
+          record.idempotency_key === idempotencyKey
+        ) {
           return record;
         }
       }
@@ -117,12 +120,15 @@ class MockD1Statement {
 
   async run() {
     if (this.sql.includes('INSERT INTO wedding_messages')) {
-      const [id, weddingKey, guestName, message, consentGiven, createdAt, idempotencyKey, fingerprint] = this.params;
+      const [id, weddingKey, guestName, message, consentGiven, createdAt, idempotencyKey, fingerprint, accountId] = this.params;
       
       // Check idempotency
       if (idempotencyKey) {
         for (const record of this.db.data.values()) {
-          if (record.wedding_key === weddingKey && record.idempotency_key === idempotencyKey) {
+          if (
+            (record.account_id === accountId || record.wedding_key === weddingKey) &&
+            record.idempotency_key === idempotencyKey
+          ) {
             return { success: false, error: 'UNIQUE constraint' };
           }
         }
@@ -143,6 +149,7 @@ class MockD1Statement {
         id, wedding_key: weddingKey, guest_name: guestName,
         message, consent_given: consentGiven, created_at: createdAt,
         idempotency_key: idempotencyKey, idempotency_fingerprint: fingerprint,
+        account_id: accountId,
       });
       return { success: true };
     }

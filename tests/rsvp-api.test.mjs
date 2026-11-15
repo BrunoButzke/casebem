@@ -113,6 +113,10 @@ class MockD1 {
         const sql = this.sql;
         const bindings = this.bindings;
 
+        if (sql.includes('FROM wedding_settings')) {
+          return { rsvp_mode: 'open' };
+        }
+
         if (sql.includes('FROM rsvps')) {
           // Check if it's idempotency lookup or token lookup
           if (bindings.length === 2 && sql.includes('idempotency_key')) {

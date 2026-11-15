@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useLayoutEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { signupRequest } from '../lib/session-api.mjs';
 import '../landing/style.css';
@@ -11,17 +11,22 @@ export default function Landing() {
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     let cancelled = false;
-    let destroy;
+    let modRef;
     (async () => {
       const mod = await import('../landing/main.js');
-      if (cancelled) return;
-      destroy = await mod.initLandingEffects({ bindPlans: false });
+      modRef = mod;
+      if (cancelled) {
+        mod.destroyLandingEffects();
+        return;
+      }
+      await mod.initLandingEffects({ bindPlans: false });
+      if (cancelled) mod.destroyLandingEffects();
     })();
     return () => {
       cancelled = true;
-      destroy?.();
+      modRef?.destroyLandingEffects();
     };
   }, []);
 

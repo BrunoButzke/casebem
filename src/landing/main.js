@@ -11,6 +11,9 @@ const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 
 let lenis = null;
 let tickerFn = null;
+let matchMedias = [];
+let onWindowLoad = null;
+let effectsAlive = false;
 
 function ensureLenis() {
   if (reducedMotion || lenis) return;
@@ -107,9 +110,11 @@ async function runPreloader() {
 
   gsap.to(bar, { width: '100%', duration: 1.1, ease: 'power2.inOut' });
   await Promise.all([waitImg, fonts, minTime]);
+  if (!effectsAlive) return;
 
   const tl = gsap.timeline({
     onComplete: () => {
+      if (!effectsAlive) return;
       preloader.remove();
       if (lenis) lenis.start();
       ScrollTrigger.refresh();
@@ -206,6 +211,7 @@ function initHow() {
   };
 
   const mm = gsap.matchMedia();
+  matchMedias.push(mm);
   mm.add('(min-width: 961px)', () => {
     ScrollTrigger.create({
       trigger: '.how',
@@ -245,6 +251,7 @@ function initFeatures() {
   if (!track || !viewport || reducedMotion) return;
 
   const mm = gsap.matchMedia();
+  matchMedias.push(mm);
   mm.add('(min-width: 961px)', () => {
     const distance = () => track.scrollWidth - innerWidth;
     const tween = gsap.to(track, {
@@ -472,7 +479,23 @@ function initWaitlist() {
 }
 
 export function destroyLandingEffects() {
-  ScrollTrigger.getAll().forEach((t) => t.kill());
+  effectsAlive = false;
+  if (onWindowLoad) {
+    removeEventListener('load', onWindowLoad);
+    onWindowLoad = null;
+  }
+  try {
+    matchMedias.forEach((mm) => mm.kill());
+  } catch {
+    /* pin spacers may already be gone after React unmount */
+  }
+  matchMedias = [];
+  try {
+    ScrollTrigger.getAll().forEach((t) => t.kill(false));
+  } catch {
+    /* pin spacers may already be gone after React unmount */
+  }
+  gsap.killTweensOf('*');
   if (tickerFn) {
     gsap.ticker.remove(tickerFn);
     tickerFn = null;
@@ -484,6 +507,7 @@ export function destroyLandingEffects() {
 }
 
 export async function initLandingEffects({ bindPlans = true } = {}) {
+  effectsAlive = true;
   ensureLenis();
   cloneMarquee();
   bindHashLinks();
@@ -506,9 +530,13 @@ export async function initLandingEffects({ bindPlans = true } = {}) {
   } else {
     await runPreloader();
   }
+  if (!effectsAlive) return destroyLandingEffects;
 
   ScrollTrigger.sort();
-  addEventListener('load', () => ScrollTrigger.refresh());
+  onWindowLoad = () => {
+    if (effectsAlive) ScrollTrigger.refresh();
+  };
+  addEventListener('load', onWindowLoad);
   return destroyLandingEffects;
 }
 

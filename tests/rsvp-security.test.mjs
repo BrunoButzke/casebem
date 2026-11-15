@@ -76,6 +76,9 @@ describe('RSVP Security Tests', () => {
           return { success: false };
         },
         async first() {
+          if (this.sql.includes('FROM wedding_settings')) {
+            return { rsvp_mode: 'open' };
+          }
           if (this.sql.includes('FROM rsvps')) {
             if (this.bindings.length === 2 && this.sql.includes('idempotency_key')) {
               const [weddingKey, idemKey] = this.bindings;

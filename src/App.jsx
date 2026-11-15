@@ -11,6 +11,7 @@ import Stationery from './pages/admin/Stationery.jsx';
 import Messages from './pages/admin/Messages.jsx';
 import Entertainment from './pages/admin/Entertainment.jsx';
 import Album from './pages/admin/Album.jsx';
+import CoupleSite from './pages/casal/CoupleSite.jsx';
 
 function RequireAuth({ children }) {
   const [status, setStatus] = useState('loading');
@@ -46,6 +47,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<Landing />} />
+      <Route path="/casal/:slug" element={<CoupleSite />} />
       <Route
         path="/entrar"
         element={

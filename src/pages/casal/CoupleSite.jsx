@@ -1,0 +1,49 @@
+import { useEffect, useState } from 'react';
+import { useParams } from 'react-router-dom';
+import { fetchCouplePage } from '../../lib/casal-api.mjs';
+import { coupleNavItems } from './couple-nav.mjs';
+
+export default function CoupleSite() {
+  const { slug } = useParams();
+  const [state, setState] = useState({ kind: 'loading' });
+
+  useEffect(() => {
+    let cancelled = false;
+    setState({ kind: 'loading' });
+    fetchCouplePage(slug).then((result) => {
+      if (cancelled) return;
+      if (!result.ok && result.status === 404) {
+        setState({ kind: 'not-found' });
+        return;
+      }
+      if (!result.ok) {
+        setState({ kind: 'not-found' });
+        return;
+      }
+      setState({ kind: 'ok', slug: result.slug, isPartner: result.isPartner });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [slug]);
+
+  if (state.kind === 'loading') {
+    return <p>Carregando…</p>;
+  }
+
+  if (state.kind === 'not-found') {
+    return <h1>Página não encontrada</h1>;
+  }
+
+  return (
+    <div className="couple-site">
+      <nav>
+        {coupleNavItems().map((item) => (
+          <a key={item.href} href={item.href}>
+            {item.label}
+          </a>
+        ))}
+      </nav>
+    </div>
+  );
+}

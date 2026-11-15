@@ -293,12 +293,16 @@ function guestListApiPlugin(env = {}) {
           }
 
           if (path === '/api/desafio/theme' && req.method === 'GET') {
-            const theme = await getDesafioTheme(null, PARTNER_ACCOUNT_ID);
+            const resolved = await resolvePublicSlugOrPartner(null, parsed.searchParams.get('slug'));
+            if (!resolved.ok) return sendJson(res, resolved.status, { error: resolved.error });
+            const theme = await getDesafioTheme(null, resolved.account.id);
             return sendJson(res, 200, { ok: true, theme, cssVars: themeToCssVars(theme) });
           }
 
           if (path === '/api/desafio/challenges' && req.method === 'GET') {
-            const catalog = await listChallengesPublic(null, PARTNER_ACCOUNT_ID);
+            const resolved = await resolvePublicSlugOrPartner(null, parsed.searchParams.get('slug'));
+            if (!resolved.ok) return sendJson(res, resolved.status, { error: resolved.error });
+            const catalog = await listChallengesPublic(null, resolved.account.id);
             return sendJson(res, 200, { ok: true, ...catalog });
           }
 
@@ -365,10 +369,13 @@ function guestListApiPlugin(env = {}) {
 
           if (path === '/api/desafio/answer' && req.method === 'POST') {
             const body = await readJsonBody(req);
+            const slugReq = new Request(`http://localhost${req.url}`);
+            const resolved = await resolvePublicSlugOrPartner(null, slugFromRequest(slugReq, body));
+            if (!resolved.ok) return sendJson(res, resolved.status, { error: resolved.error });
             try {
               const result = await gradeQuestion(
                 null,
-                PARTNER_ACCOUNT_ID,
+                resolved.account.id,
                 String(body?.questionId || ''),
                 body?.selectedIndex
               );

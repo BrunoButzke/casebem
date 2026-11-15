@@ -4,7 +4,7 @@
 
 import { getCorsHeaders } from '../../_lib/http-helpers.mjs';
 import { getDesafioTheme, themeToCssVars } from '../../_lib/desafio-theme-service.mjs';
-import { PARTNER_ACCOUNT_ID } from '../../_lib/auth-service.mjs';
+import { slugFromRequest, resolvePublicSlugOrPartner } from '../../_lib/public-slug.mjs';
 
 function json(headers, body, status = 200) {
   headers.set('Content-Type', 'application/json; charset=utf-8');
@@ -20,7 +20,12 @@ export async function onRequestGet(context) {
   const headers = getCorsHeaders(request);
 
   try {
-    const theme = await getDesafioTheme(env.DB || null, PARTNER_ACCOUNT_ID);
+    const slug = slugFromRequest(request);
+    const resolved = await resolvePublicSlugOrPartner(env.DB || null, slug);
+    if (!resolved.ok) {
+      return json(headers, { error: resolved.error }, resolved.status);
+    }
+    const theme = await getDesafioTheme(env.DB || null, resolved.account.id);
     return json(headers, { ok: true, theme, cssVars: themeToCssVars(theme) });
   } catch (err) {
     return json(headers, { ok: false, error: 'THEME_FAILED', message: err.message }, 500);

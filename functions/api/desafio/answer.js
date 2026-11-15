@@ -4,7 +4,7 @@
 
 import { getCorsHeaders, validateOrigin } from '../../_lib/http-helpers.mjs';
 import { gradeQuestion } from '../../_lib/challenges-service.mjs';
-import { PARTNER_ACCOUNT_ID } from '../../_lib/auth-service.mjs';
+import { slugFromRequest, resolvePublicSlugOrPartner } from '../../_lib/public-slug.mjs';
 
 function json(headers, body, status = 200) {
   headers.set('Content-Type', 'application/json; charset=utf-8');
@@ -31,10 +31,16 @@ export async function onRequestPost(context) {
     return json(headers, { ok: false, error: 'INVALID_JSON' }, 400);
   }
 
+  const slug = slugFromRequest(request, body);
+  const resolved = await resolvePublicSlugOrPartner(env.DB || null, slug);
+  if (!resolved.ok) {
+    return json(headers, { error: resolved.error }, resolved.status);
+  }
+
   try {
     const result = await gradeQuestion(
       env.DB || null,
-      PARTNER_ACCOUNT_ID,
+      resolved.account.id,
       String(body?.questionId || ''),
       body?.selectedIndex
     );

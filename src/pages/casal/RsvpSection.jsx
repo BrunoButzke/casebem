@@ -52,7 +52,18 @@ export default function RsvpSection({ slug }) {
     try {
       const data = await searchGuestsPublic(slug, q);
       const list = Array.isArray(data.matches) ? data.matches : [];
-      if (!data.ok || list.length === 0) {
+      if (!data.ok) {
+        setPhase('search');
+        setSelectedGuest(null);
+        setMatches([]);
+        setStatus({
+          type: 'error',
+          message:
+            data.message || data.error || 'Não foi possível buscar o convite. Tente de novo.',
+        });
+        return;
+      }
+      if (list.length === 0) {
         setPhase('search');
         setSelectedGuest(null);
         setMatches([]);
@@ -76,6 +87,7 @@ export default function RsvpSection({ slug }) {
   }
 
   async function sendRsvp() {
+    clearErrors();
     if (!selectedGuest?.displayName) {
       setStatus({ type: 'error', message: 'Busque e selecione seu convite antes de confirmar.' });
       setPhase('search');
@@ -100,8 +112,7 @@ export default function RsvpSection({ slug }) {
         if (data.status === 409) {
           setStatus({
             type: 'error',
-            message:
-              'Se você já confirmou, recupere o site no mesmo dispositivo ou fale com os noivos.',
+            message: 'Esta confirmação já foi registrada. Fale com os noivos se precisar alterar.',
           });
           return;
         }
@@ -246,7 +257,10 @@ export default function RsvpSection({ slug }) {
                       value="true"
                       checked={attending === true}
                       disabled={busy || done}
-                      onChange={() => setAttending(true)}
+                      onChange={() => {
+                        setAttending(true);
+                        setAttendingError('');
+                      }}
                     />
                     <span>Sim, estaremos lá!</span>
                   </label>
@@ -257,7 +271,10 @@ export default function RsvpSection({ slug }) {
                       value="false"
                       checked={attending === false}
                       disabled={busy || done}
-                      onChange={() => setAttending(false)}
+                      onChange={() => {
+                        setAttending(false);
+                        setAttendingError('');
+                      }}
                     />
                     <span>Infelizmente não poderei ir</span>
                   </label>

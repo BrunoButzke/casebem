@@ -123,6 +123,20 @@ test('RsvpSection asks to confirm by 15 November and has attending radios', () =
   assert.match(src, /searchGuestsPublic/);
 });
 
+test('RsvpSection uses not-found copy only after successful search with zero matches', () => {
+  const src = readFileSync(new URL('../src/pages/casal/RsvpSection.jsx', import.meta.url), 'utf8');
+  assert.doesNotMatch(src, /if\s*\(!data\.ok\s*\|\|\s*list\.length\s*===\s*0\)/);
+  assert.match(src, /if\s*\(!data\.ok\)/);
+  assert.match(src, /list\.length\s*===\s*0[\s\S]*Nome não encontrado na lista/);
+});
+
+test('RsvpSection clears validation on submit and softens duplicate RSVP copy', () => {
+  const src = readFileSync(new URL('../src/pages/casal/RsvpSection.jsx', import.meta.url), 'utf8');
+  assert.match(src, /async function sendRsvp\(\)[\s\S]*clearErrors\(\)/);
+  assert.match(src, /Esta confirmação já foi registrada/);
+  assert.doesNotMatch(src, /mesmo dispositivo/i);
+});
+
 test('PartnerHome renders RsvpSection inside confirmar-presenca', () => {
   const src = readFileSync(new URL('../src/pages/casal/PartnerHome.jsx', import.meta.url), 'utf8');
   assert.match(src, /<section className="rsvp" id="confirmar-presenca">/);

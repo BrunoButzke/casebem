@@ -1,10 +1,10 @@
 /**
  * PATCH /api/admin/messages — hide/unhide mural message
  * Body: { id, hidden: boolean }
- * Auth: Bearer ADMIN_PANEL_SECRET
+ * Auth: cookie cb_session
  */
 
-import { requireAdmin } from '../../_lib/admin-auth.mjs';
+import { requireAccount } from '../../_lib/session-auth.mjs';
 import { setMessageHidden } from '../../_lib/admin-service.mjs';
 import { getCorsHeaders, validateOrigin } from '../../_lib/http-helpers.mjs';
 
@@ -25,7 +25,7 @@ export async function onRequestPatch(context) {
     );
   }
 
-  const auth = requireAdmin(request, env);
+  const auth = await requireAccount(request, env);
   if (!auth.ok) {
     return Response.json(
       { ok: false, error: auth.error, message: auth.message },

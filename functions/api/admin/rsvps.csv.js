@@ -1,9 +1,9 @@
 /**
  * GET /api/admin/rsvps.csv — export RSVP list as CSV
- * Auth: Authorization: Bearer $ADMIN_PANEL_SECRET
+ * Auth: cookie cb_session
  */
 
-import { requireAdmin } from '../../_lib/admin-auth.mjs';
+import { requireAccount } from '../../_lib/session-auth.mjs';
 import { listRsvps, rsvpsToCsv } from '../../_lib/admin-service.mjs';
 import { getCorsHeaders } from '../../_lib/http-helpers.mjs';
 
@@ -15,7 +15,7 @@ export async function onRequestGet(context) {
   const { request, env } = context;
   const cors = getCorsHeaders(request);
 
-  const auth = requireAdmin(request, env);
+  const auth = await requireAccount(request, env);
   if (!auth.ok) {
     cors.set('Content-Type', 'application/json; charset=utf-8');
     return Response.json(

@@ -4,37 +4,41 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { requireAdmin } from '../functions/_lib/admin-auth.mjs';
+import { requireAccount } from '../functions/_lib/session-auth.mjs';
+import { signup } from '../functions/_lib/auth-service.mjs';
 import { rsvpsToCsv, markIntentPaidByProviderRef, setMessageHidden } from '../functions/_lib/admin-service.mjs';
 import { processMercadoPagoWebhook } from '../functions/_lib/mp-webhook.mjs';
 import { sendAdminNotification } from '../functions/_lib/notify-email.mjs';
 
-test('requireAdmin: 503 se ADMIN_PANEL_SECRET curto/ausente', () => {
-  const req = new Request('https://casebem.com/api/admin/summary', {
-    headers: { Authorization: 'Bearer abc' },
-  });
-  const r = requireAdmin(req, {});
-  assert.equal(r.ok, false);
-  assert.equal(r.status, 503);
-});
-
-test('requireAdmin: 401 com token errado', () => {
-  const secret = 'a'.repeat(20);
-  const req = new Request('https://casebem.com/api/admin/summary', {
-    headers: { Authorization: 'Bearer wrong-token-xxxxxx' },
-  });
-  const r = requireAdmin(req, { ADMIN_PANEL_SECRET: secret });
+test('requireAccount: 401 sem cookie', async () => {
+  const req = new Request('https://casebem.com/api/admin/summary');
+  const r = await requireAccount(req, { DB: null });
   assert.equal(r.ok, false);
   assert.equal(r.status, 401);
 });
 
-test('requireAdmin: ok com Bearer correto', () => {
-  const secret = 'super-secret-admin-1';
+test('requireAccount: 401 com cookie inválido', async () => {
   const req = new Request('https://casebem.com/api/admin/summary', {
-    headers: { Authorization: `Bearer ${secret}` },
+    headers: { cookie: 'cb_session=not-a-session' },
   });
-  const r = requireAdmin(req, { ADMIN_PANEL_SECRET: secret });
+  const r = await requireAccount(req, { DB: null });
+  assert.equal(r.ok, false);
+  assert.equal(r.status, 401);
+});
+
+test('requireAccount: ok com sessão válida', async () => {
+  const now = new Date().toISOString();
+  const created = await signup(
+    null,
+    { email: 'admin-panel@x.com', password: 'segredo12', plan: 'basic' },
+    now
+  );
+  const req = new Request('https://casebem.com/api/admin/summary', {
+    headers: { cookie: `cb_session=${created.sessionId}` },
+  });
+  const r = await requireAccount(req, { DB: null });
   assert.equal(r.ok, true);
+  assert.equal(r.account.email, 'admin-panel@x.com');
 });
 
 test('rsvpsToCsv: gera header e escapa vírgulas', () => {

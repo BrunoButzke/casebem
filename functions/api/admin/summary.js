@@ -1,10 +1,10 @@
 /**
  * GET /api/admin/summary — painel dos noivos
- * Auth: Authorization: Bearer $ADMIN_PANEL_SECRET
+ * Auth: cookie cb_session
  * Free-tier: Pages Function + D1 only
  */
 
-import { requireAdmin } from '../../_lib/admin-auth.mjs';
+import { requireAccount } from '../../_lib/session-auth.mjs';
 import { listMessagesAdmin, listGiftsAdmin } from '../../_lib/admin-service.mjs';
 import {
   getRsvpMode,
@@ -23,7 +23,7 @@ export async function onRequestGet(context) {
   const headers = getCorsHeaders(request);
   headers.set('Content-Type', 'application/json; charset=utf-8');
 
-  const auth = requireAdmin(request, env);
+  const auth = await requireAccount(request, env);
   if (!auth.ok) {
     return Response.json(
       { ok: false, error: auth.error, message: auth.message },

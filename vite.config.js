@@ -70,6 +70,7 @@ import {
   updateDesafioTheme,
   themeToCssVars,
 } from './functions/_lib/desafio-theme-service.mjs';
+import { requireAccount } from './functions/_lib/session-auth.mjs';
 
 const rootDir = dirname(fileURLToPath(import.meta.url));
 
@@ -130,17 +131,21 @@ const localMessages = [
 ];
 const localMessageIdempotency = new Map();
 
-async function nodeRequestToFetch(req) {
-  const chunks = [];
-  for await (const chunk of req) chunks.push(chunk);
+function nodeHeadersToFetch(req) {
   const headers = new Headers();
   for (const [key, value] of Object.entries(req.headers)) {
     if (value == null) continue;
     headers.set(key, Array.isArray(value) ? value.join(', ') : String(value));
   }
+  return headers;
+}
+
+async function nodeRequestToFetch(req) {
+  const chunks = [];
+  for await (const chunk of req) chunks.push(chunk);
   const method = req.method || 'GET';
   const body = method === 'GET' || method === 'HEAD' ? undefined : Buffer.concat(chunks);
-  return new Request(`http://localhost${req.url}`, { method, headers, body });
+  return new Request(`http://localhost${req.url}`, { method, headers: nodeHeadersToFetch(req), body });
 }
 
 function sendBytes(res, status, bytes, contentType) {
@@ -423,21 +428,17 @@ function adminApiPlugin(env) {
           const path = parsed.pathname;
           if (!path.startsWith('/api/admin/')) return next();
 
-          const secret = env.ADMIN_PANEL_SECRET || '';
-          const auth = req.headers.authorization || '';
-          const token = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
-          if (!secret || secret.length < 16) {
-            return sendJson(res, 503, {
-              ok: false,
-              error: 'ADMIN_NOT_CONFIGURED',
-              message: 'Defina ADMIN_PANEL_SECRET (≥16) no .env',
-            });
-          }
-          if (token !== secret) {
+          // Header-only Fetch Request (nodeRequestToFetch would consume the body stream).
+          const fetchRequest = new Request(`http://localhost${req.url}`, {
+            method: req.method || 'GET',
+            headers: nodeHeadersToFetch(req),
+          });
+          const auth = await requireAccount(fetchRequest, { DB: null });
+          if (!auth.ok) {
             return sendJson(res, 401, {
               ok: false,
-              error: 'UNAUTHORIZED',
-              message: 'Token admin inválido.',
+              error: auth.error,
+              message: auth.message,
             });
           }
 

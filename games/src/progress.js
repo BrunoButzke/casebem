@@ -1,5 +1,13 @@
+import { getGameSlug } from './game-api.mjs';
+
+export function progressStorageKey(slug, guestName) {
+  const guest = String(guestName || '').trim().toLowerCase();
+  if (!slug) return `casebem_desafio_progress:${guest}`;
+  return `casebem_desafio_progress:${guest}:${slug}`;
+}
+
 function storageKey(guestName) {
-  return `casebem_desafio_progress:${String(guestName || '').trim().toLowerCase()}`;
+  return progressStorageKey(getGameSlug(), guestName);
 }
 
 export function emptyProgress() {

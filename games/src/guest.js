@@ -1,8 +1,17 @@
-const STORAGE_KEY = 'casebem_desafio_guest_name';
+import { getGameSlug } from './game-api.mjs';
+
+export function guestStorageKey(slug) {
+  if (!slug) return 'casebem_desafio_guest_name';
+  return `casebem_desafio_guest_name:${slug}`;
+}
+
+function currentStorageKey() {
+  return guestStorageKey(getGameSlug());
+}
 
 function readStore(store) {
   try {
-    return store.getItem(STORAGE_KEY) || '';
+    return store.getItem(currentStorageKey()) || '';
   } catch {
     return '';
   }
@@ -10,8 +19,9 @@ function readStore(store) {
 
 function writeStore(store, value) {
   try {
-    if (value) store.setItem(STORAGE_KEY, value);
-    else store.removeItem(STORAGE_KEY);
+    const key = currentStorageKey();
+    if (value) store.setItem(key, value);
+    else store.removeItem(key);
   } catch {
     /* ignore quota / private mode */
   }

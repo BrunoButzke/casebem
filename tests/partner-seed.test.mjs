@@ -28,6 +28,21 @@ test('ensurePartnerAccount is a no-op without email or password', async () => {
   assert.equal(await resolveAccountBySlug(db, 'dani-carine'), null);
 });
 
+test('ensurePartnerAccount does not rehash password on second call', async () => {
+  const db = new MemoryAuthDb();
+  const now = '2026-11-14T23:00:00.000Z';
+  const creds = { email: 'dani@casebem.com', password: 'segredo12' };
+  await ensurePartnerAccount(db, creds, now);
+  const accAfterFirst = await db.prepare('SELECT * FROM accounts WHERE id = ?').bind(PARTNER_ACCOUNT_ID).first();
+  assert.ok(accAfterFirst.password_hash);
+  await ensurePartnerAccount(db, creds, now);
+  const accAfterSecond = await db.prepare('SELECT * FROM accounts WHERE id = ?').bind(PARTNER_ACCOUNT_ID).first();
+  assert.equal(accAfterSecond.password_hash, accAfterFirst.password_hash);
+  assert.equal(accAfterSecond.password_salt, accAfterFirst.password_salt);
+  const session = await login(db, creds, now);
+  assert.ok(session.sessionId);
+});
+
 test('ensurePartnerAccount updates existing partner row by id', async () => {
   const db = new MemoryAuthDb();
   const now = '2026-11-14T23:00:00.000Z';

@@ -4,6 +4,14 @@ export const PARTNER_ACCOUNT_ID = 'partner-dani-carine';
 export const SESSION_COOKIE = 'cb_session';
 export const SESSION_MAX_AGE_SEC = 1209600;
 
+let processMemoryDb = null;
+
+function resolveDb(db) {
+  if (db) return db;
+  if (!processMemoryDb) processMemoryDb = new ProcessMemoryAuthDb();
+  return processMemoryDb;
+}
+
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const PLANS = new Set(['basic', 'pro', 'vip']);
 
@@ -70,6 +78,7 @@ async function selectAccountById(db, id) {
 }
 
 export async function signup(db, { email, password, plan }, nowIso) {
+  db = resolveDb(db);
   const normalized = normalizeEmail(email);
   if (!EMAIL_RE.test(normalized)) throw new Error('INVALID_EMAIL');
   if (String(password || '').length < 8) throw new Error('PASSWORD_TOO_SHORT');
@@ -104,6 +113,7 @@ VALUES (?, ?, ?, ?, ?, ?, NULL, 0, ?)`
 }
 
 export async function login(db, { email, password }, nowIso) {
+  db = resolveDb(db);
   const normalized = normalizeEmail(email);
   const row = await selectAccountByEmail(db, normalized);
   if (!row || !(await verifyPassword(password, row.password_salt, row.password_hash))) {
@@ -115,11 +125,13 @@ export async function login(db, { email, password }, nowIso) {
 
 export async function logout(db, sessionId) {
   if (!sessionId) return;
+  db = resolveDb(db);
   await db.prepare('DELETE FROM sessions WHERE id = ?').bind(sessionId).run();
 }
 
 export async function getSessionAccount(db, sessionId, nowIso) {
   if (!sessionId) return null;
+  db = resolveDb(db);
   const session = await db.prepare('SELECT * FROM sessions WHERE id = ?').bind(sessionId).first();
   if (!session) return null;
   if (session.expires_at < nowIso) return null;
@@ -129,6 +141,7 @@ export async function getSessionAccount(db, sessionId, nowIso) {
 }
 
 export async function upgradePlan(db, accountId, plan) {
+  db = resolveDb(db);
   const resolvedPlan = resolvePlan(plan);
   const row = await selectAccountById(db, accountId);
   if (!row || row.plan !== 'basic') throw new Error('ACCOUNT_NOT_BASIC');
@@ -142,6 +155,104 @@ export async function upgradePlan(db, accountId, plan) {
 
 export async function resolveAccountBySlug(db, slug) {
   if (!slug) return null;
+  db = resolveDb(db);
   const row = await db.prepare('SELECT * FROM accounts WHERE slug = ?').bind(slug).first();
   return row ?? null;
+}
+
+function compactSql(sql) {
+  return String(sql).replace(/\s+/g, ' ').trim();
+}
+
+class ProcessMemoryAuthDb {
+  constructor() {
+    this.accounts = new Map();
+    this.sessions = new Map();
+  }
+
+  prepare(sql) {
+    return new ProcessMemoryAuthStatement(this, compactSql(sql));
+  }
+
+  findAccountById(id) {
+    for (const row of this.accounts.values()) {
+      if (row.id === id) return row;
+    }
+    return null;
+  }
+
+  findAccountBySlug(slug) {
+    for (const row of this.accounts.values()) {
+      if (row.slug === slug) return row;
+    }
+    return null;
+  }
+}
+
+class ProcessMemoryAuthStatement {
+  constructor(db, sql) {
+    this.db = db;
+    this.sql = sql;
+    this.params = [];
+  }
+
+  bind(...params) {
+    this.params = params;
+    return this;
+  }
+
+  async first() {
+    const { sql, params, db } = this;
+    if (sql.includes('SELECT * FROM accounts WHERE email')) {
+      return db.accounts.get(params[0]) ?? null;
+    }
+    if (sql.includes('SELECT * FROM accounts WHERE slug')) {
+      return db.findAccountBySlug(params[0]);
+    }
+    if (sql.includes('SELECT * FROM accounts WHERE id')) {
+      return db.findAccountById(params[0]);
+    }
+    if (sql.includes('SELECT * FROM sessions WHERE id')) {
+      return db.sessions.get(params[0]) ?? null;
+    }
+    throw new Error(`ProcessMemoryAuthDb: unsupported first() SQL: ${sql}`);
+  }
+
+  async run() {
+    const { sql, params, db } = this;
+    if (sql.includes('INSERT INTO accounts')) {
+      const [id, email, password_hash, password_salt, plan, plan_status, created_at] = params;
+      db.accounts.set(email, {
+        id,
+        email,
+        password_hash,
+        password_salt,
+        plan,
+        plan_status,
+        slug: null,
+        is_partner: 0,
+        created_at,
+      });
+      return { success: true };
+    }
+    if (sql.includes('INSERT INTO sessions')) {
+      const [id, account_id, expires_at, created_at] = params;
+      db.sessions.set(id, { id, account_id, expires_at, created_at });
+      return { success: true };
+    }
+    if (sql.includes('DELETE FROM sessions WHERE id')) {
+      db.sessions.delete(params[0]);
+      return { success: true };
+    }
+    if (sql.includes('UPDATE accounts SET plan')) {
+      const [plan, plan_status, id] = params;
+      const row = db.findAccountById(id);
+      if (row) {
+        row.plan = plan;
+        row.plan_status = plan_status;
+      }
+      return { success: true };
+    }
+    throw new Error(`ProcessMemoryAuthDb: unsupported run() SQL: ${sql}`);
+  }
 }

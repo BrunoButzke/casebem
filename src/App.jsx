@@ -5,6 +5,12 @@ import Landing from './pages/Landing.jsx';
 import Login from './pages/Login.jsx';
 import AdminHub from './pages/AdminHub.jsx';
 import ComingSoon from './pages/admin/ComingSoon.jsx';
+import Guests from './pages/admin/Guests.jsx';
+import Gifts from './pages/admin/Gifts.jsx';
+import Stationery from './pages/admin/Stationery.jsx';
+import Messages from './pages/admin/Messages.jsx';
+import Entertainment from './pages/admin/Entertainment.jsx';
+import Album from './pages/admin/Album.jsx';
 
 function RequireAuth({ children }) {
   const [status, setStatus] = useState('loading');
@@ -34,10 +40,6 @@ function GuestOnly({ children }) {
   if (status === 'loading') return <p>Carregando…</p>;
   if (status === 'in') return <Navigate to="/admin" replace />;
   return children;
-}
-
-function SectionPlaceholder() {
-  return <p>Carregando…</p>;
 }
 
 export default function App() {
@@ -72,7 +74,7 @@ export default function App() {
         path="/admin/convidados"
         element={
           <RequireAuth>
-            <SectionPlaceholder />
+            <Guests />
           </RequireAuth>
         }
       />
@@ -80,7 +82,7 @@ export default function App() {
         path="/admin/presentes"
         element={
           <RequireAuth>
-            <SectionPlaceholder />
+            <Gifts />
           </RequireAuth>
         }
       />
@@ -88,7 +90,7 @@ export default function App() {
         path="/admin/papelaria"
         element={
           <RequireAuth>
-            <SectionPlaceholder />
+            <Stationery />
           </RequireAuth>
         }
       />
@@ -96,7 +98,7 @@ export default function App() {
         path="/admin/mural"
         element={
           <RequireAuth>
-            <SectionPlaceholder />
+            <Messages />
           </RequireAuth>
         }
       />
@@ -104,7 +106,7 @@ export default function App() {
         path="/admin/entretenimento"
         element={
           <RequireAuth>
-            <SectionPlaceholder />
+            <Entertainment />
           </RequireAuth>
         }
       />
@@ -112,7 +114,7 @@ export default function App() {
         path="/admin/album"
         element={
           <RequireAuth>
-            <SectionPlaceholder />
+            <Album />
           </RequireAuth>
         }
       />

@@ -5,11 +5,35 @@
  */
 
 import { requireAccount } from '../../_lib/session-auth.mjs';
-import { setMessageHidden } from '../../_lib/admin-service.mjs';
+import { listMessagesAdmin, setMessageHidden } from '../../_lib/admin-service.mjs';
 import { getCorsHeaders, validateOrigin } from '../../_lib/http-helpers.mjs';
 
 export async function onRequestOptions(context) {
   return new Response(null, { status: 204, headers: getCorsHeaders(context.request) });
+}
+
+export async function onRequestGet(context) {
+  const { request, env } = context;
+  const headers = getCorsHeaders(request);
+  headers.set('Content-Type', 'application/json; charset=utf-8');
+
+  const auth = await requireAccount(request, env);
+  if (!auth.ok) {
+    return Response.json(
+      { ok: false, error: auth.error, message: auth.message },
+      { status: auth.status, headers }
+    );
+  }
+
+  try {
+    const messages = await listMessagesAdmin(env.DB || null, auth.account.id);
+    return Response.json({ ok: true, messages }, { status: 200, headers });
+  } catch (err) {
+    return Response.json(
+      { ok: false, error: 'LIST_FAILED', message: err.message },
+      { status: 500, headers }
+    );
+  }
 }
 
 export async function onRequestPatch(context) {

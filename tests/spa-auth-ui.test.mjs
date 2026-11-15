@@ -6,6 +6,10 @@ import assert from 'node:assert/strict';
 import { Window } from 'happy-dom';
 import { hubTiles } from '../src/pages/admin/hub-tiles.mjs';
 import { parseMe, signupRequest } from '../src/lib/session-api.mjs';
+import {
+  addGuestsAdmin,
+  shouldFetchAdminResource,
+} from '../src/lib/admin-api.mjs';
 
 test('basic sees entertainment locked; pro does not', () => {
   assert.equal(hubTiles('basic').find((t) => t.id === 'entretenimento').needsUpgrade, true);
@@ -85,4 +89,35 @@ test('parseMe ignores HTML 200 from SPA fallback', async () => {
 
   const unauthorized = new Response(JSON.stringify({ ok: false }), { status: 401 });
   assert.equal(await parseMe(unauthorized), null);
+});
+
+test('basic entertainment and album skip admin APIs; guests stay open', () => {
+  assert.equal(shouldFetchAdminResource('basic', 'entretenimento'), false);
+  assert.equal(shouldFetchAdminResource('basic', 'album'), false);
+  assert.equal(shouldFetchAdminResource('pro', 'entretenimento'), true);
+  assert.equal(shouldFetchAdminResource('vip', 'album'), true);
+  assert.equal(shouldFetchAdminResource('basic', 'convidados'), true);
+});
+
+test('addGuestsAdmin posts names to /api/admin/guest-list with credentials include', async () => {
+  const window = new Window({ url: 'http://localhost/' });
+  globalThis.window = window;
+  globalThis.document = window.document;
+  let captured;
+  globalThis.fetch = async (url, init) => {
+    captured = { url, init };
+    return new Response(JSON.stringify({ ok: true, guests: [] }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+
+  const res = await addGuestsAdmin(['Ana Silva']);
+  assert.equal(String(captured.url), '/api/admin/guest-list');
+  assert.equal(captured.init.method, 'POST');
+  assert.equal(captured.init.credentials, 'include');
+  const body = JSON.parse(captured.init.body);
+  assert.deepEqual(body.names, ['Ana Silva']);
+  assert.equal(body.wedding_key, undefined);
+  assert.equal(res.status, 200);
 });

@@ -205,12 +205,48 @@
   color: var(--muted);
 }
 
-.hub-field input {
+.hub-field input,
+.hub-field textarea {
   padding: 0.8rem 0.95rem;
   border-radius: 12px;
   border: 1px solid var(--line);
   background: #fff;
   font: inherit;
+}
+
+.hub-field textarea {
+  resize: vertical;
+  min-height: 5rem;
+}
+
+.hub-list {
+  list-style: none;
+  margin: 0 0 1.5rem;
+  padding: 0;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.hub-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 0.9rem 1rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--line);
+}
+
+.hub-list__meta {
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 400;
+}
+
+.hub-empty {
+  margin: 0 0 1.25rem;
+  color: var(--muted);
 }
 
 .hub-btn {

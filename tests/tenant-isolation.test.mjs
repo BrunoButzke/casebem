@@ -103,3 +103,28 @@ test('guest-list handler POST as A is empty for B', async () => {
   const bodyA = await listedA.json();
   assert.equal(bodyA.guests.some((g) => g.displayName === 'Ana Silva'), true);
 });
+
+test('admin guest-list uses session account not body wedding_key', async () => {
+  resetMemoryGuestsForTests();
+  const now = new Date().toISOString();
+  const a = await signup(null, { email: 'ga@x.com', password: 'segredo12', plan: 'basic' }, now);
+  const b = await signup(null, { email: 'gb@x.com', password: 'segredo12', plan: 'basic' }, now);
+
+  const posted = await guestListPost(
+    guestListCtx('http://localhost/api/admin/guest-list', {
+      method: 'POST',
+      cookie: `cb_session=${a.sessionId}`,
+      body: { names: ['Ana Silva'], wedding_key: 'dani-carine' },
+    })
+  );
+  assert.equal(posted.status, 200);
+
+  const listedB = await guestListGet(
+    guestListCtx('http://localhost/api/admin/guest-list', {
+      cookie: `cb_session=${b.sessionId}`,
+    })
+  );
+  assert.equal(listedB.status, 200);
+  const bodyB = await listedB.json();
+  assert.equal(bodyB.guests.length, 0);
+});

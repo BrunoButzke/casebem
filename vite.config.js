@@ -73,6 +73,26 @@ import {
 import { requireAccount } from './functions/_lib/session-auth.mjs';
 import { PARTNER_ACCOUNT_ID } from './functions/_lib/auth-service.mjs';
 import { listMessagesAdmin } from './functions/_lib/admin-service.mjs';
+import {
+  onRequestPost as signupPost,
+  onRequestOptions as signupOptions,
+} from './functions/api/auth/signup.js';
+import {
+  onRequestPost as loginPost,
+  onRequestOptions as loginOptions,
+} from './functions/api/auth/login.js';
+import {
+  onRequestPost as logoutPost,
+  onRequestOptions as logoutOptions,
+} from './functions/api/auth/logout.js';
+import {
+  onRequestGet as meGet,
+  onRequestOptions as meOptions,
+} from './functions/api/auth/me.js';
+import {
+  onRequestPost as planPost,
+  onRequestOptions as planOptions,
+} from './functions/api/account/plan.js';
 
 const rootDir = dirname(fileURLToPath(import.meta.url));
 
@@ -148,6 +168,59 @@ async function nodeRequestToFetch(req) {
   const method = req.method || 'GET';
   const body = method === 'GET' || method === 'HEAD' ? undefined : Buffer.concat(chunks);
   return new Request(`http://localhost${req.url}`, { method, headers: nodeHeadersToFetch(req), body });
+}
+
+async function sendFunctionResponse(res, response) {
+  res.statusCode = response.status;
+  const cookies =
+    typeof response.headers.getSetCookie === 'function' ? response.headers.getSetCookie() : [];
+  for (const [key, value] of response.headers.entries()) {
+    if (key.toLowerCase() === 'set-cookie') continue;
+    res.setHeader(key, value);
+  }
+  if (cookies.length) {
+    res.setHeader('Set-Cookie', cookies);
+  } else {
+    const single = response.headers.get('set-cookie');
+    if (single) res.setHeader('Set-Cookie', single);
+  }
+  const buf = Buffer.from(await response.arrayBuffer());
+  res.end(buf.length ? buf : undefined);
+}
+
+function authApiPlugin(env) {
+  const pagesEnv = {
+    DB: null,
+    PARTNER_EMAIL: env.PARTNER_EMAIL,
+    PARTNER_BOOTSTRAP_PASSWORD: env.PARTNER_BOOTSTRAP_PASSWORD,
+  };
+  const routes = {
+    '/api/auth/signup': { POST: signupPost, OPTIONS: signupOptions },
+    '/api/auth/login': { POST: loginPost, OPTIONS: loginOptions },
+    '/api/auth/logout': { POST: logoutPost, OPTIONS: logoutOptions },
+    '/api/auth/me': { GET: meGet, OPTIONS: meOptions },
+    '/api/account/plan': { POST: planPost, OPTIONS: planOptions },
+  };
+  return {
+    name: 'auth-api-local',
+    configureServer(server) {
+      server.middlewares.use(async (req, res, next) => {
+        try {
+          const parsed = new URL(req.url || '/', 'http://localhost');
+          const handlers = routes[parsed.pathname];
+          if (!handlers) return next();
+          const method = String(req.method || 'GET').toUpperCase();
+          const handler = handlers[method];
+          if (!handler) return next();
+          const request = await nodeRequestToFetch(req);
+          const response = await handler({ request, env: pagesEnv });
+          return sendFunctionResponse(res, response);
+        } catch (err) {
+          return sendJson(res, 500, { ok: false, error: err?.message || 'Erro interno.' });
+        }
+      });
+    },
+  };
 }
 
 function sendBytes(res, status, bytes, contentType) {
@@ -757,6 +830,18 @@ function adminApiPlugin(env) {
             }
           }
 
+          if (path === '/api/admin/messages' && req.method === 'GET') {
+            const messages = await listMessagesAdmin(null, auth.account.id);
+            return sendJson(res, 200, { ok: true, messages });
+          }
+
+          if (path === '/api/admin/gallery' && req.method === 'GET') {
+            if (auth.account.id !== PARTNER_ACCOUNT_ID) {
+              return sendJson(res, 200, { ok: true, photos: [] });
+            }
+            return sendJson(res, 200, { ok: true, photos: await listGalleryPhotos(null) });
+          }
+
           if (path === '/api/admin/challenges/stamp-cards') {
             try {
               if (req.method === 'GET') {
@@ -879,7 +964,14 @@ export default defineConfig(({ mode }) => {
   return {
     root: '.',
     publicDir: 'public',
-    plugins: [mpaSpaFallbackPlugin(), react(), guestListApiPlugin(), adminApiPlugin(env), mercadopagoApiPlugin(env)],
+    plugins: [
+      mpaSpaFallbackPlugin(),
+      react(),
+      authApiPlugin(env),
+      guestListApiPlugin(),
+      adminApiPlugin(env),
+      mercadopagoApiPlugin(env),
+    ],
     build: {
       outDir: 'dist',
       emptyOutDir: true,

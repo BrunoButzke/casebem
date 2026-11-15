@@ -802,6 +802,19 @@ function adminApiPlugin(env) {
             }
           }
 
+          if (path === '/api/admin/page') {
+            const { onRequestGet, onRequestPut } = await import('./functions/api/admin/page.js');
+            if (req.method === 'GET') {
+              const resFn = await onRequestGet({ request: fetchRequest, env: { DB: null } });
+              return sendFunctionResponse(res, resFn);
+            }
+            if (req.method === 'PUT') {
+              const request = await nodeRequestToFetch(req);
+              const resFn = await onRequestPut({ request, env: { DB: null } });
+              return sendFunctionResponse(res, resFn);
+            }
+          }
+
           if (path === '/api/admin/stationery') {
             const origin = `http://${req.headers.host || 'localhost:5173'}`;
             const mapErr = (err) => {

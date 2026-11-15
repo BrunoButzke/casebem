@@ -19,6 +19,20 @@ test('couple nav omits playlist, lodging, stationery and login', () => {
   assert.equal(ids.some((h) => h.includes('playlist') || h.includes('hosped')), false);
 });
 
+test('fetchCouplePage invalid JSON on error response does not throw', async () => {
+  const window = new Window({ url: 'http://localhost/casal/x' });
+  globalThis.window = window;
+  globalThis.fetch = async () =>
+    new Response('not-json', {
+      status: 502,
+      headers: { 'content-type': 'application/json' },
+    });
+  const result = await fetchCouplePage('x');
+  assert.equal(result.ok, false);
+  assert.equal(result.status, 502);
+  assert.equal(result.error, 'SLUG_NOT_FOUND');
+});
+
 test('fetchCouplePage 404 yields SLUG_NOT_FOUND', async () => {
   const window = new Window({ url: 'http://localhost/casal/x' });
   globalThis.window = window;
@@ -33,6 +47,11 @@ test('fetchCouplePage 404 yields SLUG_NOT_FOUND', async () => {
   assert.equal(result.ok, false);
   assert.equal(result.status, 404);
   assert.equal(result.error, 'SLUG_NOT_FOUND');
+});
+
+test('CoupleSite catches fetchCouplePage rejection', () => {
+  const page = readFileSync(new URL('../src/pages/casal/CoupleSite.jsx', import.meta.url), 'utf8');
+  assert.match(page, /fetchCouplePage\(slug\)[\s\S]*\.catch\s*\(/);
 });
 
 test('App.jsx declares /casal/:slug and CoupleSite has no admin login', () => {

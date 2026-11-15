@@ -10,18 +10,19 @@ export default function CoupleSite() {
   useEffect(() => {
     let cancelled = false;
     setState({ kind: 'loading' });
-    fetchCouplePage(slug).then((result) => {
-      if (cancelled) return;
-      if (!result.ok && result.status === 404) {
+    fetchCouplePage(slug)
+      .then((result) => {
+        if (cancelled) return;
+        if (!result.ok) {
+          setState({ kind: 'not-found' });
+          return;
+        }
+        setState({ kind: 'ok', slug: result.slug, isPartner: result.isPartner });
+      })
+      .catch(() => {
+        if (cancelled) return;
         setState({ kind: 'not-found' });
-        return;
-      }
-      if (!result.ok) {
-        setState({ kind: 'not-found' });
-        return;
-      }
-      setState({ kind: 'ok', slug: result.slug, isPartner: result.isPartner });
-    });
+      });
     return () => {
       cancelled = true;
     };

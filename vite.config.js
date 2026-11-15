@@ -307,14 +307,18 @@ function guestListApiPlugin(env = {}) {
           }
 
           if (path === '/api/desafio/gallery' && req.method === 'GET') {
-            return sendJson(res, 200, { ok: true, photos: await listGalleryPhotos(null) });
+            const resolved = await resolvePublicSlugOrPartner(null, parsed.searchParams.get('slug'));
+            if (!resolved.ok) return sendJson(res, resolved.status, { error: resolved.error });
+            return sendJson(res, 200, { ok: true, photos: await listGalleryPhotos(null, resolved.account.id) });
           }
 
           if (path === '/api/desafio/gallery' && req.method === 'POST') {
             try {
               const request = await nodeRequestToFetch(req);
               const payload = await parseGalleryUpload(request);
-              const photo = await upsertGalleryPhoto(null, payload, null);
+              const resolved = await resolvePublicSlugOrPartner(null, slugFromRequest(request, payload));
+              if (!resolved.ok) return sendJson(res, resolved.status, { error: resolved.error });
+              const photo = await upsertGalleryPhoto(null, payload, null, resolved.account.id);
               return sendJson(res, 201, { ok: true, photo });
             } catch (err) {
               const map = { VALIDATION: 400, GALLERY_UNAVAILABLE: 503 };
@@ -329,6 +333,8 @@ function guestListApiPlugin(env = {}) {
 
           if (path === '/api/desafio/gallery' && req.method === 'DELETE') {
             try {
+              const resolved = await resolvePublicSlugOrPartner(null, parsed.searchParams.get('slug'));
+              if (!resolved.ok) return sendJson(res, resolved.status, { error: resolved.error });
               await deleteGalleryPhoto(
                 null,
                 {
@@ -336,7 +342,8 @@ function guestListApiPlugin(env = {}) {
                   guestName: parsed.searchParams.get('guestName'),
                   missionId: parsed.searchParams.get('missionId'),
                 },
-                null
+                null,
+                resolved.account.id
               );
               return sendJson(res, 200, { ok: true, removed: true });
             } catch (err) {
@@ -348,7 +355,14 @@ function guestListApiPlugin(env = {}) {
           const galleryImage = path.match(/^\/api\/desafio\/gallery\/([^/]+)\/image$/);
           if (galleryImage && req.method === 'GET') {
             try {
-              const image = await getGalleryImage(null, decodeURIComponent(galleryImage[1]), null);
+              const resolved = await resolvePublicSlugOrPartner(null, parsed.searchParams.get('slug'));
+              if (!resolved.ok) return sendJson(res, resolved.status, { error: resolved.error });
+              const image = await getGalleryImage(
+                null,
+                decodeURIComponent(galleryImage[1]),
+                null,
+                resolved.account.id
+              );
               return sendBytes(res, 200, image.bytes, image.contentType);
             } catch (err) {
               const map = { NOT_FOUND: 404, INVALID_ID: 400 };
@@ -359,7 +373,13 @@ function guestListApiPlugin(env = {}) {
           const galleryOne = path.match(/^\/api\/desafio\/gallery\/([^/]+)$/);
           if (galleryOne && req.method === 'GET') {
             try {
-              const photo = await getGalleryPhoto(null, decodeURIComponent(galleryOne[1]));
+              const resolved = await resolvePublicSlugOrPartner(null, parsed.searchParams.get('slug'));
+              if (!resolved.ok) return sendJson(res, resolved.status, { error: resolved.error });
+              const photo = await getGalleryPhoto(
+                null,
+                decodeURIComponent(galleryOne[1]),
+                resolved.account.id
+              );
               return sendJson(res, 200, { ok: true, photo });
             } catch (err) {
               const map = { NOT_FOUND: 404, INVALID_ID: 400 };

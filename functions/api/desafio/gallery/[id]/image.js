@@ -4,6 +4,7 @@
 
 import { getCorsHeaders } from '../../../../_lib/http-helpers.mjs';
 import { getGalleryImage } from '../../../../_lib/gallery-service.mjs';
+import { slugFromRequest, resolvePublicSlugOrPartner } from '../../../../_lib/public-slug.mjs';
 
 export async function onRequestOptions(context) {
   return new Response(null, { status: 204, headers: getCorsHeaders(context.request) });
@@ -13,7 +14,17 @@ export async function onRequestGet(context) {
   const { request, env, params } = context;
   const headers = getCorsHeaders(request);
   try {
-    const image = await getGalleryImage(env.DB || null, String(params?.id || ''), env.GALLERY || env.R2 || null);
+    const resolved = await resolvePublicSlugOrPartner(env.DB || null, slugFromRequest(request));
+    if (!resolved.ok) {
+      headers.set('Content-Type', 'application/json; charset=utf-8');
+      return Response.json({ error: resolved.error }, { status: resolved.status, headers });
+    }
+    const image = await getGalleryImage(
+      env.DB || null,
+      String(params?.id || ''),
+      env.GALLERY || env.R2 || null,
+      resolved.account.id
+    );
     headers.set('Content-Type', image.contentType || 'image/jpeg');
     headers.set('Cache-Control', 'public, max-age=31536000, immutable');
     return new Response(image.bytes, { status: 200, headers });

@@ -1,4 +1,5 @@
 import { WEDDING_KEY } from './challenges-validators.mjs';
+import { PARTNER_ACCOUNT_ID } from './auth-service.mjs';
 
 export const GALLERY_IMAGE_MAX_BYTES = 8 * 1024 * 1024;
 const DATA_URL = /^data:image\/(jpeg|jpg|png|webp);base64,([A-Za-z0-9+/=\s]+)$/i;
@@ -31,8 +32,12 @@ function extensionFor(contentType) {
   return '.jpg';
 }
 
-function objectKeyFor(id, contentType) {
-  return `desafio/${WEDDING_KEY}/${id}${extensionFor(contentType)}`;
+function weddingKeyFor(accountId) {
+  return accountId === PARTNER_ACCOUNT_ID ? WEDDING_KEY : accountId;
+}
+
+function objectKeyFor(id, contentType, accountId) {
+  return `desafio/${accountId}/${id}${extensionFor(contentType)}`;
 }
 
 export function decodeDataUrl(preview) {
@@ -80,6 +85,7 @@ export async function parseGalleryUpload(request) {
       guestName: String(form.get('guestName') || ''),
       missionId: String(form.get('missionId') || ''),
       title: String(form.get('title') || ''),
+      slug: String(form.get('slug') || ''),
       bytes,
       contentType: file?.type || 'image/jpeg',
     };
@@ -90,6 +96,7 @@ export async function parseGalleryUpload(request) {
     guestName: json?.guestName,
     missionId: json?.missionId,
     title: json?.title,
+    slug: json?.slug,
     bytes: decoded?.bytes || json?.bytes || null,
     contentType: decoded?.contentType || json?.contentType || 'image/jpeg',
   };
@@ -138,54 +145,60 @@ async function deleteObject(bucket, key) {
   else memoryObjects.delete(key);
 }
 
-async function existingRows(db, guestName, missionId) {
-  if (!db) return memoryGallery.filter((p) => p.guestName === guestName && p.missionId === missionId);
+async function existingRows(db, guestName, missionId, accountId) {
+  if (!db) {
+    return memoryGallery.filter(
+      (p) => p.accountId === accountId && p.guestName === guestName && p.missionId === missionId
+    );
+  }
   const rows = await db
     .prepare(
       `SELECT id, object_key FROM desafio_gallery
-       WHERE wedding_key = ? AND guest_name = ? AND mission_id = ?`
+       WHERE account_id = ? AND guest_name = ? AND mission_id = ?`
     )
-    .bind(WEDDING_KEY, guestName, missionId)
+    .bind(accountId, guestName, missionId)
     .all();
   return rows?.results || [];
 }
 
-export async function listGalleryPhotos(db) {
-  if (!db) return [...memoryGallery].sort(sortByCreated).map(toMeta);
+export async function listGalleryPhotos(db, accountId = PARTNER_ACCOUNT_ID) {
+  if (!db) {
+    return memoryGallery.filter((p) => p.accountId === accountId).sort(sortByCreated).map(toMeta);
+  }
   const rows = await db
     .prepare(
       `SELECT id, wedding_key, guest_name, mission_id, title, created_at
        FROM desafio_gallery
-       WHERE wedding_key = ?
+       WHERE account_id = ?
        ORDER BY created_at ASC, id ASC`
     )
-    .bind(WEDDING_KEY)
+    .bind(accountId)
     .all();
   return (rows?.results || []).map(toMeta);
 }
 
-export async function getGalleryPhoto(db, id) {
+export async function getGalleryPhoto(db, id, accountId = PARTNER_ACCOUNT_ID) {
   if (!id) throw new Error('INVALID_ID');
   if (!db) {
-    const row = memoryGallery.find((p) => p.id === id);
+    const row = memoryGallery.find((p) => p.id === id && p.accountId === accountId);
     if (!row) throw new Error('NOT_FOUND');
     return toMeta(row);
   }
   const row = await db
     .prepare(
       `SELECT id, wedding_key, guest_name, mission_id, title, created_at
-       FROM desafio_gallery WHERE id = ? AND wedding_key = ?`
+       FROM desafio_gallery WHERE id = ? AND account_id = ?`
     )
-    .bind(id, WEDDING_KEY)
+    .bind(id, accountId)
     .first();
   if (!row) throw new Error('NOT_FOUND');
   return toMeta(row);
 }
 
-export async function getGalleryImage(db, id, bucket) {
+export async function getGalleryImage(db, id, bucket, accountId = PARTNER_ACCOUNT_ID) {
   if (!id) throw new Error('INVALID_ID');
   if (!db) {
-    const row = memoryGallery.find((p) => p.id === id);
+    const row = memoryGallery.find((p) => p.id === id && p.accountId === accountId);
     if (!row) throw new Error('NOT_FOUND');
     const stored = await getObject(bucket, row.objectKey);
     if (stored) return stored;
@@ -195,9 +208,9 @@ export async function getGalleryImage(db, id, bucket) {
   }
   const row = await db
     .prepare(
-      `SELECT id, object_key, preview FROM desafio_gallery WHERE id = ? AND wedding_key = ?`
+      `SELECT id, object_key, preview FROM desafio_gallery WHERE id = ? AND account_id = ?`
     )
-    .bind(id, WEDDING_KEY)
+    .bind(id, accountId)
     .first();
   if (!row) throw new Error('NOT_FOUND');
   const stored = await getObject(bucket, row.object_key);
@@ -207,7 +220,7 @@ export async function getGalleryImage(db, id, bucket) {
   throw new Error('NOT_FOUND');
 }
 
-export async function upsertGalleryPhoto(db, body, bucket) {
+export async function upsertGalleryPhoto(db, body, bucket, accountId = PARTNER_ACCOUNT_ID) {
   const meta = validateGalleryMeta(body);
   if (!meta.valid) throwValidation(meta.errors);
 
@@ -228,14 +241,15 @@ export async function upsertGalleryPhoto(db, body, bucket) {
   const d = meta.data;
   const now = new Date().toISOString();
   const id = newId();
-  const objectKey = objectKeyFor(id, contentType);
-  const previous = await existingRows(db, d.guestName, d.missionId);
+  const objectKey = objectKeyFor(id, contentType, accountId);
+  const previous = await existingRows(db, d.guestName, d.missionId, accountId);
 
   await putObject(bucket, objectKey, bytes, contentType);
 
   const row = {
     id,
-    weddingKey: WEDDING_KEY,
+    weddingKey: weddingKeyFor(accountId),
+    accountId,
     guestName: d.guestName,
     missionId: d.missionId,
     title: d.title,
@@ -244,36 +258,40 @@ export async function upsertGalleryPhoto(db, body, bucket) {
   };
 
   if (!db) {
-    memoryGallery = memoryGallery.filter((p) => !(p.guestName === d.guestName && p.missionId === d.missionId));
+    memoryGallery = memoryGallery.filter(
+      (p) => !(p.accountId === accountId && p.guestName === d.guestName && p.missionId === d.missionId)
+    );
     memoryGallery.push(row);
     await Promise.all(previous.map((old) => deleteObject(bucket, old.objectKey || old.object_key)));
     return toMeta(row);
   }
 
   await db
-    .prepare(`DELETE FROM desafio_gallery WHERE wedding_key = ? AND guest_name = ? AND mission_id = ?`)
-    .bind(WEDDING_KEY, d.guestName, d.missionId)
+    .prepare(`DELETE FROM desafio_gallery WHERE account_id = ? AND guest_name = ? AND mission_id = ?`)
+    .bind(accountId, d.guestName, d.missionId)
     .run();
   await db
     .prepare(
-      `INSERT INTO desafio_gallery (id, wedding_key, guest_name, mission_id, title, preview, object_key, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO desafio_gallery (id, wedding_key, guest_name, mission_id, title, preview, object_key, created_at, account_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
-    .bind(id, WEDDING_KEY, d.guestName, d.missionId, d.title, '', objectKey, now)
+    .bind(id, weddingKeyFor(accountId), d.guestName, d.missionId, d.title, '', objectKey, now, accountId)
     .run();
   await Promise.all(previous.map((old) => deleteObject(bucket, old.object_key)));
   return toMeta(row);
 }
 
-export async function deleteGalleryPhoto(db, query, bucket) {
+export async function deleteGalleryPhoto(db, query, bucket, accountId = PARTNER_ACCOUNT_ID) {
   const id = String(query?.id || '').trim();
   const guestName = String(query?.guestName || '').trim();
   const missionId = String(query?.missionId || '').trim();
 
   if (!db) {
+    const match = (p) =>
+      p.accountId === accountId && (id ? p.id === id : p.guestName === guestName && p.missionId === missionId);
     const before = memoryGallery.length;
-    const removed = memoryGallery.filter((p) => (id ? p.id === id : p.guestName === guestName && p.missionId === missionId));
-    memoryGallery = memoryGallery.filter((p) => (id ? p.id !== id : !(p.guestName === guestName && p.missionId === missionId)));
+    const removed = memoryGallery.filter(match);
+    memoryGallery = memoryGallery.filter((p) => !match(p));
     if (memoryGallery.length === before) throw new Error('NOT_FOUND');
     await Promise.all(removed.map((row) => deleteObject(bucket, row.objectKey)));
     return { removed: true };
@@ -282,15 +300,15 @@ export async function deleteGalleryPhoto(db, query, bucket) {
   let rows;
   if (id) {
     rows = await db
-      .prepare(`SELECT id, object_key FROM desafio_gallery WHERE id = ? AND wedding_key = ?`)
-      .bind(id, WEDDING_KEY)
+      .prepare(`SELECT id, object_key FROM desafio_gallery WHERE id = ? AND account_id = ?`)
+      .bind(id, accountId)
       .all();
   } else if (guestName && missionId) {
     rows = await db
       .prepare(
-        `SELECT id, object_key FROM desafio_gallery WHERE wedding_key = ? AND guest_name = ? AND mission_id = ?`
+        `SELECT id, object_key FROM desafio_gallery WHERE account_id = ? AND guest_name = ? AND mission_id = ?`
       )
-      .bind(WEDDING_KEY, guestName, missionId)
+      .bind(accountId, guestName, missionId)
       .all();
   } else {
     throw new Error('INVALID_ID');
@@ -300,11 +318,11 @@ export async function deleteGalleryPhoto(db, query, bucket) {
   if (!found.length) throw new Error('NOT_FOUND');
 
   if (id) {
-    await db.prepare(`DELETE FROM desafio_gallery WHERE id = ? AND wedding_key = ?`).bind(id, WEDDING_KEY).run();
+    await db.prepare(`DELETE FROM desafio_gallery WHERE id = ? AND account_id = ?`).bind(id, accountId).run();
   } else {
     await db
-      .prepare(`DELETE FROM desafio_gallery WHERE wedding_key = ? AND guest_name = ? AND mission_id = ?`)
-      .bind(WEDDING_KEY, guestName, missionId)
+      .prepare(`DELETE FROM desafio_gallery WHERE account_id = ? AND guest_name = ? AND mission_id = ?`)
+      .bind(accountId, guestName, missionId)
       .run();
   }
   await Promise.all(found.map((row) => deleteObject(bucket, row.object_key)));

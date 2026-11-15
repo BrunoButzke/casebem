@@ -4,6 +4,7 @@
 
 import { getCorsHeaders, validateOrigin } from '../../_lib/http-helpers.mjs';
 import { deleteGalleryPhoto, listGalleryPhotos, parseGalleryUpload, upsertGalleryPhoto } from '../../_lib/gallery-service.mjs';
+import { slugFromRequest, resolvePublicSlugOrPartner } from '../../_lib/public-slug.mjs';
 
 function json(headers, body, status = 200) {
   headers.set('Content-Type', 'application/json; charset=utf-8');
@@ -22,7 +23,11 @@ export async function onRequestGet(context) {
   const { request, env } = context;
   const headers = getCorsHeaders(request);
   try {
-    const photos = await listGalleryPhotos(galleryEnv(env).db);
+    const resolved = await resolvePublicSlugOrPartner(env.DB || null, slugFromRequest(request));
+    if (!resolved.ok) {
+      return json(headers, { error: resolved.error }, resolved.status);
+    }
+    const photos = await listGalleryPhotos(galleryEnv(env).db, resolved.account.id);
     return json(headers, { ok: true, photos });
   } catch (err) {
     return json(headers, { ok: false, error: 'GALLERY_FAILED', message: err.message }, 500);
@@ -43,8 +48,12 @@ export async function onRequestPost(context) {
     return json(headers, { ok: false, error: 'INVALID_JSON' }, 400);
   }
   try {
+    const resolved = await resolvePublicSlugOrPartner(env.DB || null, slugFromRequest(request, payload));
+    if (!resolved.ok) {
+      return json(headers, { error: resolved.error }, resolved.status);
+    }
     const { db, bucket } = galleryEnv(env);
-    const photo = await upsertGalleryPhoto(db, payload, bucket);
+    const photo = await upsertGalleryPhoto(db, payload, bucket, resolved.account.id);
     return json(headers, { ok: true, photo }, 201);
   } catch (err) {
     if (err.message === 'VALIDATION') {
@@ -66,6 +75,10 @@ export async function onRequestDelete(context) {
   }
   const url = new URL(request.url);
   try {
+    const resolved = await resolvePublicSlugOrPartner(env.DB || null, slugFromRequest(request));
+    if (!resolved.ok) {
+      return json(headers, { error: resolved.error }, resolved.status);
+    }
     const { db, bucket } = galleryEnv(env);
     await deleteGalleryPhoto(
       db,
@@ -74,7 +87,8 @@ export async function onRequestDelete(context) {
         guestName: url.searchParams.get('guestName'),
         missionId: url.searchParams.get('missionId'),
       },
-      bucket
+      bucket,
+      resolved.account.id
     );
     return json(headers, { ok: true, removed: true });
   } catch (err) {

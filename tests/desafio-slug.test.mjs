@@ -8,6 +8,16 @@ import {
 import { onRequestGet as challengesGet } from '../functions/api/desafio/challenges.js';
 import { onRequestPost as answerPost } from '../functions/api/desafio/answer.js';
 import { onRequestGet as themeGet } from '../functions/api/desafio/theme.js';
+import {
+  resetMemoryGalleryForTests,
+  upsertGalleryPhoto,
+  listGalleryPhotos,
+} from '../functions/_lib/gallery-service.mjs';
+import { onRequestGet as galleryGet } from '../functions/api/desafio/gallery.js';
+import { onRequestGet as galleryGetOne } from '../functions/api/desafio/gallery/[id].js';
+import { onRequestGet as galleryGetImage } from '../functions/api/desafio/gallery/[id]/image.js';
+
+const GALLERY_JPEG_PREVIEW = 'data:image/jpeg;base64,/9j/4AAQ';
 
 test('challenges for slug B omit question created on A', async () => {
   resetMemoryChallengesForTests();
@@ -52,6 +62,66 @@ test('answer POST unknown slug is 404', async () => {
 test('theme GET unknown slug is 404', async () => {
   const res = await themeGet({
     request: new Request('https://casebem.com/api/desafio/theme?slug=nao-existe'),
+    env: { DB: null },
+  });
+  assert.equal(res.status, 404);
+});
+
+test('gallery list for slug B omits photo uploaded on A', async () => {
+  resetMemoryGalleryForTests();
+  const now = '2026-11-15T06:00:00.000Z';
+  const a = await signup(null, { email: 'gal-a@x.com', password: 'segredo12', plan: 'pro' }, now);
+  const b = await signup(null, { email: 'gal-b@x.com', password: 'segredo12', plan: 'pro' }, now);
+  await setAccountSlug(null, a.accountId, 'gal-a');
+  await setAccountSlug(null, b.accountId, 'gal-b');
+  const photo = await upsertGalleryPhoto(
+    null,
+    { guestName: 'Ana', missionId: 'm1', title: 'Foto A', preview: GALLERY_JPEG_PREVIEW },
+    null,
+    a.accountId
+  );
+  assert.equal(photo.accountId, undefined);
+  const res = await galleryGet({
+    request: new Request('https://casebem.com/api/desafio/gallery?slug=gal-b'),
+    env: { DB: null },
+  });
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal((body.photos || []).some((p) => p.id === photo.id), false);
+  assert.equal((await listGalleryPhotos(null, b.accountId)).some((p) => p.id === photo.id), false);
+});
+
+test('gallery GET photo by id for slug B is 404 when uploaded on A', async () => {
+  resetMemoryGalleryForTests();
+  const now = '2026-11-15T06:00:00.000Z';
+  const a = await signup(null, { email: 'gal-id-a@x.com', password: 'segredo12', plan: 'pro' }, now);
+  const b = await signup(null, { email: 'gal-id-b@x.com', password: 'segredo12', plan: 'pro' }, now);
+  await setAccountSlug(null, a.accountId, 'gal-id-a');
+  await setAccountSlug(null, b.accountId, 'gal-id-b');
+  const photo = await upsertGalleryPhoto(
+    null,
+    { guestName: 'Ana', missionId: 'm1', title: 'Foto A', preview: GALLERY_JPEG_PREVIEW },
+    null,
+    a.accountId
+  );
+  const res = await galleryGetOne({
+    request: new Request(`https://casebem.com/api/desafio/gallery/${photo.id}?slug=gal-id-b`),
+    env: { DB: null },
+    params: { id: photo.id },
+  });
+  assert.equal(res.status, 404);
+
+  const image = await galleryGetImage({
+    request: new Request(`https://casebem.com/api/desafio/gallery/${photo.id}/image?slug=gal-id-b`),
+    env: { DB: null },
+    params: { id: photo.id },
+  });
+  assert.equal(image.status, 404);
+});
+
+test('gallery GET unknown slug is 404', async () => {
+  const res = await galleryGet({
+    request: new Request('https://casebem.com/api/desafio/gallery?slug=nao-existe'),
     env: { DB: null },
   });
   assert.equal(res.status, 404);

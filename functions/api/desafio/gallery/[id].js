@@ -4,6 +4,7 @@
 
 import { getCorsHeaders } from '../../../_lib/http-helpers.mjs';
 import { getGalleryPhoto } from '../../../_lib/gallery-service.mjs';
+import { slugFromRequest, resolvePublicSlugOrPartner } from '../../../_lib/public-slug.mjs';
 
 function json(headers, body, status = 200) {
   headers.set('Content-Type', 'application/json; charset=utf-8');
@@ -18,7 +19,11 @@ export async function onRequestGet(context) {
   const { request, env, params } = context;
   const headers = getCorsHeaders(request);
   try {
-    const photo = await getGalleryPhoto(env.DB || null, String(params?.id || ''));
+    const resolved = await resolvePublicSlugOrPartner(env.DB || null, slugFromRequest(request));
+    if (!resolved.ok) {
+      return json(headers, { error: resolved.error }, resolved.status);
+    }
+    const photo = await getGalleryPhoto(env.DB || null, String(params?.id || ''), resolved.account.id);
     return json(headers, { ok: true, photo });
   } catch (err) {
     if (err.message === 'NOT_FOUND') return json(headers, { ok: false, error: 'NOT_FOUND' }, 404);

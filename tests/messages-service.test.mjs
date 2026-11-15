@@ -88,16 +88,16 @@ class MockD1Statement {
   async all() {
     if (this.sql.includes('SELECT') && this.sql.includes('wedding_messages')) {
       // Support both formats: with cursor and without
-      const weddingKey = this.params[0];
+      const accountId = this.params[0];
       let limit;
       let cursorCreatedAt = null;
       let cursorId = null;
       
       if (this.params.length === 2) {
-        // No cursor: [weddingKey, limit]
+        // No cursor: [accountId, limit]
         limit = this.params[1];
       } else if (this.params.length === 5) {
-        // With cursor: [weddingKey, createdAt, createdAt, id, limit]
+        // With cursor: [accountId, createdAt, createdAt, id, limit]
         cursorCreatedAt = this.params[1];
         cursorId = this.params[3];
         limit = this.params[4];
@@ -107,7 +107,7 @@ class MockD1Statement {
       
       // Convert Map to array and filter
       for (const [id, record] of this.db.data.entries()) {
-        if (record.wedding_key === weddingKey) {
+        if (record.account_id === accountId || record.wedding_key === accountId) {
           // Apply cursor filter if present
           if (cursorCreatedAt && cursorId) {
             if (record.created_at < cursorCreatedAt || 
@@ -321,9 +321,9 @@ test('getMessages returns empty array when no messages', async () => {
 
 test('getMessages returns messages in DESC order (newest first)', async () => {
   const db = createMockDb([
-    { id: 'id-1', wedding_key: WEDDING_KEY, guest_name: 'First', message: 'Msg1', consent_given: 1, created_at: '2026-11-06T10:00:00.000Z', idempotency_key: null, idempotency_fingerprint: 'fp1' },
-    { id: 'id-2', wedding_key: WEDDING_KEY, guest_name: 'Second', message: 'Msg2', consent_given: 1, created_at: '2026-11-06T11:00:00.000Z', idempotency_key: null, idempotency_fingerprint: 'fp2' },
-    { id: 'id-3', wedding_key: WEDDING_KEY, guest_name: 'Third', message: 'Msg3', consent_given: 1, created_at: '2026-11-06T12:00:00.000Z', idempotency_key: null, idempotency_fingerprint: 'fp3' },
+    { id: 'id-1', wedding_key: WEDDING_KEY, account_id: PARTNER_ACCOUNT_ID, guest_name: 'First', message: 'Msg1', consent_given: 1, created_at: '2026-11-06T10:00:00.000Z', idempotency_key: null, idempotency_fingerprint: 'fp1' },
+    { id: 'id-2', wedding_key: WEDDING_KEY, account_id: PARTNER_ACCOUNT_ID, guest_name: 'Second', message: 'Msg2', consent_given: 1, created_at: '2026-11-06T11:00:00.000Z', idempotency_key: null, idempotency_fingerprint: 'fp2' },
+    { id: 'id-3', wedding_key: WEDDING_KEY, account_id: PARTNER_ACCOUNT_ID, guest_name: 'Third', message: 'Msg3', consent_given: 1, created_at: '2026-11-06T12:00:00.000Z', idempotency_key: null, idempotency_fingerprint: 'fp3' },
   ]);
   
   const result = await getMessages(db, 10, null);
@@ -336,9 +336,9 @@ test('getMessages returns messages in DESC order (newest first)', async () => {
 
 test('getMessages respects limit parameter', async () => {
   const db = createMockDb([
-    { id: 'id-1', wedding_key: WEDDING_KEY, guest_name: 'A', message: 'Msg', consent_given: 1, created_at: '2026-11-06T10:00:00.000Z', idempotency_key: null, idempotency_fingerprint: 'fp1' },
-    { id: 'id-2', wedding_key: WEDDING_KEY, guest_name: 'B', message: 'Msg', consent_given: 1, created_at: '2026-11-06T11:00:00.000Z', idempotency_key: null, idempotency_fingerprint: 'fp2' },
-    { id: 'id-3', wedding_key: WEDDING_KEY, guest_name: 'C', message: 'Msg', consent_given: 1, created_at: '2026-11-06T12:00:00.000Z', idempotency_key: null, idempotency_fingerprint: 'fp3' },
+    { id: 'id-1', wedding_key: WEDDING_KEY, account_id: PARTNER_ACCOUNT_ID, guest_name: 'A', message: 'Msg', consent_given: 1, created_at: '2026-11-06T10:00:00.000Z', idempotency_key: null, idempotency_fingerprint: 'fp1' },
+    { id: 'id-2', wedding_key: WEDDING_KEY, account_id: PARTNER_ACCOUNT_ID, guest_name: 'B', message: 'Msg', consent_given: 1, created_at: '2026-11-06T11:00:00.000Z', idempotency_key: null, idempotency_fingerprint: 'fp2' },
+    { id: 'id-3', wedding_key: WEDDING_KEY, account_id: PARTNER_ACCOUNT_ID, guest_name: 'C', message: 'Msg', consent_given: 1, created_at: '2026-11-06T12:00:00.000Z', idempotency_key: null, idempotency_fingerprint: 'fp3' },
   ]);
   
   const result = await getMessages(db, 2, null); // Limit 2
@@ -350,7 +350,7 @@ test('getMessages respects limit parameter', async () => {
 
 test('getMessages returns only public fields', async () => {
   const db = createMockDb([
-    { id: 'id-1', wedding_key: WEDDING_KEY, guest_name: 'João', message: 'Msg', consent_given: 1, created_at: '2026-11-06T10:00:00.000Z', idempotency_key: 'secret-key', idempotency_fingerprint: 'secret-fp' },
+    { id: 'id-1', wedding_key: WEDDING_KEY, account_id: PARTNER_ACCOUNT_ID, guest_name: 'João', message: 'Msg', consent_given: 1, created_at: '2026-11-06T10:00:00.000Z', idempotency_key: 'secret-key', idempotency_fingerprint: 'secret-fp' },
   ]);
   
   const result = await getMessages(db, 10, null);
@@ -455,10 +455,10 @@ test('createMessage validates CHECK constraints via DB', async () => {
 
 test('getMessages handles pagination cursor correctly', async () => {
   const db = createMockDb([
-    { id: 'id-1', wedding_key: WEDDING_KEY, guest_name: 'A', message: 'M1', consent_given: 1, created_at: '2026-11-06T10:00:00.000Z', idempotency_key: null, idempotency_fingerprint: 'f1' },
-    { id: 'id-2', wedding_key: WEDDING_KEY, guest_name: 'B', message: 'M2', consent_given: 1, created_at: '2026-11-06T11:00:00.000Z', idempotency_key: null, idempotency_fingerprint: 'f2' },
-    { id: 'id-3', wedding_key: WEDDING_KEY, guest_name: 'C', message: 'M3', consent_given: 1, created_at: '2026-11-06T12:00:00.000Z', idempotency_key: null, idempotency_fingerprint: 'f3' },
-    { id: 'id-4', wedding_key: WEDDING_KEY, guest_name: 'D', message: 'M4', consent_given: 1, created_at: '2026-11-06T13:00:00.000Z', idempotency_key: null, idempotency_fingerprint: 'f4' },
+    { id: 'id-1', wedding_key: WEDDING_KEY, account_id: PARTNER_ACCOUNT_ID, guest_name: 'A', message: 'M1', consent_given: 1, created_at: '2026-11-06T10:00:00.000Z', idempotency_key: null, idempotency_fingerprint: 'f1' },
+    { id: 'id-2', wedding_key: WEDDING_KEY, account_id: PARTNER_ACCOUNT_ID, guest_name: 'B', message: 'M2', consent_given: 1, created_at: '2026-11-06T11:00:00.000Z', idempotency_key: null, idempotency_fingerprint: 'f2' },
+    { id: 'id-3', wedding_key: WEDDING_KEY, account_id: PARTNER_ACCOUNT_ID, guest_name: 'C', message: 'M3', consent_given: 1, created_at: '2026-11-06T12:00:00.000Z', idempotency_key: null, idempotency_fingerprint: 'f3' },
+    { id: 'id-4', wedding_key: WEDDING_KEY, account_id: PARTNER_ACCOUNT_ID, guest_name: 'D', message: 'M4', consent_given: 1, created_at: '2026-11-06T13:00:00.000Z', idempotency_key: null, idempotency_fingerprint: 'f4' },
   ]);
   
   // First page (2 messages)
@@ -513,9 +513,9 @@ test('getMessages rejects malformed cursor', async () => {
 
 test('getMessages handles boundary: identical created_at distinct id', async () => {
   const db = createMockDb([
-    { id: 'id-a', wedding_key: WEDDING_KEY, guest_name: 'A', message: 'M1', consent_given: 1, created_at: '2026-11-06T10:00:00.000Z', idempotency_key: null, idempotency_fingerprint: 'f1' },
-    { id: 'id-b', wedding_key: WEDDING_KEY, guest_name: 'B', message: 'M2', consent_given: 1, created_at: '2026-11-06T10:00:00.000Z', idempotency_key: null, idempotency_fingerprint: 'f2' },
-    { id: 'id-c', wedding_key: WEDDING_KEY, guest_name: 'C', message: 'M3', consent_given: 1, created_at: '2026-11-06T10:00:00.000Z', idempotency_key: null, idempotency_fingerprint: 'f3' },
+    { id: 'id-a', wedding_key: WEDDING_KEY, account_id: PARTNER_ACCOUNT_ID, guest_name: 'A', message: 'M1', consent_given: 1, created_at: '2026-11-06T10:00:00.000Z', idempotency_key: null, idempotency_fingerprint: 'f1' },
+    { id: 'id-b', wedding_key: WEDDING_KEY, account_id: PARTNER_ACCOUNT_ID, guest_name: 'B', message: 'M2', consent_given: 1, created_at: '2026-11-06T10:00:00.000Z', idempotency_key: null, idempotency_fingerprint: 'f2' },
+    { id: 'id-c', wedding_key: WEDDING_KEY, account_id: PARTNER_ACCOUNT_ID, guest_name: 'C', message: 'M3', consent_given: 1, created_at: '2026-11-06T10:00:00.000Z', idempotency_key: null, idempotency_fingerprint: 'f3' },
   ]);
   
   // All messages have same created_at, sorted by id DESC

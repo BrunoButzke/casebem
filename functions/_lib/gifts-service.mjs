@@ -159,7 +159,8 @@ export async function createCheckoutPayment(request, env, db, ipAddress, options
   }
 
   // Catálogo ativo (D1 + seed; fallback estático)
-  const catalog = await getActiveCatalog(db, PARTNER_ACCOUNT_ID);
+  const accountId = options.accountId || PARTNER_ACCOUNT_ID;
+  const catalog = await getActiveCatalog(db, accountId);
 
   for (const item of request.items) {
     if (!getGiftFromCatalog(catalog, item.giftId)) {

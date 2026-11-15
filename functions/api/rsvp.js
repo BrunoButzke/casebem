@@ -15,6 +15,7 @@ import {
   updateRsvpByToken,
   checkRateLimit,
 } from '../_lib/rsvp-service.mjs';
+import { slugFromRequest, resolvePublicSlugOrPartner } from '../_lib/public-slug.mjs';
 
 /**
  * Get allowed origins for CORS (same-origin only)
@@ -178,12 +179,37 @@ async function handlePost(request, env) {
     return errorResponse(request, 'JSON inválido', 400);
   }
 
-  const validation = validateRsvpCreate(body);
+  const slug = slugFromRequest(request, body);
+  const resolved = await resolvePublicSlugOrPartner(env.DB || null, slug);
+  if (!resolved.ok) {
+    return errorResponse(request, resolved.error, resolved.status);
+  }
+
+  const { slug: _slug, ...payload } = body;
+  const validation = validateRsvpCreate(payload);
   if (!validation.valid) {
     return errorResponse(request, 'Dados inválidos', 400, validation.errors);
   }
 
   try {
+    // RSVP fechado: nome precisa estar na lista (Free-tier D1)
+    const { assertGuestAllowed } = await import('../_lib/rsvp-guest-list.mjs');
+    const gate = await assertGuestAllowed(env.DB || null, validation.data.guestName, resolved.account.id);
+    if (!gate.allowed) {
+      return errorResponse(request, gate.message || 'Convidado não autorizado', 403, {
+        error: gate.error,
+        rsvpMode: gate.mode,
+      });
+    }
+
+    if (!env.DB) {
+      return errorResponse(
+        request,
+        'Serviço temporariamente indisponível. Tente novamente mais tarde.',
+        503
+      );
+    }
+
     // Rate limit with HMAC
     const ip = getClientIp(request);
     const rateLimit = await checkRateLimit(env.DB, ip, env.RSVP_SECRET, 10);
@@ -196,16 +222,6 @@ async function handlePost(request, env) {
       );
     }
 
-    // RSVP fechado: nome precisa estar na lista (Free-tier D1)
-    const { assertGuestAllowed } = await import('../_lib/rsvp-guest-list.mjs');
-    const gate = await assertGuestAllowed(env.DB, validation.data.guestName);
-    if (!gate.allowed) {
-      return errorResponse(request, gate.message || 'Convidado não autorizado', 403, {
-        error: gate.error,
-        rsvpMode: gate.mode,
-      });
-    }
-
     // Extract bearer token for idempotent replay verification
     const bearerToken = extractBearerToken(request);
     
@@ -215,7 +231,8 @@ async function handlePost(request, env) {
       validation.data,
       idempotencyKey,
       env.RSVP_SECRET,
-      bearerToken
+      bearerToken,
+      resolved.account.id
     );
 
     try {
@@ -223,7 +240,8 @@ async function handlePost(request, env) {
       await markGuestResponse(
         env.DB,
         rsvp.guestName || validation.data.guestName,
-        rsvp.attending ?? validation.data.attending
+        rsvp.attending ?? validation.data.attending,
+        resolved.account.id
       );
     } catch {
       /* lista oculta: best-effort */
@@ -365,6 +383,10 @@ function handleOptions(request) {
   });
 }
 
+export async function onRequestPost(context) {
+  return onRequest(context);
+}
+
 export async function onRequest(context) {
   const { request, env } = context;
 
@@ -383,16 +405,6 @@ export async function onRequest(context) {
     });
   }
 
-  // Check required environment variables
-  if (!env.DB) {
-    console.error('DB binding not found');
-    return errorResponse(
-      request,
-      'Serviço temporariamente indisponível. Tente novamente mais tarde.',
-      503
-    );
-  }
-
   if (!env.RSVP_SECRET) {
     console.error('RSVP_SECRET not configured');
     return errorResponse(
@@ -404,6 +416,15 @@ export async function onRequest(context) {
 
   if (method === 'POST') {
     return handlePost(request, env);
+  }
+
+  if (!env.DB) {
+    console.error('DB binding not found');
+    return errorResponse(
+      request,
+      'Serviço temporariamente indisponível. Tente novamente mais tarde.',
+      503
+    );
   }
 
   if (method === 'GET') {

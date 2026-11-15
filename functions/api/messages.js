@@ -14,7 +14,7 @@ import {
   getMessages,
   checkRateLimit,
 } from '../_lib/messages-service.mjs';
-import { PARTNER_ACCOUNT_ID } from '../_lib/auth-service.mjs';
+import { slugFromRequest, resolvePublicSlugOrPartner } from '../_lib/public-slug.mjs';
 
 /**
  * Get allowed origins for CORS (same-origin only)
@@ -158,9 +158,24 @@ async function handlePost(request, env) {
     return errorResponse(request, 'JSON inválido', 400);
   }
 
-  const validation = validateMessageCreate(body);
+  const slug = slugFromRequest(request, body);
+  const resolved = await resolvePublicSlugOrPartner(env.DB || null, slug);
+  if (!resolved.ok) {
+    return errorResponse(request, resolved.error, resolved.status);
+  }
+
+  const { slug: _slug, ...payload } = body;
+  const validation = validateMessageCreate(payload);
   if (!validation.valid) {
     return errorResponse(request, 'Dados inválidos', 400, validation.errors);
+  }
+
+  if (!env.DB) {
+    return errorResponse(
+      request,
+      'Serviço temporariamente indisponível. Tente novamente mais tarde.',
+      503
+    );
   }
 
   try {
@@ -182,7 +197,7 @@ async function handlePost(request, env) {
       validation.data,
       idempotencyKey,
       env.RSVP_SECRET,
-      PARTNER_ACCOUNT_ID
+      resolved.account.id
     );
 
     // Best-effort e-mail (Resend free). Sem key = no-op, zero custo Cloudflare.
@@ -229,7 +244,12 @@ async function handleGet(request, env) {
   }
 
   try {
-    const result = await getMessages(env.DB, limit, cursorParam);
+    const slug = slugFromRequest(request);
+    const resolved = await resolvePublicSlugOrPartner(env.DB || null, slug);
+    if (!resolved.ok) {
+      return errorResponse(request, resolved.error, resolved.status);
+    }
+    const result = await getMessages(env.DB || null, limit, cursorParam, resolved.account.id);
     return jsonResponse(request, result, 200);
   } catch (error) {
     console.error('Failed to get messages:', error);
@@ -257,6 +277,14 @@ function handleOptions(request) {
   });
 }
 
+export async function onRequestGet(context) {
+  return onRequest(context);
+}
+
+export async function onRequestPost(context) {
+  return onRequest(context);
+}
+
 export async function onRequest(context) {
   const { request, env } = context;
 
@@ -275,14 +303,8 @@ export async function onRequest(context) {
     });
   }
 
-  // Check required environment variables
-  if (!env.DB) {
-    console.error('DB binding not found');
-    return errorResponse(
-      request,
-      'Serviço temporariamente indisponível. Tente novamente mais tarde.',
-      503
-    );
+  if (method === 'GET') {
+    return handleGet(request, env);
   }
 
   if (!env.RSVP_SECRET) {
@@ -296,10 +318,6 @@ export async function onRequest(context) {
 
   if (method === 'POST') {
     return handlePost(request, env);
-  }
-
-  if (method === 'GET') {
-    return handleGet(request, env);
   }
 
   return errorResponse(request, 'Método não suportado', 405);

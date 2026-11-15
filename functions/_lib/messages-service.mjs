@@ -281,14 +281,64 @@ function decodeCursor(cursor) {
   }
 }
 
+function isHiddenMessage(row) {
+  return row.hidden === true || Number(row.hidden) === 1;
+}
+
+function toPublicMessage(row) {
+  return {
+    id: row.id,
+    guestName: row.guestName ?? row.guest_name,
+    message: row.message,
+    createdAt: row.createdAt ?? row.created_at,
+  };
+}
+
+function paginatePublicMessages(rows, limit, cursor) {
+  let decoded = null;
+  if (cursor) {
+    decoded = decodeCursor(cursor);
+    if (!decoded) {
+      throw new Error('INVALID_CURSOR');
+    }
+  }
+
+  const sorted = [...rows].sort((a, b) => {
+    if (a.createdAt !== b.createdAt) return b.createdAt.localeCompare(a.createdAt);
+    return b.id.localeCompare(a.id);
+  });
+
+  const filtered = decoded
+    ? sorted.filter(
+        (m) =>
+          m.createdAt < decoded.createdAt ||
+          (m.createdAt === decoded.createdAt && m.id < decoded.id)
+      )
+    : sorted;
+
+  const hasMore = filtered.length > limit;
+  const messages = filtered.slice(0, limit).map(toPublicMessage);
+  const nextCursor =
+    hasMore && messages.length > 0 ? encodeCursor(messages[messages.length - 1]) : null;
+  return { messages, nextCursor };
+}
+
 /**
  * Get messages with pagination
  * @param {D1Database} db - Cloudflare D1 database
  * @param {number} limit - Number of messages to return (3-50)
  * @param {string|null} cursor - Pagination cursor (base64 encoded)
+ * @param {string} [accountId]
  * @returns {Promise<{messages: Array, nextCursor: string|null}>}
  */
-export async function getMessages(db, limit, cursor) {
+export async function getMessages(db, limit, cursor, accountId = PARTNER_ACCOUNT_ID) {
+  if (!db) {
+    const rows = listMemoryMessages(accountId)
+      .filter((m) => !isHiddenMessage(m))
+      .map((m) => ({ id: m.id, guestName: m.guestName, message: m.message, createdAt: m.createdAt }));
+    return paginatePublicMessages(rows, limit, cursor);
+  }
+
   let query;
   let params;
   
@@ -302,21 +352,21 @@ export async function getMessages(db, limit, cursor) {
     // Query messages after cursor position (exclude moderated/hidden)
     query = `SELECT id, guest_name, message, created_at
              FROM wedding_messages
-             WHERE wedding_key = ?
+             WHERE account_id = ?
                AND COALESCE(hidden, 0) = 0
                AND (created_at < ? OR (created_at = ? AND id < ?))
              ORDER BY created_at DESC, id DESC
              LIMIT ?`;
-    params = [WEDDING_KEY, decoded.createdAt, decoded.createdAt, decoded.id, limit + 1];
+    params = [accountId, decoded.createdAt, decoded.createdAt, decoded.id, limit + 1];
   } else {
     // First page (exclude moderated/hidden)
     query = `SELECT id, guest_name, message, created_at
              FROM wedding_messages
-             WHERE wedding_key = ?
+             WHERE account_id = ?
                AND COALESCE(hidden, 0) = 0
              ORDER BY created_at DESC, id DESC
              LIMIT ?`;
-    params = [WEDDING_KEY, limit + 1];
+    params = [accountId, limit + 1];
   }
   
   const result = await db.prepare(query).bind(...params).all();

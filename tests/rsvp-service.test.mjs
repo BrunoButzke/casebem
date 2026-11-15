@@ -53,7 +53,7 @@ class MockD1 {
         const bindings = this.bindings;
 
         if (sql.includes('INSERT INTO rsvps')) {
-          const [id, weddingKey, guestName, attending, adultsCount, childrenCount, observations, consentGiven, tokenHash, createdAt, updatedAt, idemKey, idemFingerprint] = bindings;
+          const [id, weddingKey, guestName, attending, adultsCount, childrenCount, observations, consentGiven, tokenHash, createdAt, updatedAt, idemKey, idemFingerprint, accountId] = bindings;
           mock.data.rsvps.push({
             id,
             wedding_key: weddingKey,
@@ -67,7 +67,8 @@ class MockD1 {
             created_at: createdAt,
             updated_at: updatedAt,
             idempotency_key: idemKey,
-            idempotency_fingerprint: idemFingerprint
+            idempotency_fingerprint: idemFingerprint,
+            account_id: accountId,
           });
           return { success: true };
         }
@@ -139,9 +140,9 @@ class MockD1 {
         if (sql.includes('FROM rsvps')) {
           // Check if it's idempotency lookup or token lookup
           if (bindings.length === 2 && sql.includes('idempotency_key')) {
-            const [weddingKey, idemKey] = bindings;
+            const [accountId, idemKey] = bindings;
             return mock.data.rsvps.find(
-              r => r.wedding_key === weddingKey && r.idempotency_key === idemKey
+              r => (r.account_id === accountId || r.wedding_key === accountId) && r.idempotency_key === idemKey
             ) || null;
           } else {
             const [tokenHash, weddingKey] = bindings;

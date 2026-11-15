@@ -28,10 +28,12 @@ describe('RSVP Security Tests', () => {
         },
         async run() {
           if (this.sql.includes('INSERT INTO rsvps')) {
-            const [id, weddingKey, guestName, attending, adultsCount, childrenCount, observations, consentGiven, tokenHash, createdAt, updatedAt, idemKey, idemFingerprint] = this.bindings;
+            const [id, weddingKey, guestName, attending, adultsCount, childrenCount, observations, consentGiven, tokenHash, createdAt, updatedAt, idemKey, idemFingerprint, accountId] = this.bindings;
             
             // Check UNIQUE constraint
-            const existing = mock.data.rsvps.find(r => r.wedding_key === weddingKey && r.idempotency_key === idemKey);
+            const existing = mock.data.rsvps.find(r =>
+              (r.account_id === accountId || r.wedding_key === weddingKey) && r.idempotency_key === idemKey
+            );
             if (existing) {
               throw new Error('UNIQUE constraint failed: rsvps.idempotency_key');
             }
@@ -42,7 +44,8 @@ describe('RSVP Security Tests', () => {
               consent_given: consentGiven, manage_token_hash: tokenHash,
               created_at: createdAt, updated_at: updatedAt,
               idempotency_key: idemKey,
-              idempotency_fingerprint: idemFingerprint
+              idempotency_fingerprint: idemFingerprint,
+              account_id: accountId,
             });
             return { success: true };
           }
@@ -81,8 +84,10 @@ describe('RSVP Security Tests', () => {
           }
           if (this.sql.includes('FROM rsvps')) {
             if (this.bindings.length === 2 && this.sql.includes('idempotency_key')) {
-              const [weddingKey, idemKey] = this.bindings;
-              return mock.data.rsvps.find(r => r.wedding_key === weddingKey && r.idempotency_key === idemKey) || null;
+              const [accountId, idemKey] = this.bindings;
+              return mock.data.rsvps.find(r =>
+                (r.account_id === accountId || r.wedding_key === accountId) && r.idempotency_key === idemKey
+              ) || null;
             } else {
               const [tokenHash, weddingKey] = this.bindings;
               return mock.data.rsvps.find(r => r.manage_token_hash === tokenHash && r.wedding_key === weddingKey) || null;

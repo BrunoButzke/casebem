@@ -74,16 +74,16 @@ class MockD1Statement {
   async all() {
     if (this.sql.includes('SELECT') && this.sql.includes('wedding_messages')) {
       // Support both formats: with cursor and without
-      const weddingKey = this.params[0];
+      const accountId = this.params[0];
       let limit;
       let cursorCreatedAt = null;
       let cursorId = null;
       
       if (this.params.length === 2) {
-        // No cursor: [weddingKey, limit]
+        // No cursor: [accountId, limit]
         limit = this.params[1];
       } else if (this.params.length === 5) {
-        // With cursor: [weddingKey, createdAt, createdAt, id, limit]
+        // With cursor: [accountId, createdAt, createdAt, id, limit]
         cursorCreatedAt = this.params[1];
         cursorId = this.params[3];
         limit = this.params[4];
@@ -92,7 +92,7 @@ class MockD1Statement {
       const results = [];
       
       for (const record of this.db.data.values()) {
-        if (record.wedding_key === weddingKey) {
+        if (record.account_id === accountId || record.wedding_key === accountId) {
           // Apply cursor filter if present
           if (cursorCreatedAt && cursorId) {
             if (record.created_at < cursorCreatedAt || 
@@ -523,8 +523,8 @@ test('GET returns empty list when no messages', async () => {
 
 test('GET returns messages in DESC order', async () => {
   const env = createMockEnv([
-    { id: 'id-1', wedding_key: 'dani-carine', guest_name: 'First', message: 'Msg1', consent_given: 1, created_at: '2026-11-06T10:00:00.000Z', idempotency_key: null, idempotency_fingerprint: 'fp1' },
-    { id: 'id-2', wedding_key: 'dani-carine', guest_name: 'Second', message: 'Msg2', consent_given: 1, created_at: '2026-11-06T11:00:00.000Z', idempotency_key: null, idempotency_fingerprint: 'fp2' },
+    { id: 'id-1', wedding_key: 'dani-carine', account_id: 'partner-dani-carine', guest_name: 'First', message: 'Msg1', consent_given: 1, created_at: '2026-11-06T10:00:00.000Z', idempotency_key: null, idempotency_fingerprint: 'fp1' },
+    { id: 'id-2', wedding_key: 'dani-carine', account_id: 'partner-dani-carine', guest_name: 'Second', message: 'Msg2', consent_given: 1, created_at: '2026-11-06T11:00:00.000Z', idempotency_key: null, idempotency_fingerprint: 'fp2' },
   ]);
   const request = createRequest('GET');
   
@@ -539,7 +539,7 @@ test('GET returns messages in DESC order', async () => {
 
 test('GET returns only public fields', async () => {
   const env = createMockEnv([
-    { id: 'id-1', wedding_key: 'dani-carine', guest_name: 'João', message: 'Msg', consent_given: 1, created_at: '2026-11-06T10:00:00.000Z', idempotency_key: 'secret-key', idempotency_fingerprint: 'secret-fp' },
+    { id: 'id-1', wedding_key: 'dani-carine', account_id: 'partner-dani-carine', guest_name: 'João', message: 'Msg', consent_given: 1, created_at: '2026-11-06T10:00:00.000Z', idempotency_key: 'secret-key', idempotency_fingerprint: 'secret-fp' },
   ]);
   const request = createRequest('GET');
   
@@ -558,10 +558,10 @@ test('GET returns only public fields', async () => {
 
 test('GET respects limit parameter', async () => {
   const env = createMockEnv([
-    { id: 'id-1', wedding_key: 'dani-carine', guest_name: 'A', message: 'M', consent_given: 1, created_at: '2026-11-06T10:00:00.000Z', idempotency_key: null, idempotency_fingerprint: 'f1' },
-    { id: 'id-2', wedding_key: 'dani-carine', guest_name: 'B', message: 'M', consent_given: 1, created_at: '2026-11-06T11:00:00.000Z', idempotency_key: null, idempotency_fingerprint: 'f2' },
-    { id: 'id-3', wedding_key: 'dani-carine', guest_name: 'C', message: 'M', consent_given: 1, created_at: '2026-11-06T12:00:00.000Z', idempotency_key: null, idempotency_fingerprint: 'f3' },
-    { id: 'id-4', wedding_key: 'dani-carine', guest_name: 'D', message: 'M', consent_given: 1, created_at: '2026-11-06T13:00:00.000Z', idempotency_key: null, idempotency_fingerprint: 'f4' },
+    { id: 'id-1', wedding_key: 'dani-carine', account_id: 'partner-dani-carine', guest_name: 'A', message: 'M', consent_given: 1, created_at: '2026-11-06T10:00:00.000Z', idempotency_key: null, idempotency_fingerprint: 'f1' },
+    { id: 'id-2', wedding_key: 'dani-carine', account_id: 'partner-dani-carine', guest_name: 'B', message: 'M', consent_given: 1, created_at: '2026-11-06T11:00:00.000Z', idempotency_key: null, idempotency_fingerprint: 'f2' },
+    { id: 'id-3', wedding_key: 'dani-carine', account_id: 'partner-dani-carine', guest_name: 'C', message: 'M', consent_given: 1, created_at: '2026-11-06T12:00:00.000Z', idempotency_key: null, idempotency_fingerprint: 'f3' },
+    { id: 'id-4', wedding_key: 'dani-carine', account_id: 'partner-dani-carine', guest_name: 'D', message: 'M', consent_given: 1, created_at: '2026-11-06T13:00:00.000Z', idempotency_key: null, idempotency_fingerprint: 'f4' },
   ]);
   const request = new Request('https://casebem.pages.dev/api/messages?limit=3', {
     headers: { 'Origin': 'https://casebem.pages.dev' },
@@ -601,12 +601,14 @@ test('GET validates limit parameter', async () => {
   assert.equal(responseValid.status, 200);
 });
 
-test('GET returns 503 when DB not configured', async () => {
+test('GET without DB uses memory and returns 200', async () => {
   const envNoDb = { RSVP_SECRET: 'test' };
   const request = createRequest('GET');
   
   const response = await onRequest({ request, env: envNoDb });
-  assert.equal(response.status, 503);
+  assert.equal(response.status, 200);
+  const data = await response.json();
+  assert.ok(Array.isArray(data.messages));
 });
 
 test('unsupported method returns 405', async () => {

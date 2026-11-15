@@ -3,11 +3,16 @@
  */
 
 import { WEDDING_KEY } from './rsvp-validators.mjs';
+import { PARTNER_ACCOUNT_ID } from './auth-service.mjs';
 import { 
   deriveRsvpKeys, 
   hmacHash, 
   createPayloadFingerprint 
 } from './crypto-utils.mjs';
+
+function weddingKeyFor(accountId) {
+  return accountId === PARTNER_ACCOUNT_ID ? WEDDING_KEY : accountId;
+}
 
 export async function generateToken() {
   const bytes = new Uint8Array(32);
@@ -38,8 +43,9 @@ export function now() {
  * Create RSVP with secure idempotency
  * NEVER returns decrypted token without Authorization + fingerprint match
  */
-export async function createRsvp(db, data, idempotencyKey, secret, bearerToken = null) {
+export async function createRsvp(db, data, idempotencyKey, secret, bearerToken = null, accountId = PARTNER_ACCOUNT_ID) {
   const keys = await deriveRsvpKeys(secret);
+  const weddingKey = weddingKeyFor(accountId);
   
   // Normalize: attending=false forces counts to 0
   const normalizedData = {
@@ -58,9 +64,9 @@ export async function createRsvp(db, data, idempotencyKey, secret, bearerToken =
                 observations, manage_token_hash,
                 idempotency_fingerprint, created_at, updated_at
          FROM rsvps
-         WHERE wedding_key = ? AND idempotency_key = ?`
+         WHERE account_id = ? AND idempotency_key = ?`
       )
-      .bind(WEDDING_KEY, idempotencyKey)
+      .bind(accountId, idempotencyKey)
       .first();
 
     if (existing) {
@@ -88,7 +94,7 @@ export async function createRsvp(db, data, idempotencyKey, secret, bearerToken =
       // NO DECRYPTION - just return the bearer they already have
       return {
         id: existing.id,
-        weddingKey: WEDDING_KEY,
+        weddingKey,
         guestName: existing.guest_name,
         attending: existing.attending === 1,
         adultsCount: existing.adults_count,
@@ -115,15 +121,15 @@ export async function createRsvp(db, data, idempotencyKey, secret, bearerToken =
           id, wedding_key, guest_name, attending,
           adults_count, children_count, observations,
           consent_given, manage_token_hash, created_at, updated_at,
-          idempotency_key, idempotency_fingerprint
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          idempotency_key, idempotency_fingerprint, account_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).bind(
-        id, WEDDING_KEY, normalizedData.guestName,
+        id, weddingKey, normalizedData.guestName,
         normalizedData.attending ? 1 : 0,
         normalizedData.adultsCount, normalizedData.childrenCount,
         normalizedData.observations, 1,
         tokenHash, timestamp, timestamp,
-        idempotencyKey || null, fingerprint
+        idempotencyKey || null, fingerprint, accountId
       ),
     ]);
   } catch (batchError) {
@@ -143,9 +149,9 @@ export async function createRsvp(db, data, idempotencyKey, secret, bearerToken =
                   observations, manage_token_hash, idempotency_fingerprint,
                   created_at, updated_at
            FROM rsvps
-           WHERE wedding_key = ? AND idempotency_key = ?`
+           WHERE account_id = ? AND idempotency_key = ?`
         )
-        .bind(WEDDING_KEY, idempotencyKey)
+        .bind(accountId, idempotencyKey)
         .first();
 
       if (existing) {
@@ -160,7 +166,7 @@ export async function createRsvp(db, data, idempotencyKey, secret, bearerToken =
         // Valid replay
         return {
           id: existing.id,
-          weddingKey: WEDDING_KEY,
+          weddingKey,
           guestName: existing.guest_name,
           attending: existing.attending === 1,
           adultsCount: existing.adults_count,
@@ -176,7 +182,7 @@ export async function createRsvp(db, data, idempotencyKey, secret, bearerToken =
   }
 
   return {
-    id, weddingKey: WEDDING_KEY,
+    id, weddingKey,
     guestName: normalizedData.guestName,
     attending: normalizedData.attending,
     adultsCount: normalizedData.adultsCount,

@@ -17,6 +17,7 @@ import {
   addGuests,
   removeGuest,
   markGuestResponse,
+  assertGuestAllowed,
   getRsvpMode,
   setRsvpMode,
   setGuestAttending,
@@ -110,6 +111,7 @@ const localRsvpsByToken = new Map();
 
 /** Local mural store — 6 recados mockados para a trilha rolante */
 const hoursAgo = (h) => new Date(Date.now() - h * 3600_000).toISOString();
+const localMessagesByAccount = new Map();
 const localMessages = [
   {
     id: 'mock-1',
@@ -155,6 +157,12 @@ const localMessages = [
   },
 ];
 const localMessageIdempotency = new Map();
+
+function muralFor(accountId) {
+  if (accountId === PARTNER_ACCOUNT_ID) return localMessages;
+  if (!localMessagesByAccount.has(accountId)) localMessagesByAccount.set(accountId, []);
+  return localMessagesByAccount.get(accountId);
+}
 
 function nodeHeadersToFetch(req) {
   const headers = new Headers();
@@ -354,12 +362,23 @@ function guestListApiPlugin() {
             const idem = req.headers['idempotency-key'];
             if (!idem) return sendJson(res, 400, { error: 'Header Idempotency-Key é obrigatório' });
             const body = await readJsonBody(req);
-            const validation = validateRsvpCreate(body);
+            const slugReq = new Request(`http://localhost${req.url}`);
+            const resolved = await resolvePublicSlugOrPartner(null, slugFromRequest(slugReq, body));
+            if (!resolved.ok) return sendJson(res, resolved.status, { error: resolved.error });
+            const { slug: _slug, ...payload } = body || {};
+            const validation = validateRsvpCreate(payload);
             if (!validation.valid) {
               return sendJson(res, 400, { error: 'Dados inválidos', details: validation.errors });
             }
             const data = validation.data;
-            await markGuestResponse(null, data.guestName, data.attending, PARTNER_ACCOUNT_ID);
+            const gate = await assertGuestAllowed(null, data.guestName, resolved.account.id);
+            if (!gate.allowed) {
+              return sendJson(res, 403, {
+                error: gate.message || 'Convidado não autorizado',
+                details: { error: gate.error, rsvpMode: gate.mode },
+              });
+            }
+            await markGuestResponse(null, data.guestName, data.attending, resolved.account.id);
             const manageToken = crypto.randomUUID().replaceAll('-', '');
             const now = new Date().toISOString();
             const rsvp = {
@@ -459,12 +478,16 @@ function guestListApiPlugin() {
           }
 
           if (path === '/api/messages' && req.method === 'GET') {
+            const request = await nodeRequestToFetch(req);
+            const resolved = await resolvePublicSlugOrPartner(null, slugFromRequest(request));
+            if (!resolved.ok) return sendJson(res, resolved.status, { error: resolved.error });
             const limitRaw = parseInt(parsed.searchParams.get('limit') || '12', 10);
             const limit = Number.isFinite(limitRaw)
               ? Math.min(50, Math.max(3, limitRaw))
               : 12;
             const cursor = parsed.searchParams.get('cursor');
-            const sorted = [...localMessages].sort((a, b) => {
+            const mural = muralFor(resolved.account.id).filter((m) => m.hidden !== 1 && m.hidden !== true);
+            const sorted = [...mural].sort((a, b) => {
               if (a.createdAt === b.createdAt) return a.id < b.id ? 1 : -1;
               return a.createdAt < b.createdAt ? 1 : -1;
             });
@@ -510,25 +533,30 @@ function guestListApiPlugin() {
               return sendJson(res, 400, { error: 'Header Idempotency-Key é obrigatório' });
             }
             const body = await readJsonBody(req);
-            const validation = validateMessageCreate(body);
+            const slugReq = new Request(`http://localhost${req.url}`);
+            const resolved = await resolvePublicSlugOrPartner(null, slugFromRequest(slugReq, body));
+            if (!resolved.ok) return sendJson(res, resolved.status, { error: resolved.error });
+            const { slug: _slug, ...payload } = body || {};
+            const validation = validateMessageCreate(payload);
             if (!validation.valid) {
               return sendJson(res, 400, {
                 error: 'Dados inválidos',
                 details: validation.errors,
               });
             }
-            if (localMessageIdempotency.has(idem)) {
-              return sendJson(res, 201, localMessageIdempotency.get(idem));
+            const idemKey = `${resolved.account.id}:${idem}`;
+            if (localMessageIdempotency.has(idemKey)) {
+              return sendJson(res, 201, localMessageIdempotency.get(idemKey));
             }
             const created = {
               id: crypto.randomUUID(),
-              weddingKey: 'dani-carine',
+              weddingKey: resolved.account.slug || resolved.account.id,
               guestName: validation.data.guestName,
               message: validation.data.message,
               createdAt: new Date().toISOString(),
             };
-            localMessages.unshift(created);
-            localMessageIdempotency.set(idem, created);
+            muralFor(resolved.account.id).unshift(created);
+            localMessageIdempotency.set(idemKey, created);
             return sendJson(res, 201, created);
           }
         } catch (err) {

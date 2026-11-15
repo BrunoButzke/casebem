@@ -12,6 +12,7 @@ import {
   errorResponse403,
   sanitizeError,
 } from '../../_lib/http-helpers.mjs';
+import { slugFromRequest, resolvePublicSlugOrPartner } from '../../_lib/public-slug.mjs';
 
 /**
  * Handle OPTIONS preflight
@@ -60,10 +61,24 @@ export async function onRequestPost(context) {
                     request.headers.get('X-Forwarded-For')?.split(',')[0] ||
                     '0.0.0.0';
 
+  const slug = slugFromRequest(request, body);
+  const resolved = await resolvePublicSlugOrPartner(env.DB || null, slug);
+  if (!resolved.ok) {
+    const headers = getCorsHeaders(request);
+    headers.set('Content-Type', 'application/json');
+    return new Response(JSON.stringify({ error: resolved.error }), {
+      status: resolved.status,
+      headers,
+    });
+  }
+
   try {
     const origin = request.headers.get('Origin') || new URL(request.url).origin;
     // Processar checkout (com DB e IP para idempotência e rate limit)
-    const result = await createCheckoutPayment(body, env, env.DB, ipAddress, { origin });
+    const result = await createCheckoutPayment(body, env, env.DB, ipAddress, {
+      origin,
+      accountId: resolved.account.id,
+    });
 
     // Se o result tem status (ex: 503), usar esse status
     const statusCode = result.ok ? 200 : (result.status || 400);

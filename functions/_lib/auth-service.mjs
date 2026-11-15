@@ -1,4 +1,5 @@
 import { hashPassword, verifyPassword, randomSaltB64 } from './password.mjs';
+import { normalizeSlug, RESERVED_SLUGS, assertSlugFormat } from './slug.mjs';
 
 export const PARTNER_ACCOUNT_ID = 'partner-dani-carine';
 export const SESSION_COOKIE = 'cb_session';
@@ -165,6 +166,24 @@ export async function setAccountSlug(db, accountId, slug) {
   db = resolveDb(db);
   await db.prepare('UPDATE accounts SET slug = ? WHERE id = ?').bind(slug, accountId).run();
   return resolveAccountBySlug(db, slug);
+}
+
+export async function claimAccountSlug(db, accountId, raw) {
+  db = resolveDb(db);
+  const row = await selectAccountById(db, accountId);
+  if (!row) throw new Error('ACCOUNT_NOT_FOUND');
+  const slug = normalizeSlug(raw);
+  const isPartner = Boolean(Number(row.is_partner));
+  if (isPartner) {
+    if (slug !== 'dani-carine') throw new Error('SLUG_LOCKED');
+    return { slug: 'dani-carine' };
+  }
+  assertSlugFormat(slug);
+  if (RESERVED_SLUGS.has(slug)) throw new Error('SLUG_RESERVED');
+  const taken = await resolveAccountBySlug(db, slug);
+  if (taken && taken.id !== accountId) throw new Error('SLUG_TAKEN');
+  await db.prepare('UPDATE accounts SET slug = ? WHERE id = ?').bind(slug, accountId).run();
+  return { slug };
 }
 
 function compactSql(sql) {

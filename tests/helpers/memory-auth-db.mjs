@@ -130,6 +130,12 @@ class MemoryAuthStatement {
       }
       return { success: true };
     }
+    if (sql.includes('UPDATE accounts SET slug')) {
+      const [slug, id] = params;
+      const row = db.findAccountById(id);
+      if (row) row.slug = slug;
+      return { success: true };
+    }
     throw new Error(`MemoryAuthDb: unsupported run() SQL: ${sql}`);
   }
 

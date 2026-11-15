@@ -72,6 +72,7 @@ import {
 } from './functions/_lib/desafio-theme-service.mjs';
 import { requireAccount } from './functions/_lib/session-auth.mjs';
 import { PARTNER_ACCOUNT_ID } from './functions/_lib/auth-service.mjs';
+import { ensurePartnerAccount } from './functions/_lib/partner-seed.mjs';
 import { listMessagesAdmin } from './functions/_lib/admin-service.mjs';
 import {
   onRequestPost as signupPost,
@@ -239,6 +240,22 @@ function guestListApiPlugin() {
           const rawUrl = req.url || '/';
           const parsed = new URL(rawUrl, 'http://localhost');
           const path = parsed.pathname;
+
+          const casalPage = path.match(/^\/api\/casal\/([^/]+)\/?$/);
+          if (casalPage && req.method === 'GET') {
+            await ensurePartnerAccount(null, {
+              email: process.env.PARTNER_EMAIL,
+              password: process.env.PARTNER_BOOTSTRAP_PASSWORD,
+            }, new Date().toISOString());
+            const { onRequestGet } = await import('./functions/api/casal/[slug].js');
+            const resFn = await onRequestGet({
+              request: new Request(`http://localhost${path}`),
+              env: { DB: null },
+              params: { slug: decodeURIComponent(casalPage[1]) },
+            });
+            const text = await resFn.text();
+            return sendJson(res, resFn.status, JSON.parse(text));
+          }
 
           if (path === '/api/desafio/theme' && req.method === 'GET') {
             const theme = await getDesafioTheme(null, PARTNER_ACCOUNT_ID);

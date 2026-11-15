@@ -109,7 +109,7 @@ VALUES (?, ?, ?, ?, ?, ?, NULL, 0, ?)`
     slug: null,
     is_partner: 0,
   };
-  return { account: publicAccount(row), sessionId, accountId: id };
+  return { account: { ...publicAccount(row), id }, sessionId, accountId: id };
 }
 
 export async function login(db, { email, password }, nowIso) {
@@ -159,6 +159,12 @@ export async function resolveAccountBySlug(db, slug) {
   const row = await db.prepare('SELECT * FROM accounts WHERE slug = ?').bind(slug).first();
   if (!row) return null;
   return { ...row, isPartner: Boolean(Number(row.is_partner)) };
+}
+
+export async function setAccountSlug(db, accountId, slug) {
+  db = resolveDb(db);
+  await db.prepare('UPDATE accounts SET slug = ? WHERE id = ?').bind(slug, accountId).run();
+  return resolveAccountBySlug(db, slug);
 }
 
 function compactSql(sql) {
@@ -252,6 +258,12 @@ class ProcessMemoryAuthStatement {
         row.plan = plan;
         row.plan_status = plan_status;
       }
+      return { success: true };
+    }
+    if (sql.includes('UPDATE accounts SET slug')) {
+      const [slug, id] = params;
+      const row = db.findAccountById(id);
+      if (row) row.slug = slug;
       return { success: true };
     }
     throw new Error(`ProcessMemoryAuthDb: unsupported run() SQL: ${sql}`);

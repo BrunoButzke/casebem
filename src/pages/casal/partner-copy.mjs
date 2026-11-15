@@ -1,0 +1,25 @@
+export const PARTNER_COPY = {
+  city: 'Florianópolis · Lagoa da Conceição',
+  names: ['Dani', 'Carine'],
+  dateLine: '21 de novembro · 8h',
+  heroImage: '/images/hero-casal.jpg',
+  welcomeTitle: 'Sejam muito bem-vindos ao nosso cantinho especial!',
+  storyEyebrow: 'Nossa história',
+  manifesto: 'Um sim ao amanhecer.',
+  manifestoImage: '/images/indaia-noite.jpg',
+  portraits: [
+    { src: '/images/casal-dani.png', alt: 'Dani', caption: 'Dani' },
+    { src: '/images/casal-carine.png', alt: 'Carine', caption: 'Carine' },
+  ],
+  moments: [
+    { n: '01', title: 'Cerimônia', detail: '21 de novembro · 8h', image: '/images/cerimonia-altar.png' },
+    { n: '02', title: 'Brunch', detail: 'Buffet de café da manhã', image: '/images/brunch-saloes.png' },
+    { n: '03', title: 'Festa', detail: 'Indaiá Eventos', image: '/images/festa-danca.jpg' },
+  ],
+  venueName: 'Indaiá Eventos',
+  venuePlace: 'Canto da Lagoa · Florianópolis',
+  mapsHref: 'https://www.google.com/maps/search/?api=1&query=Indai%C3%A1+Eventos+Canto+da+Lagoa+Florian%C3%B3polis',
+  dressTitle: 'Social completo',
+  dressRule: 'Branco proibido',
+  manualImage: '/images/manual-convidado.png',
+};

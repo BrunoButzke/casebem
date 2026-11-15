@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { Window } from 'happy-dom';
 import { coupleNavItems } from '../src/pages/casal/couple-nav.mjs';
 import { fetchCouplePage } from '../src/lib/casal-api.mjs';
+import { PARTNER_COPY } from '../src/pages/casal/partner-copy.mjs';
 import { readFileSync } from 'node:fs';
 
 test('couple nav omits playlist, lodging, stationery and login', () => {
@@ -60,4 +61,19 @@ test('App.jsx declares /casal/:slug and CoupleSite has no admin login', () => {
   const page = readFileSync(new URL('../src/pages/casal/CoupleSite.jsx', import.meta.url), 'utf8');
   assert.doesNotMatch(page, /admin-login|Acesso dos noivos/);
   assert.match(page, /Página não encontrada/);
+});
+
+test('partner copy names Dani and Carine and keeps venue Indaiá', () => {
+  assert.deepEqual(PARTNER_COPY.names, ['Dani', 'Carine']);
+  assert.equal(PARTNER_COPY.venueName, 'Indaiá Eventos');
+  assert.equal(PARTNER_COPY.dressRule, 'Branco proibido');
+  assert.match(PARTNER_COPY.heroImage, /hero-casal/);
+});
+
+test('PartnerHome markup contains required section ids and omits playlist', () => {
+  const src = readFileSync(new URL('../src/pages/casal/PartnerHome.jsx', import.meta.url), 'utf8');
+  for (const id of ['boas-vindas', 'o-casal', 'o-dia', 'local', 'dress-code', 'manual-convidado']) {
+    assert.match(src, new RegExp(`id="${id}"`));
+  }
+  assert.doesNotMatch(src, /id="playlist"|hospedagem|Papelaria/);
 });

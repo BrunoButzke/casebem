@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { fetchCouplePage } from '../../lib/casal-api.mjs';
 import { coupleNavItems } from './couple-nav.mjs';
+import PartnerHome from './PartnerHome.jsx';
 
 export default function CoupleSite() {
   const { slug } = useParams();
@@ -45,6 +46,11 @@ export default function CoupleSite() {
           </a>
         ))}
       </nav>
+      {state.isPartner ? <PartnerHome slug={state.slug} /> : (
+        <main>
+          <h1>Em breve</h1>
+        </main>
+      )}
     </div>
   );
 }

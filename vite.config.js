@@ -72,6 +72,7 @@ import {
 } from './functions/_lib/desafio-theme-service.mjs';
 import { requireAccount } from './functions/_lib/session-auth.mjs';
 import { PARTNER_ACCOUNT_ID } from './functions/_lib/auth-service.mjs';
+import { listMessagesAdmin } from './functions/_lib/admin-service.mjs';
 
 const rootDir = dirname(fileURLToPath(import.meta.url));
 
@@ -450,21 +451,15 @@ function adminApiPlugin(env) {
             const groups = await listGroups(null, auth.account.id);
             const guestStats = summarizeGuestList(guests);
             const rsvpMode = await getRsvpMode(null, auth.account.id);
-            const messages = localMessages.map((m) => ({
-              id: m.id,
-              guestName: m.guestName,
-              message: m.message,
-              createdAt: m.createdAt,
-              hidden: false,
-            }));
+            const messages = await listMessagesAdmin(null, auth.account.id);
             return sendJson(res, 200, {
               ok: true,
               summary: {
                 attendingCount: guestStats.attendingCount,
                 declinedCount: guestStats.declinedCount,
                 pendingCount: guestStats.pendingCount,
-                messagesVisible: messages.length,
-                messagesHidden: 0,
+                messagesVisible: messages.filter((m) => !m.hidden).length,
+                messagesHidden: messages.filter((m) => m.hidden).length,
                 giftsPending: 0,
                 giftsPaid: 0,
                 giftsPaidCents: 0,

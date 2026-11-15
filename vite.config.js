@@ -29,6 +29,7 @@ import {
 import { validateRsvpCreate } from './functions/_lib/rsvp-validators.mjs';
 import { validateMessageCreate } from './functions/_lib/messages-validators.mjs';
 import {
+  getActiveCatalog,
   listCatalogAdmin,
   createGift,
   updateGift,
@@ -73,6 +74,7 @@ import {
 import { requireAccount } from './functions/_lib/session-auth.mjs';
 import { PARTNER_ACCOUNT_ID } from './functions/_lib/auth-service.mjs';
 import { ensurePartnerAccount } from './functions/_lib/partner-seed.mjs';
+import { slugFromRequest, resolvePublicSlugOrPartner } from './functions/_lib/public-slug.mjs';
 import { listMessagesAdmin } from './functions/_lib/admin-service.mjs';
 import {
   onRequestPost as signupPost,
@@ -385,6 +387,24 @@ function guestListApiPlugin() {
             return sendJson(res, 200, publicRsvp);
           }
 
+          if (path === '/api/gifts/catalog' && req.method === 'GET') {
+            const request = await nodeRequestToFetch(req);
+            const resolved = await resolvePublicSlugOrPartner(null, slugFromRequest(request));
+            if (!resolved.ok) return sendJson(res, resolved.status, { error: resolved.error });
+            const catalog = await getActiveCatalog(null, resolved.account.id);
+            return sendJson(res, 200, {
+              ok: true,
+              gifts: catalog.map((g) => ({
+                id: g.id,
+                name: g.name,
+                description: g.description,
+                priceInCents: g.priceInCents,
+                imageUrl: g.imageUrl,
+                mode: g.mode,
+              })),
+            });
+          }
+
           if (path === '/api/guests/search' && req.method === 'GET') {
             const q = parsed.searchParams.get('q') || '';
             if (String(q).trim().length < 2) {
@@ -394,7 +414,10 @@ function guestListApiPlugin() {
                 message: 'Digite pelo menos 2 letras para buscar.',
               });
             }
-            const matches = await searchGuests(null, q, PARTNER_ACCOUNT_ID);
+            const request = await nodeRequestToFetch(req);
+            const resolved = await resolvePublicSlugOrPartner(null, slugFromRequest(request));
+            if (!resolved.ok) return sendJson(res, resolved.status, { error: resolved.error });
+            const matches = await searchGuests(null, q, resolved.account.id);
             return sendJson(res, 200, {
               ok: true,
               query: q,

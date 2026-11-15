@@ -3,8 +3,8 @@
  */
 
 import { getCorsHeaders } from '../../_lib/http-helpers.mjs';
-import { PARTNER_ACCOUNT_ID } from '../../_lib/auth-service.mjs';
 import { searchGuests } from '../../_lib/rsvp-guest-list.mjs';
+import { slugFromRequest, resolvePublicSlugOrPartner } from '../../_lib/public-slug.mjs';
 
 export async function onRequestOptions(context) {
   return new Response(null, { status: 204, headers: getCorsHeaders(context.request) });
@@ -25,7 +25,12 @@ export async function onRequestGet(context) {
   }
 
   try {
-    const matches = await searchGuests(env.DB || null, q, PARTNER_ACCOUNT_ID);
+    const slug = slugFromRequest(request);
+    const resolved = await resolvePublicSlugOrPartner(env.DB || null, slug);
+    if (!resolved.ok) {
+      return Response.json({ error: resolved.error }, { status: resolved.status, headers });
+    }
+    const matches = await searchGuests(env.DB || null, q, resolved.account.id);
     return Response.json(
       {
         ok: true,

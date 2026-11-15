@@ -4,8 +4,8 @@
  */
 
 import { getActiveCatalog } from '../../_lib/catalog-service.mjs';
-import { PARTNER_ACCOUNT_ID } from '../../_lib/auth-service.mjs';
 import { getCorsHeaders } from '../../_lib/http-helpers.mjs';
+import { slugFromRequest, resolvePublicSlugOrPartner } from '../../_lib/public-slug.mjs';
 
 export async function onRequestOptions(context) {
   return new Response(null, { status: 204, headers: getCorsHeaders(context.request) });
@@ -18,7 +18,12 @@ export async function onRequestGet(context) {
   headers.set('Cache-Control', 'public, max-age=30');
 
   try {
-    const catalog = await getActiveCatalog(env.DB || null, PARTNER_ACCOUNT_ID);
+    const slug = slugFromRequest(request);
+    const resolved = await resolvePublicSlugOrPartner(env.DB || null, slug);
+    if (!resolved.ok) {
+      return Response.json({ error: resolved.error }, { status: resolved.status, headers });
+    }
+    const catalog = await getActiveCatalog(env.DB || null, resolved.account.id);
     return Response.json(
       {
         ok: true,

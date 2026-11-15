@@ -567,28 +567,28 @@ function adminApiPlugin(env) {
             };
             try {
               if (req.method === 'GET') {
-                const gifts = await listCatalogAdmin(null);
+                const gifts = await listCatalogAdmin(null, auth.account.id);
                 return sendJson(res, 200, { ok: true, gifts });
               }
               if (req.method === 'POST') {
                 const body = await readJsonBody(req);
-                const gift = await createGift(null, body || {});
-                return sendJson(res, 201, { ok: true, gift, gifts: await listCatalogAdmin(null) });
+                const gift = await createGift(null, auth.account.id, body || {});
+                return sendJson(res, 201, { ok: true, gift, gifts: await listCatalogAdmin(null, auth.account.id) });
               }
               if (req.method === 'PATCH') {
                 const body = await readJsonBody(req);
                 if (!body?.id) return sendJson(res, 400, { ok: false, error: 'MISSING_ID' });
-                const gift = await updateGift(null, String(body.id), body);
+                const gift = await updateGift(null, auth.account.id, String(body.id), body);
                 return sendJson(res, 200, { ok: true, gift });
               }
               if (req.method === 'DELETE') {
                 const id = parsed.searchParams.get('id');
                 if (!id) return sendJson(res, 400, { ok: false, error: 'MISSING_ID' });
-                await deleteGift(null, id);
+                await deleteGift(null, auth.account.id, id);
                 return sendJson(res, 200, {
                   ok: true,
                   removed: id,
-                  gifts: await listCatalogAdmin(null),
+                  gifts: await listCatalogAdmin(null, auth.account.id),
                 });
               }
             } catch (err) {

@@ -4,6 +4,7 @@
  */
 
 import { getActiveCatalog } from '../../_lib/catalog-service.mjs';
+import { PARTNER_ACCOUNT_ID } from '../../_lib/auth-service.mjs';
 import { getCorsHeaders } from '../../_lib/http-helpers.mjs';
 
 export async function onRequestOptions(context) {
@@ -17,7 +18,7 @@ export async function onRequestGet(context) {
   headers.set('Cache-Control', 'public, max-age=30');
 
   try {
-    const catalog = await getActiveCatalog(env.DB || null);
+    const catalog = await getActiveCatalog(env.DB || null, PARTNER_ACCOUNT_ID);
     return Response.json(
       {
         ok: true,

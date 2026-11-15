@@ -5,13 +5,19 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { GIFTS_CATALOG } from '../data/gifts-catalog.mjs';
+import { PARTNER_ACCOUNT_ID } from '../functions/_lib/auth-service.mjs';
 import {
   seedCatalogIfEmpty,
   getActiveCatalog,
   updateGift,
   validateGiftPatch,
   calculateTotalFromCatalog,
+  resetMemoryCatalogForTests,
 } from '../functions/_lib/catalog-service.mjs';
+
+function rowMatchesAccount(row, accountId) {
+  return !accountId || !row.account_id || row.account_id === accountId;
+}
 
 function mockCatalogDb(initialRows = []) {
   const rows = new Map(initialRows.map((r) => [r.id, { ...r }]));
@@ -26,16 +32,28 @@ function mockCatalogDb(initialRows = []) {
         },
         async first() {
           if (sql.includes('COUNT(*)')) {
+            const accountId = this._p[0];
+            if (sql.includes('account_id') && accountId != null) {
+              const c = [...rows.values()].filter((r) => rowMatchesAccount(r, accountId)).length;
+              return { c };
+            }
             return { c: rows.size };
           }
           if (sql.includes('FROM gifts_catalog WHERE id')) {
-            return rows.get(this._p[0]) || null;
+            const [id, accountId] = this._p;
+            const row = rows.get(id);
+            if (!row || !rowMatchesAccount(row, accountId)) return null;
+            return row;
           }
           return null;
         },
         async all() {
           let list = [...rows.values()];
-          if (sql.includes('WHERE active = 1')) {
+          const accountId = this._p[0];
+          if (sql.includes('account_id') && accountId != null) {
+            list = list.filter((r) => rowMatchesAccount(r, accountId));
+          }
+          if (sql.includes('active = 1')) {
             list = list.filter((r) => r.active === 1);
           }
           list.sort((a, b) => (a.sort_order - b.sort_order) || a.id.localeCompare(b.id));
@@ -43,30 +61,53 @@ function mockCatalogDb(initialRows = []) {
         },
         async run() {
           if (sql.includes('INSERT INTO gifts_catalog')) {
-            const [id, name, description, price, image, mode, sort, updated] = this._p;
-            rows.set(id, {
-              id,
-              name,
-              description,
-              price_in_cents: price,
-              image_url: image,
-              mode,
-              active: 1,
-              sort_order: sort,
-              updated_at: updated,
-            });
+            if (this._p.length >= 11) {
+              const [id, name, description, price, image, imageData, mode, active, sort, updated, accountId] =
+                this._p;
+              rows.set(id, {
+                id,
+                name,
+                description,
+                price_in_cents: price,
+                image_url: image,
+                image_data: imageData,
+                mode,
+                active,
+                sort_order: sort,
+                updated_at: updated,
+                account_id: accountId,
+              });
+            } else {
+              const [id, name, description, price, image, mode, sort, updated, accountId] = this._p;
+              rows.set(id, {
+                id,
+                name,
+                description,
+                price_in_cents: price,
+                image_url: image,
+                mode,
+                active: 1,
+                sort_order: sort,
+                updated_at: updated,
+                account_id: accountId,
+              });
+            }
             return { success: true, meta: { changes: 1 } };
           }
           if (sql.includes('UPDATE gifts_catalog')) {
-            const [name, description, price, image, mode, active, sort, updated, id] = this._p;
+            const [name, description, price, image, imageData, mode, active, sort, updated, id, accountId] =
+              this._p;
             const cur = rows.get(id);
-            if (!cur) return { success: true, meta: { changes: 0 } };
+            if (!cur || !rowMatchesAccount(cur, accountId)) {
+              return { success: true, meta: { changes: 0 } };
+            }
             rows.set(id, {
               ...cur,
               name,
               description,
               price_in_cents: price,
               image_url: image,
+              image_data: imageData,
               mode,
               active,
               sort_order: sort,
@@ -88,26 +129,29 @@ test('validateGiftPatch: rejeita preço < 99', () => {
 
 test('seedCatalogIfEmpty: popula a partir do estático', async () => {
   const db = mockCatalogDb();
-  const r = await seedCatalogIfEmpty(db);
+  const r = await seedCatalogIfEmpty(db, PARTNER_ACCOUNT_ID);
   assert.equal(r.seeded, true);
   assert.equal(r.count, GIFTS_CATALOG.length);
-  const again = await seedCatalogIfEmpty(db);
+  const again = await seedCatalogIfEmpty(db, PARTNER_ACCOUNT_ID);
   assert.equal(again.seeded, false);
 });
 
 test('getActiveCatalog: omite inativos', async () => {
   const db = mockCatalogDb();
-  await seedCatalogIfEmpty(db);
-  await updateGift(db, 'danca', { active: false });
-  const active = await getActiveCatalog(db);
+  await seedCatalogIfEmpty(db, PARTNER_ACCOUNT_ID);
+  await updateGift(db, PARTNER_ACCOUNT_ID, 'danca', { active: false });
+  const active = await getActiveCatalog(db, PARTNER_ACCOUNT_ID);
   assert.equal(active.some((g) => g.id === 'danca'), false);
   assert.ok(active.some((g) => g.id === 'spa'));
 });
 
 test('updateGift: altera preço em centavos', async () => {
   const db = mockCatalogDb();
-  await seedCatalogIfEmpty(db);
-  const gift = await updateGift(db, 'spa', { priceInCents: 33300, name: 'Spa premium' });
+  await seedCatalogIfEmpty(db, PARTNER_ACCOUNT_ID);
+  const gift = await updateGift(db, PARTNER_ACCOUNT_ID, 'spa', {
+    priceInCents: 33300,
+    name: 'Spa premium',
+  });
   assert.equal(gift.priceInCents, 33300);
   assert.equal(gift.name, 'Spa premium');
 });
@@ -119,6 +163,7 @@ test('calculateTotalFromCatalog: usa preço do catálogo vivo', () => {
 });
 
 test('getActiveCatalog: sem DB retorna estático', async () => {
-  const catalog = await getActiveCatalog(null);
+  resetMemoryCatalogForTests();
+  const catalog = await getActiveCatalog(null, PARTNER_ACCOUNT_ID);
   assert.equal(catalog.length, GIFTS_CATALOG.length);
 });

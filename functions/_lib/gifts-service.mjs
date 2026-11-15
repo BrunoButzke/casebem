@@ -9,6 +9,7 @@ import {
   getGiftFromCatalog,
   calculateTotalFromCatalog,
 } from './catalog-service.mjs';
+import { PARTNER_ACCOUNT_ID } from './auth-service.mjs';
 
 const ALLOWED_PAYMENT_METHODS = ['pix', 'card', 'boleto'];
 
@@ -158,7 +159,7 @@ export async function createCheckoutPayment(request, env, db, ipAddress, options
   }
 
   // Catálogo ativo (D1 + seed; fallback estático)
-  const catalog = await getActiveCatalog(db);
+  const catalog = await getActiveCatalog(db, PARTNER_ACCOUNT_ID);
 
   for (const item of request.items) {
     if (!getGiftFromCatalog(catalog, item.giftId)) {

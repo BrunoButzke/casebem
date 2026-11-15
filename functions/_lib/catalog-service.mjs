@@ -4,8 +4,10 @@
  */
 
 import { GIFTS_CATALOG } from '../../data/gifts-catalog.mjs';
+import { PARTNER_ACCOUNT_ID } from './auth-service.mjs';
 
-let memoryCatalog = null;
+/** @type {Map<string, Array>} */
+let memoryCatalogs = new Map();
 
 const MAX_IMAGE_DATA = 180_000;
 
@@ -60,32 +62,43 @@ export function slugifyId(text) {
   return base || `item-${Date.now().toString(36)}`;
 }
 
-function ensureMemoryCatalog() {
-  if (!memoryCatalog) {
-    memoryCatalog = GIFTS_CATALOG.map((g, i) => ({
-      id: g.id,
-      name: g.name,
-      description: g.description,
-      priceInCents: g.priceInCents,
-      imageUrl: g.imageUrl,
-      mode: g.mode,
-      active: true,
-      sortOrder: i,
-      updatedAt: null,
-    }));
+function seedMemoryFromStatic() {
+  return GIFTS_CATALOG.map((g, i) => ({
+    id: g.id,
+    name: g.name,
+    description: g.description,
+    priceInCents: g.priceInCents,
+    imageUrl: g.imageUrl,
+    mode: g.mode,
+    active: true,
+    sortOrder: i,
+    updatedAt: null,
+  }));
+}
+
+function ensureMemoryCatalog(accountId) {
+  if (!memoryCatalogs.has(accountId)) {
+    memoryCatalogs.set(
+      accountId,
+      accountId === PARTNER_ACCOUNT_ID ? seedMemoryFromStatic() : []
+    );
   }
-  return memoryCatalog;
+  return memoryCatalogs.get(accountId);
 }
 
 export function resetMemoryCatalogForTests() {
-  memoryCatalog = null;
+  memoryCatalogs = new Map();
 }
 
-export async function seedCatalogIfEmpty(db) {
-  if (!db) return { seeded: false, count: ensureMemoryCatalog().length };
-  const countRow = await db.prepare(`SELECT COUNT(*) AS c FROM gifts_catalog`).first();
+export async function seedCatalogIfEmpty(db, accountId) {
+  if (!db) return { seeded: false, count: ensureMemoryCatalog(accountId).length };
+  const countRow = await db
+    .prepare(`SELECT COUNT(*) AS c FROM gifts_catalog WHERE account_id = ?`)
+    .bind(accountId)
+    .first();
   const count = Number(countRow?.c || 0);
   if (count > 0) return { seeded: false, count };
+  if (accountId !== PARTNER_ACCOUNT_ID) return { seeded: false, count: 0 };
 
   const now = new Date().toISOString();
   let i = 0;
@@ -93,8 +106,8 @@ export async function seedCatalogIfEmpty(db) {
     await db
       .prepare(
         `INSERT INTO gifts_catalog (
-          id, name, description, price_in_cents, image_url, mode, active, sort_order, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)`
+          id, name, description, price_in_cents, image_url, mode, active, sort_order, updated_at, account_id
+        ) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`
       )
       .bind(
         gift.id,
@@ -104,7 +117,8 @@ export async function seedCatalogIfEmpty(db) {
         gift.imageUrl,
         gift.mode,
         i++,
-        now
+        now,
+        accountId
       )
       .run();
   }
@@ -114,44 +128,52 @@ export async function seedCatalogIfEmpty(db) {
 /**
  * Active gifts for checkout / public site. Falls back to static if D1 empty/unavailable.
  */
-export async function getActiveCatalog(db) {
+export async function getActiveCatalog(db, accountId) {
   if (!db) {
-    return ensureMemoryCatalog()
+    return ensureMemoryCatalog(accountId)
       .filter((g) => g.active)
       .map((g) => ({ ...g }));
   }
 
   try {
-    await seedCatalogIfEmpty(db);
+    await seedCatalogIfEmpty(db, accountId);
     const rows = await db
       .prepare(
         `SELECT id, name, description, price_in_cents, image_url, image_data, mode, active, sort_order, updated_at
          FROM gifts_catalog
-         WHERE active = 1
+         WHERE active = 1 AND account_id = ?
          ORDER BY sort_order ASC, id ASC`
       )
+      .bind(accountId)
       .all();
     const list = (rows?.results || []).map(rowToGift);
-    if (list.length === 0) return GIFTS_CATALOG.map((g) => ({ ...g, active: true }));
+    if (list.length === 0 && accountId === PARTNER_ACCOUNT_ID) {
+      return GIFTS_CATALOG.map((g) => ({ ...g, active: true }));
+    }
     return list;
   } catch {
-    return GIFTS_CATALOG.map((g) => ({ ...g, active: true }));
+    if (accountId === PARTNER_ACCOUNT_ID) {
+      return GIFTS_CATALOG.map((g) => ({ ...g, active: true }));
+    }
+    return [];
   }
 }
 
-export async function listCatalogAdmin(db) {
+export async function listCatalogAdmin(db, accountId) {
   if (!db) {
-    return [...ensureMemoryCatalog()].sort(
+    return [...ensureMemoryCatalog(accountId)].sort(
       (a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id)
     );
   }
-  await seedCatalogIfEmpty(db);
+  await seedCatalogIfEmpty(db, accountId);
   const rows = await db
     .prepare(
       `SELECT id, name, description, price_in_cents, image_url, image_data, mode, active, sort_order, updated_at
        FROM gifts_catalog
+       WHERE account_id = ?
        ORDER BY sort_order ASC, id ASC`
     )
+    .bind(accountId)
     .all();
   return (rows?.results || []).map(rowToGift);
 }
@@ -255,7 +277,7 @@ export function validateGiftCreate(body) {
   };
 }
 
-export async function createGift(db, body) {
+export async function createGift(db, accountId, body) {
   const validation = validateGiftCreate(body);
   if (!validation.valid) {
     const err = new Error('VALIDATION');
@@ -266,7 +288,7 @@ export async function createGift(db, body) {
   const now = new Date().toISOString();
 
   if (!db) {
-    const mem = ensureMemoryCatalog();
+    const mem = ensureMemoryCatalog(accountId);
     if (mem.some((g) => g.id === d.id)) throw new Error('GIFT_EXISTS');
     const gift = {
       id: d.id,
@@ -288,8 +310,8 @@ export async function createGift(db, body) {
     await db
       .prepare(
         `INSERT INTO gifts_catalog (
-          id, name, description, price_in_cents, image_url, image_data, mode, active, sort_order, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          id, name, description, price_in_cents, image_url, image_data, mode, active, sort_order, updated_at, account_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .bind(
         d.id,
@@ -301,7 +323,8 @@ export async function createGift(db, body) {
         d.mode,
         d.active ? 1 : 0,
         d.sortOrder,
-        now
+        now,
+        accountId
       )
       .run();
   } catch (err) {
@@ -325,7 +348,7 @@ export async function createGift(db, body) {
   });
 }
 
-export async function updateGift(db, giftId, patch) {
+export async function updateGift(db, accountId, giftId, patch) {
   if (!giftId || typeof giftId !== 'string') throw new Error('INVALID_GIFT_ID');
 
   const validation = validateGiftPatch(patch);
@@ -339,7 +362,7 @@ export async function updateGift(db, giftId, patch) {
   const now = new Date().toISOString();
 
   if (!db) {
-    const mem = ensureMemoryCatalog();
+    const mem = ensureMemoryCatalog(accountId);
     const g = mem.find((x) => x.id === giftId);
     if (!g) throw new Error('GIFT_NOT_FOUND');
     if (d.name !== undefined) g.name = d.name;
@@ -361,17 +384,17 @@ export async function updateGift(db, giftId, patch) {
   }
 
   const existing = await db
-    .prepare(`SELECT id FROM gifts_catalog WHERE id = ?`)
-    .bind(giftId)
+    .prepare(`SELECT id FROM gifts_catalog WHERE id = ? AND account_id = ?`)
+    .bind(giftId, accountId)
     .first();
   if (!existing) throw new Error('GIFT_NOT_FOUND');
 
   const row = await db
     .prepare(
       `SELECT id, name, description, price_in_cents, image_url, image_data, mode, active, sort_order
-       FROM gifts_catalog WHERE id = ?`
+       FROM gifts_catalog WHERE id = ? AND account_id = ?`
     )
-    .bind(giftId)
+    .bind(giftId, accountId)
     .first();
 
   const next = {
@@ -395,7 +418,7 @@ export async function updateGift(db, giftId, patch) {
       `UPDATE gifts_catalog
        SET name = ?, description = ?, price_in_cents = ?, image_url = ?, image_data = ?,
            mode = ?, active = ?, sort_order = ?, updated_at = ?
-       WHERE id = ?`
+       WHERE id = ? AND account_id = ?`
     )
     .bind(
       next.name,
@@ -407,25 +430,29 @@ export async function updateGift(db, giftId, patch) {
       next.active,
       next.sort_order,
       now,
-      giftId
+      giftId,
+      accountId
     )
     .run();
 
   return rowToGift({ ...next, id: giftId, updated_at: now });
 }
 
-export async function deleteGift(db, giftId) {
+export async function deleteGift(db, accountId, giftId) {
   if (!giftId || typeof giftId !== 'string') throw new Error('INVALID_GIFT_ID');
 
   if (!db) {
-    const mem = ensureMemoryCatalog();
+    const mem = ensureMemoryCatalog(accountId);
     const idx = mem.findIndex((g) => g.id === giftId);
     if (idx < 0) throw new Error('GIFT_NOT_FOUND');
     mem.splice(idx, 1);
     return { id: giftId, removed: true };
   }
 
-  const result = await db.prepare(`DELETE FROM gifts_catalog WHERE id = ?`).bind(giftId).run();
+  const result = await db
+    .prepare(`DELETE FROM gifts_catalog WHERE id = ? AND account_id = ?`)
+    .bind(giftId, accountId)
+    .run();
   const changes = Number(result?.meta?.changes ?? result?.changes ?? 0);
   if (changes === 0) throw new Error('GIFT_NOT_FOUND');
   return { id: giftId, removed: true };

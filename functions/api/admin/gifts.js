@@ -51,7 +51,7 @@ export async function onRequestGet(context) {
   if (!env.DB) return json(headers, { ok: false, error: 'DB_NOT_CONFIGURED' }, 503);
 
   try {
-    const gifts = await listCatalogAdmin(env.DB);
+    const gifts = await listCatalogAdmin(env.DB, auth.account.id);
     return json(headers, { ok: true, gifts });
   } catch (err) {
     return json(headers, { ok: false, error: 'LIST_FAILED', message: err.message }, 500);
@@ -79,8 +79,8 @@ export async function onRequestPost(context) {
   }
 
   try {
-    const gift = await createGift(env.DB, body || {});
-    const gifts = await listCatalogAdmin(env.DB);
+    const gift = await createGift(env.DB, auth.account.id, body || {});
+    const gifts = await listCatalogAdmin(env.DB, auth.account.id);
     return json(headers, { ok: true, gift, gifts }, 201);
   } catch (err) {
     return mapWriteError(headers, err);
@@ -112,7 +112,7 @@ export async function onRequestPatch(context) {
   }
 
   try {
-    const gift = await updateGift(env.DB, String(body.id), body);
+    const gift = await updateGift(env.DB, auth.account.id, String(body.id), body);
     return json(headers, { ok: true, gift });
   } catch (err) {
     return mapWriteError(headers, err);
@@ -136,8 +136,8 @@ export async function onRequestDelete(context) {
   if (!id) return json(headers, { ok: false, error: 'MISSING_ID' }, 400);
 
   try {
-    await deleteGift(env.DB, id);
-    const gifts = await listCatalogAdmin(env.DB);
+    await deleteGift(env.DB, auth.account.id, id);
+    const gifts = await listCatalogAdmin(env.DB, auth.account.id);
     return json(headers, { ok: true, removed: id, gifts });
   } catch (err) {
     return mapWriteError(headers, err);

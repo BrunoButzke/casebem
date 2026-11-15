@@ -43,3 +43,30 @@ export async function submitRsvp(slug, payload) {
   const data = await readJson(res);
   return { ok: res.ok, status: res.status, ...data };
 }
+
+export async function fetchCatalog(slug) {
+  const params = new URLSearchParams({ slug: String(slug ?? '') });
+  const res = await fetch(`/api/gifts/catalog?${params}`, { credentials: 'omit' });
+  const data = await readJson(res);
+  if (!res.ok) {
+    return { ok: false, status: res.status, error: data.error, gifts: [] };
+  }
+  return data;
+}
+
+export async function submitCheckout(slug, payload) {
+  const res = await fetch('/api/gifts/checkout', {
+    method: 'POST',
+    credentials: 'omit',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      ...payload,
+      slug,
+      paymentMethod: 'pix',
+    }),
+  });
+  const data = await readJson(res);
+  return { ok: res.ok, status: res.status, ...data };
+}

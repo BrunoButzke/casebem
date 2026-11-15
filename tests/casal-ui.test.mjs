@@ -2,7 +2,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Window } from 'happy-dom';
 import { coupleNavItems } from '../src/pages/casal/couple-nav.mjs';
-import { fetchCouplePage, searchGuestsPublic, submitRsvp } from '../src/lib/casal-api.mjs';
+import {
+  fetchCouplePage,
+  searchGuestsPublic,
+  submitRsvp,
+  fetchCatalog,
+  submitCheckout,
+} from '../src/lib/casal-api.mjs';
 import { PARTNER_COPY } from '../src/pages/casal/partner-copy.mjs';
 import { readFileSync } from 'node:fs';
 
@@ -141,4 +147,82 @@ test('PartnerHome renders RsvpSection inside confirmar-presenca', () => {
   const src = readFileSync(new URL('../src/pages/casal/PartnerHome.jsx', import.meta.url), 'utf8');
   assert.match(src, /<section className="rsvp" id="confirmar-presenca">/);
   assert.match(src, /<RsvpSection slug=\{slug\}/);
+});
+
+test('fetchCatalog and submitCheckout include slug', async () => {
+  globalThis.fetch = async (url, init) => {
+    if (String(url).includes('/api/gifts/catalog')) {
+      assert.equal(String(url).includes('slug=dani-carine'), true);
+      return new Response(JSON.stringify({ ok: true, gifts: [] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    const body = JSON.parse(init.body);
+    assert.equal(body.slug, 'dani-carine');
+    assert.equal(body.paymentMethod, 'pix');
+    return new Response(JSON.stringify({ ok: true }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+  await fetchCatalog('dani-carine');
+  await submitCheckout('dani-carine', {
+    gifterName: 'Ana',
+    intentKey: 'k1',
+    items: [{ giftId: 'spa', quantity: 1 }],
+  });
+});
+
+test('GiftsSection renders present list section id', () => {
+  const src = readFileSync(new URL('../src/pages/casal/GiftsSection.jsx', import.meta.url), 'utf8');
+  assert.match(src, /fetchCatalog/);
+  assert.match(src, /CartStorage/);
+});
+
+test('PartnerHome renders GiftsSection inside presentes', () => {
+  const src = readFileSync(new URL('../src/pages/casal/PartnerHome.jsx', import.meta.url), 'utf8');
+  assert.match(src, /<section className="gifts" id="presentes">/);
+  assert.match(src, /<GiftsSection slug=\{slug\}/);
+});
+
+test('gift helpers omit credentials and keep gifterName without extra email', async () => {
+  const calls = [];
+  globalThis.fetch = async (url, init) => {
+    calls.push({ url: String(url), init });
+    return new Response(JSON.stringify({ ok: true, gifts: [] }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+  await fetchCatalog('dani-carine');
+  await submitCheckout('dani-carine', {
+    gifterName: 'Ana',
+    intentKey: 'k1',
+    items: [{ giftId: 'spa', quantity: 1 }],
+  });
+  assert.equal(calls[0].init.credentials, 'omit');
+  assert.equal(calls[1].init.credentials, 'omit');
+  const body = JSON.parse(calls[1].init.body);
+  assert.equal(body.gifterName, 'Ana');
+  assert.equal('payerEmail' in body, false);
+  assert.equal('email' in body, false);
+});
+
+test('GiftsSection uses CartStorage, Pix keys from createCheckoutPayment, and skips empty checkout', () => {
+  const src = readFileSync(new URL('../src/pages/casal/GiftsSection.jsx', import.meta.url), 'utf8');
+  assert.match(src, /new CartStorage/);
+  assert.match(src, /localStorage/);
+  assert.match(src, /crypto\.randomUUID/);
+  assert.match(
+    src,
+    /Intl\.NumberFormat\('pt-BR',\s*\{\s*style:\s*'currency',\s*currency:\s*'BRL'\s*\}\)/
+  );
+  assert.match(src, /gifterName/);
+  assert.doesNotMatch(src, /payerEmail|type=["']email["']/);
+  assert.match(src, /qrCodeBase64/);
+  assert.match(src, /payment\.qrCode/);
+  assert.doesNotMatch(src, /pixQrCode|pixCopyPaste/);
+  assert.match(src, /items\.length\s*===?\s*0/);
+  assert.match(src, /submitCheckout/);
 });

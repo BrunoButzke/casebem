@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { PARTNER_COPY } from './partner-copy.mjs';
 import RsvpSection from './RsvpSection.jsx';
+import GiftsSection from './GiftsSection.jsx';
 import '../../dani-carine/style.css';
 
 const WEDDING_AT = Date.parse('2026-11-21T08:00:00-03:00');
@@ -393,7 +394,9 @@ export default function PartnerHome({ slug }) {
       <section className="rsvp" id="confirmar-presenca">
         <RsvpSection slug={slug} />
       </section>
-      <section id="presentes" />
+      <section className="gifts" id="presentes">
+        <GiftsSection slug={slug} />
+      </section>
       <section id="mural-recados" />
     </main>
   );

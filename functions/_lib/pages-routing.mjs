@@ -49,6 +49,10 @@ export function resolvePagesRoute(hostname, pathname) {
     return { action: 'redirect', pathname: '/entrar' };
   }
 
+  if (path === '/casal/dani-carine' || path === '/casal/dani-carine/') {
+    return { action: 'redirect', pathname: '/dani-carine/' };
+  }
+
   if (!isGameHost(hostname) && (path === '/' || path === '/index.html')) {
     return { action: 'next' };
   }

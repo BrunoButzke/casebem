@@ -21,6 +21,7 @@ import {
   DESAFIO_STAMP_CARDS,
 } from '../../data/desafio-challenges-seed.mjs';
 import { PARTNER_ACCOUNT_ID } from './auth-service.mjs';
+import { insertRetryOnForeignOwner } from './unique-row.mjs';
 
 /** @type {Map<string, { questions: Array, photoMissions: Array, stampCards: Array }>} */
 let memoryStores = new Map();
@@ -307,11 +308,6 @@ function sortByOrder(a, b) {
   return a.sortOrder - b.sortOrder || a.id.localeCompare(b.id);
 }
 
-function isUniqueViolation(err) {
-  const msg = String(err?.message || '');
-  return msg.includes('UNIQUE') || msg.includes('PRIMARY');
-}
-
 // ——— Questions ———
 
 export async function listQuestionsAdmin(db, accountId) {
@@ -359,33 +355,41 @@ export async function createQuestion(db, accountId, body) {
     return { ...row };
   }
 
-  try {
-    await db
-      .prepare(
-        `INSERT INTO challenge_questions (
+  const usedId = await insertRetryOnForeignOwner({
+    id: d.id,
+    accountId: accId,
+    existsError: 'EXISTS',
+    insert: (questionId) =>
+      db
+        .prepare(
+          `INSERT INTO challenge_questions (
           id, wedding_key, prompt, options_json, correct_index, points, active, sort_order, updated_at, account_id
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      )
-      .bind(
-        d.id,
-        weddingKey,
-        d.prompt,
-        JSON.stringify(d.options),
-        d.correctIndex,
-        d.points,
-        d.active ? 1 : 0,
-        d.sortOrder,
-        now,
-        accId
-      )
-      .run();
-  } catch (err) {
-    if (isUniqueViolation(err)) throw new Error('EXISTS');
-    throw err;
-  }
+        )
+        .bind(
+          questionId,
+          weddingKey,
+          d.prompt,
+          JSON.stringify(d.options),
+          d.correctIndex,
+          d.points,
+          d.active ? 1 : 0,
+          d.sortOrder,
+          now,
+          accId
+        )
+        .run(),
+    selectOwnerAccountId: async (questionId) => {
+      const row = await db
+        .prepare('SELECT account_id FROM challenge_questions WHERE id = ?')
+        .bind(questionId)
+        .first();
+      return row?.account_id || null;
+    },
+  });
 
   return rowToQuestion({
-    id: d.id,
+    id: usedId,
     wedding_key: weddingKey,
     prompt: d.prompt,
     options_json: JSON.stringify(d.options),
@@ -531,32 +535,40 @@ export async function createPhotoMission(db, accountId, body) {
     return { ...row };
   }
 
-  try {
-    await db
-      .prepare(
-        `INSERT INTO challenge_photo_missions (
+  const usedId = await insertRetryOnForeignOwner({
+    id: d.id,
+    accountId: accId,
+    existsError: 'EXISTS',
+    insert: (missionId) =>
+      db
+        .prepare(
+          `INSERT INTO challenge_photo_missions (
           id, wedding_key, title, points, awards_stamp, active, sort_order, updated_at, account_id
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      )
-      .bind(
-        d.id,
-        weddingKey,
-        d.title,
-        d.points,
-        d.awardsStamp ? 1 : 0,
-        d.active ? 1 : 0,
-        d.sortOrder,
-        now,
-        accId
-      )
-      .run();
-  } catch (err) {
-    if (isUniqueViolation(err)) throw new Error('EXISTS');
-    throw err;
-  }
+        )
+        .bind(
+          missionId,
+          weddingKey,
+          d.title,
+          d.points,
+          d.awardsStamp ? 1 : 0,
+          d.active ? 1 : 0,
+          d.sortOrder,
+          now,
+          accId
+        )
+        .run(),
+    selectOwnerAccountId: async (missionId) => {
+      const row = await db
+        .prepare('SELECT account_id FROM challenge_photo_missions WHERE id = ?')
+        .bind(missionId)
+        .first();
+      return row?.account_id || null;
+    },
+  });
 
   return rowToPhotoMission({
-    id: d.id,
+    id: usedId,
     wedding_key: weddingKey,
     title: d.title,
     points: d.points,
@@ -708,43 +720,51 @@ export async function createStampCard(db, accountId, body) {
     return { ...row };
   }
 
-  try {
-    await db
-      .prepare(
-        `INSERT INTO challenge_stamp_cards (
+  const usedId = await insertRetryOnForeignOwner({
+    id: d.id,
+    accountId: accId,
+    existsError: 'EXISTS',
+    insert: (cardId) =>
+      db
+        .prepare(
+          `INSERT INTO challenge_stamp_cards (
           id, wedding_key, name, stamps_required, reward_text, active, sort_order, updated_at,
           card_bg, card_accent, card_accent_soft, card_text, card_border, bar_hint, footer_template,
           fill_mode, points_per_slot, account_id
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      )
-      .bind(
-        d.id,
-        weddingKey,
-        d.name,
-        d.stampsRequired,
-        d.rewardText,
-        d.active ? 1 : 0,
-        d.sortOrder,
-        now,
-        d.cardBg,
-        d.cardAccent,
-        d.cardAccentSoft,
-        d.cardText,
-        d.cardBorder,
-        d.barHint,
-        d.footerTemplate,
-        d.fillMode,
-        d.pointsPerSlot,
-        accId
-      )
-      .run();
-  } catch (err) {
-    if (isUniqueViolation(err)) throw new Error('EXISTS');
-    throw err;
-  }
+        )
+        .bind(
+          cardId,
+          weddingKey,
+          d.name,
+          d.stampsRequired,
+          d.rewardText,
+          d.active ? 1 : 0,
+          d.sortOrder,
+          now,
+          d.cardBg,
+          d.cardAccent,
+          d.cardAccentSoft,
+          d.cardText,
+          d.cardBorder,
+          d.barHint,
+          d.footerTemplate,
+          d.fillMode,
+          d.pointsPerSlot,
+          accId
+        )
+        .run(),
+    selectOwnerAccountId: async (cardId) => {
+      const row = await db
+        .prepare('SELECT account_id FROM challenge_stamp_cards WHERE id = ?')
+        .bind(cardId)
+        .first();
+      return row?.account_id || null;
+    },
+  });
 
   return rowToStampCard({
-    id: d.id,
+    id: usedId,
     wedding_key: weddingKey,
     name: d.name,
     stamps_required: d.stampsRequired,

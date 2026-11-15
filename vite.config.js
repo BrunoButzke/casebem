@@ -524,6 +524,10 @@ function adminApiPlugin(env) {
             });
           }
 
+          if (path.startsWith('/api/admin/challenges/') && auth.account.plan === 'basic') {
+            return sendJson(res, 403, { ok: false, error: 'PLAN_REQUIRED' });
+          }
+
           if (path === '/api/admin/summary' && req.method === 'GET') {
             const guests = await listGuestList(null, auth.account.id);
             const groups = await listGroups(null, auth.account.id);

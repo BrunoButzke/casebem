@@ -5,20 +5,19 @@
 import { PARTNER_ACCOUNT_ID } from './auth-service.mjs';
 import { listMemoryMessages } from './messages-service.mjs';
 
-const WEDDING_KEY = 'dani-carine';
-
-export async function listRsvps(db, { limit = 200 } = {}) {
-  const safeLimit = Math.min(Math.max(Number(limit) || 200, 1), 500);
+export async function listRsvps(db, accountId, { limit = 500 } = {}) {
+  if (!accountId) throw new Error('ACCOUNT_ID_REQUIRED');
+  const safeLimit = Math.min(Math.max(Number(limit) || 500, 1), 500);
   const rows = await db
     .prepare(
       `SELECT id, guest_name, attending, adults_count, children_count,
               observations, created_at, updated_at
        FROM rsvps
-       WHERE wedding_key = ?
+       WHERE account_id = ?
        ORDER BY created_at DESC
        LIMIT ?`
     )
-    .bind(WEDDING_KEY, safeLimit)
+    .bind(accountId, safeLimit)
     .all();
 
   return (rows?.results || []).map((r) => ({

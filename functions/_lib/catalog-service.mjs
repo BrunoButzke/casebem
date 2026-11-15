@@ -5,6 +5,7 @@
 
 import { GIFTS_CATALOG } from '../../data/gifts-catalog.mjs';
 import { PARTNER_ACCOUNT_ID } from './auth-service.mjs';
+import { insertRetryOnForeignOwner } from './unique-row.mjs';
 
 /** @type {Map<string, Array>} */
 let memoryCatalogs = new Map();
@@ -306,36 +307,39 @@ export async function createGift(db, accountId, body) {
     return gift;
   }
 
-  try {
-    await db
-      .prepare(
-        `INSERT INTO gifts_catalog (
+  const usedId = await insertRetryOnForeignOwner({
+    id: d.id,
+    accountId,
+    existsError: 'GIFT_EXISTS',
+    insert: (giftId) =>
+      db
+        .prepare(
+          `INSERT INTO gifts_catalog (
           id, name, description, price_in_cents, image_url, image_data, mode, active, sort_order, updated_at, account_id
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      )
-      .bind(
-        d.id,
-        d.name,
-        d.description,
-        d.priceInCents,
-        d.imageUrl,
-        d.imageData,
-        d.mode,
-        d.active ? 1 : 0,
-        d.sortOrder,
-        now,
-        accountId
-      )
-      .run();
-  } catch (err) {
-    if (err?.message?.includes('UNIQUE') || err?.message?.includes('PRIMARY')) {
-      throw new Error('GIFT_EXISTS');
-    }
-    throw err;
-  }
+        )
+        .bind(
+          giftId,
+          d.name,
+          d.description,
+          d.priceInCents,
+          d.imageUrl,
+          d.imageData,
+          d.mode,
+          d.active ? 1 : 0,
+          d.sortOrder,
+          now,
+          accountId
+        )
+        .run(),
+    selectOwnerAccountId: async (giftId) => {
+      const row = await db.prepare('SELECT account_id FROM gifts_catalog WHERE id = ?').bind(giftId).first();
+      return row?.account_id || null;
+    },
+  });
 
   return rowToGift({
-    id: d.id,
+    id: usedId,
     name: d.name,
     description: d.description,
     price_in_cents: d.priceInCents,

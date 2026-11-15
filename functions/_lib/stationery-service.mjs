@@ -10,6 +10,7 @@ import {
 } from '../../data/stationery-templates.mjs';
 import { slugifyId } from './catalog-service.mjs';
 import { PARTNER_ACCOUNT_ID } from './auth-service.mjs';
+import { insertRetryOnForeignOwner } from './unique-row.mjs';
 
 /** @type {Map<string, Array>} */
 let memoryStationery = new Map();
@@ -254,24 +255,30 @@ export async function createStationeryTemplate(db, accountId, body) {
     return template;
   }
 
-  try {
-    await db
-      .prepare(
-        `INSERT INTO stationery_templates (
+  const usedId = await insertRetryOnForeignOwner({
+    id: d.id,
+    accountId: id,
+    existsError: 'TEMPLATE_EXISTS',
+    insert: (templateId) =>
+      db
+        .prepare(
+          `INSERT INTO stationery_templates (
           id, title, body, kind, active, sort_order, updated_at, account_id
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-      )
-      .bind(d.id, d.title, d.body, d.kind, d.active ? 1 : 0, d.sortOrder, now, id)
-      .run();
-  } catch (err) {
-    if (err?.message?.includes('UNIQUE') || err?.message?.includes('PRIMARY')) {
-      throw new Error('TEMPLATE_EXISTS');
-    }
-    throw err;
-  }
+        )
+        .bind(templateId, d.title, d.body, d.kind, d.active ? 1 : 0, d.sortOrder, now, id)
+        .run(),
+    selectOwnerAccountId: async (templateId) => {
+      const row = await db
+        .prepare('SELECT account_id FROM stationery_templates WHERE id = ?')
+        .bind(templateId)
+        .first();
+      return row?.account_id || null;
+    },
+  });
 
   return rowToTemplate({
-    id: d.id,
+    id: usedId,
     title: d.title,
     body: d.body,
     kind: d.kind,

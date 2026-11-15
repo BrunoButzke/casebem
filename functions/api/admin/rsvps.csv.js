@@ -29,10 +29,10 @@ export async function onRequestGet(context) {
     return Response.json({ ok: false, error: 'DB_NOT_CONFIGURED' }, { status: 503, headers: cors });
   }
 
-  const rsvps = await listRsvps(env.DB, { limit: 500 });
+  const rsvps = await listRsvps(env.DB, auth.account.id);
   const csv = rsvpsToCsv(rsvps);
 
   cors.set('Content-Type', 'text/csv; charset=utf-8');
-  cors.set('Content-Disposition', 'attachment; filename="rsvps-dani-carine.csv"');
+  cors.set('Content-Disposition', 'attachment; filename="rsvps.csv"');
   return new Response(csv, { status: 200, headers: cors });
 }

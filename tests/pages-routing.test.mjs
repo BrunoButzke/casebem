@@ -92,12 +92,23 @@ test('apex / is the SPA, not the old landing redirect', () => {
 });
 
 test('product routes rewrite to the root SPA', () => {
-  for (const path of ['/entrar', '/admin', '/admin/presentes', '/casal/dani-carine', '/casal/x/game/quiz']) {
+  for (const path of ['/entrar', '/admin', '/admin/presentes', '/casal/outro-casal', '/casal/x/game/quiz']) {
     assert.deepEqual(resolvePagesRoute('casebem.com', path), {
       action: 'rewrite',
       assetPath: '/',
     });
   }
+});
+
+test('/casal/dani-carine redirects to the static partner landing', () => {
+  assert.deepEqual(resolvePagesRoute('casebem.com', '/casal/dani-carine'), {
+    action: 'redirect',
+    pathname: '/dani-carine/',
+  });
+  assert.deepEqual(resolvePagesRoute('casebem.com', '/casal/dani-carine/'), {
+    action: 'redirect',
+    pathname: '/dani-carine/',
+  });
 });
 
 test('/casal without slug redirects to /entrar', () => {
@@ -139,6 +150,12 @@ test('middleware serves casebem.com / via next (SPA at root)', async () => {
   const res = await onRequest(context);
   assert.equal(res.status, 200);
   assert.deepEqual(fetched, []);
+});
+
+test('middleware redirects /casal/dani-carine to /dani-carine/', async () => {
+  const res = await onRequest(mockContext('https://casebem.com/casal/dani-carine').context);
+  assert.equal(res.status, 302);
+  assert.equal(res.headers.get('location'), 'https://casebem.com/dani-carine/');
 });
 
 test('middleware redirects /games on desafio.casebem.com to the host root path', async () => {

@@ -71,6 +71,10 @@ class MemoryAuthStatement {
         maybeCreatedAt,
       ] = params;
       const partnerInsert = params.length >= 9;
+      const occupant = db.accounts.get(email);
+      if (occupant && occupant.id !== id) {
+        throw new Error('UNIQUE constraint failed: accounts.email');
+      }
       const row = {
         id,
         email,
@@ -96,6 +100,10 @@ class MemoryAuthStatement {
     }
     if (sql.includes('UPDATE accounts SET email')) {
       const [email, password_hash, password_salt, slug, is_partner, plan, plan_status, id] = params;
+      const occupant = db.accounts.get(email);
+      if (occupant && occupant.id !== id) {
+        throw new Error('UNIQUE constraint failed: accounts.email');
+      }
       const row = db.findAccountById(id);
       if (row) {
         const previousEmail = row.email;

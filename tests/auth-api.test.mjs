@@ -1,18 +1,20 @@
 /**
  * Run: node --test tests/auth-api.test.mjs
  */
-import { test } from 'node:test';
+import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { resetAuthRateLimitForTests } from '../functions/_lib/auth-rate-limit.mjs';
 import { onRequestPost as signup } from '../functions/api/auth/signup.js';
 import { onRequestPost as login } from '../functions/api/auth/login.js';
 import { onRequestPost as logout } from '../functions/api/auth/logout.js';
 import { onRequestGet as me } from '../functions/api/auth/me.js';
 import { onRequestPost as plan } from '../functions/api/account/plan.js';
 
-function ctx(url, { method = 'GET', body, cookie, db } = {}) {
+function ctx(url, { method = 'GET', body, cookie, db, ip } = {}) {
   const headers = { origin: 'http://localhost:5173' };
   if (body) headers['content-type'] = 'application/json';
   if (cookie) headers.cookie = cookie;
+  if (ip) headers['CF-Connecting-IP'] = ip;
   return {
     request: new Request(url, {
       method,
@@ -26,6 +28,10 @@ function ctx(url, { method = 'GET', body, cookie, db } = {}) {
 function cookieFrom(res) {
   return res.headers.get('set-cookie') || '';
 }
+
+beforeEach(() => {
+  resetAuthRateLimitForTests();
+});
 
 test('signup 201 sets cb_session; me reads it; duplicate 409', async () => {
   const created = await signup(
@@ -157,6 +163,21 @@ test('plan without session is 401; basic upgrades to pro pending_payment', async
   assert.equal(json.account.planStatus, 'pending_payment');
   const mine = await me(ctx('http://localhost/api/auth/me', { cookie }));
   assert.equal((await mine.json()).planStatus, 'pending_payment');
+});
+
+test('11th signup from the same IP is 429', async () => {
+  const ip = '203.0.113.99';
+  let last;
+  for (let i = 0; i < 11; i += 1) {
+    last = await signup(
+      ctx('http://localhost/api/auth/signup', {
+        method: 'POST',
+        body: { email: `rl-${i}@x.com`, password: 'segredo12', plan: 'basic' },
+        ip,
+      })
+    );
+  }
+  assert.equal(last.status, 429);
 });
 
 test('signup CORS allows credentials; logout 204 expires cookie', async () => {

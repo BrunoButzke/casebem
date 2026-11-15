@@ -1,10 +1,12 @@
+import { desafioUrl } from './game-api.mjs';
+
 export function galleryImageUrl(id) {
   if (!id) return '';
-  return `/api/desafio/gallery/${encodeURIComponent(id)}/image`;
+  return desafioUrl(`/api/desafio/gallery/${encodeURIComponent(id)}/image`);
 }
 
 export async function listGallery() {
-  const res = await fetch('/api/desafio/gallery');
+  const res = await fetch(desafioUrl('/api/desafio/gallery'), { credentials: 'omit' });
   const data = await res.json().catch(() => ({}));
   if (!res.ok || !data.ok) throw new Error(data.message || 'Não deu para carregar a galeria');
   return (data.photos || []).map((photo) => ({
@@ -15,7 +17,9 @@ export async function listGallery() {
 
 export async function loadGalleryPhoto(id) {
   if (!id) return null;
-  const res = await fetch(`/api/desafio/gallery/${encodeURIComponent(id)}`);
+  const res = await fetch(desafioUrl(`/api/desafio/gallery/${encodeURIComponent(id)}`), {
+    credentials: 'omit',
+  });
   const data = await res.json().catch(() => ({}));
   if (!res.ok || !data.ok) throw new Error(data.message || 'Não deu para abrir a foto');
   return {
@@ -33,11 +37,12 @@ export async function publishGalleryPhoto(body) {
     form.set('missionId', body.missionId);
     form.set('title', body.title);
     form.set('file', file, 'photo.jpg');
-    res = await fetch('/api/desafio/gallery', { method: 'POST', body: form });
+    res = await fetch(desafioUrl('/api/desafio/gallery'), { method: 'POST', body: form, credentials: 'omit' });
   } else {
-    res = await fetch('/api/desafio/gallery', {
+    res = await fetch(desafioUrl('/api/desafio/gallery'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'omit',
       body: JSON.stringify(body),
     });
   }
@@ -47,8 +52,10 @@ export async function publishGalleryPhoto(body) {
 }
 
 export async function unpublishGalleryPhoto({ guestName, missionId }) {
-  const q = new URLSearchParams({ guestName, missionId });
-  const res = await fetch(`/api/desafio/gallery?${q}`, { method: 'DELETE' });
+  const res = await fetch(
+    desafioUrl('/api/desafio/gallery', { search: { guestName, missionId } }),
+    { method: 'DELETE', credentials: 'omit' }
+  );
   if (res.status === 404) return false;
   const data = await res.json().catch(() => ({}));
   if (!res.ok || !data.ok) throw new Error(data.message || data.error || 'Não deu para excluir a foto');

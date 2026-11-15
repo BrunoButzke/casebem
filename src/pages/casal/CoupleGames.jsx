@@ -2,12 +2,17 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { fetchCouplePage } from '../../lib/casal-api.mjs';
 import GamesApp from '../../../games/src/App.jsx';
+import { loadAndApplyDesafioTheme } from '../../../games/src/theme.js';
 import '../../../games/src/styles.css';
 
 export default function CoupleGames() {
   const { slug } = useParams();
   const [state, setState] = useState({ kind: 'loading' });
   const [retry, setRetry] = useState(0);
+
+  useEffect(() => {
+    void loadAndApplyDesafioTheme();
+  }, []);
 
   useEffect(() => {
     let cancelled = false;

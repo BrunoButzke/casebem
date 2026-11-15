@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { desafioUrl, getGameSlug } from './game-api.mjs';
 import { publishGalleryPhoto, unpublishGalleryPhoto } from './gallery-api.js';
 import { loadProgress, photoEntry, saveProgress } from './progress.js';
 
@@ -14,7 +15,7 @@ export function PlayProvider({ guestName, children }) {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch('/api/desafio/challenges');
+        const res = await fetch(desafioUrl('/api/desafio/challenges'), { credentials: 'omit' });
         const data = await res.json().catch(() => ({}));
         if (!res.ok || !data.ok) {
           if (!cancelled) setError(data.message || data.error || 'Não deu para carregar as missões');
@@ -56,10 +57,14 @@ export function PlayProvider({ guestName, children }) {
       setPending(question.id);
       setError('');
       try {
-        const res = await fetch('/api/desafio/answer', {
+        const slug = getGameSlug();
+        const payload = { questionId: question.id, selectedIndex };
+        if (slug) payload.slug = slug;
+        const res = await fetch(desafioUrl('/api/desafio/answer'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ questionId: question.id, selectedIndex }),
+          credentials: 'omit',
+          body: JSON.stringify(payload),
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok || !data.ok) {

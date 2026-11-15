@@ -328,3 +328,9 @@ test('MessagesSection lists recados with load more and validates the form', () =
   assert.match(src, /length\s*<\s*2/);
   assert.match(src, /length\s*<\s*3|length\s*>\s*250/);
 });
+
+test('CoupleGames calls loadAndApplyDesafioTheme on mount', () => {
+  const src = readFileSync(new URL('../src/pages/casal/CoupleGames.jsx', import.meta.url), 'utf8');
+  assert.match(src, /loadAndApplyDesafioTheme/);
+  assert.match(src, /useEffect[\s\S]*loadAndApplyDesafioTheme/);
+});

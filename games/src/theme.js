@@ -1,3 +1,5 @@
+import { desafioUrl } from './game-api.mjs';
+
 export function applyDesafioTheme(cssVars) {
   if (!cssVars || typeof cssVars !== 'object') return;
   const root = document.documentElement;
@@ -8,7 +10,7 @@ export function applyDesafioTheme(cssVars) {
 
 export async function loadAndApplyDesafioTheme() {
   try {
-    const res = await fetch('/api/desafio/theme');
+    const res = await fetch(desafioUrl('/api/desafio/theme'), { credentials: 'omit' });
     const data = await res.json().catch(() => ({}));
     if (res.ok && data.ok && data.cssVars) applyDesafioTheme(data.cssVars);
     return data.theme || null;

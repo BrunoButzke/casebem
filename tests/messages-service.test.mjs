@@ -15,6 +15,7 @@ import {
 } from '../functions/_lib/messages-service.mjs';
 
 import { WEDDING_KEY } from '../functions/_lib/messages-validators.mjs';
+import { PARTNER_ACCOUNT_ID } from '../functions/_lib/auth-service.mjs';
 
 // Mock D1 Database
 class MockD1Database {
@@ -49,9 +50,12 @@ class MockD1Statement {
     if (this.sql.includes('SELECT') && this.sql.includes('wedding_messages')) {
       if (this.sql.includes('idempotency_key')) {
         // Find by idempotency key
-        const [weddingKey, idempotencyKey] = this.params;
+        const [accountId, idempotencyKey] = this.params;
         for (const [id, record] of this.db.data.entries()) {
-          if (record.wedding_key === weddingKey && record.idempotency_key === idempotencyKey) {
+          if (
+            (record.account_id === accountId || record.wedding_key === accountId) &&
+            record.idempotency_key === idempotencyKey
+          ) {
             return record;
           }
         }
@@ -134,12 +138,15 @@ class MockD1Statement {
 
   async run() {
     if (this.sql.includes('INSERT INTO wedding_messages')) {
-      const [id, weddingKey, guestName, message, consentGiven, createdAt, idempotencyKey, fingerprint] = this.params;
+      const [id, weddingKey, guestName, message, consentGiven, createdAt, idempotencyKey, fingerprint, accountId] = this.params;
       
       // Check idempotency constraint
       if (idempotencyKey) {
         for (const [existingId, record] of this.db.data.entries()) {
-          if (record.wedding_key === weddingKey && record.idempotency_key === idempotencyKey) {
+          if (
+            (record.account_id === accountId || record.wedding_key === weddingKey) &&
+            record.idempotency_key === idempotencyKey
+          ) {
             return { success: false, error: 'UNIQUE constraint failed: wedding_messages.idempotency_key' };
           }
         }
@@ -160,6 +167,7 @@ class MockD1Statement {
         id, wedding_key: weddingKey, guest_name: guestName,
         message, consent_given: consentGiven, created_at: createdAt,
         idempotency_key: idempotencyKey, idempotency_fingerprint: fingerprint,
+        account_id: accountId,
       });
       return { success: true };
     }
@@ -205,7 +213,7 @@ test('createMessage creates new message successfully', async () => {
   };
   const idempotencyKey = 'test-key-123';
   
-  const result = await createMessage(db, data, idempotencyKey, TEST_SECRET);
+  const result = await createMessage(db, data, idempotencyKey, TEST_SECRET, PARTNER_ACCOUNT_ID);
   
   assert.ok(result.id);
   assert.equal(result.weddingKey, WEDDING_KEY);
@@ -227,11 +235,11 @@ test('createMessage handles idempotent replay with same fingerprint', async () =
   const idempotencyKey = 'replay-key-456';
   
   // First creation
-  const first = await createMessage(db, data, idempotencyKey, TEST_SECRET);
+  const first = await createMessage(db, data, idempotencyKey, TEST_SECRET, PARTNER_ACCOUNT_ID);
   assert.ok(first.id);
   
   // Idempotent replay with same data
-  const second = await createMessage(db, data, idempotencyKey, TEST_SECRET);
+  const second = await createMessage(db, data, idempotencyKey, TEST_SECRET, PARTNER_ACCOUNT_ID);
   
   // Should return same message
   assert.equal(second.id, first.id);
@@ -254,7 +262,7 @@ test('createMessage throws conflict on same key with different data', async () =
     guestName: 'Pedro',
     message: 'Primeira mensagem',
     consentGiven: true,
-  }, idempotencyKey, TEST_SECRET);
+  }, idempotencyKey, TEST_SECRET, PARTNER_ACCOUNT_ID);
   
   // Different data, same key
   await assert.rejects(
@@ -263,7 +271,7 @@ test('createMessage throws conflict on same key with different data', async () =
         guestName: 'Pedro',
         message: 'Mensagem diferente', // Changed message
         consentGiven: true,
-      }, idempotencyKey, TEST_SECRET);
+      }, idempotencyKey, TEST_SECRET, PARTNER_ACCOUNT_ID);
     },
     { message: /IDEMPOTENCY_CONFLICT/ }
   );
@@ -276,13 +284,13 @@ test('createMessage creates different messages with different keys', async () =>
     guestName: 'Ana',
     message: 'Mensagem 1',
     consentGiven: true,
-  }, 'key-1', TEST_SECRET);
+  }, 'key-1', TEST_SECRET, PARTNER_ACCOUNT_ID);
   
   const msg2 = await createMessage(db, {
     guestName: 'Ana', // Same guest
     message: 'Mensagem 1', // Same message
     consentGiven: true,
-  }, 'key-2', TEST_SECRET); // Different key
+  }, 'key-2', TEST_SECRET, PARTNER_ACCOUNT_ID); // Different key
   
   assert.notEqual(msg1.id, msg2.id);
   assert.equal(db.data.size, 2);
@@ -295,7 +303,7 @@ test('createMessage works without idempotency key', async () => {
     guestName: 'Carlos',
     message: 'Sem idempotência',
     consentGiven: true,
-  }, null, TEST_SECRET);
+  }, null, TEST_SECRET, PARTNER_ACCOUNT_ID);
   
   assert.ok(result.id);
   assert.equal(result.guestName, 'Carlos');
@@ -423,7 +431,7 @@ test('createMessage throws error on missing secret', async () => {
         guestName: 'Test',
         message: 'Message',
         consentGiven: true,
-      }, 'key', null); // No secret
+      }, 'key', null, PARTNER_ACCOUNT_ID); // No secret
     },
     { message: /secret|not configured/i }
   );
@@ -439,7 +447,7 @@ test('createMessage validates CHECK constraints via DB', async () => {
         guestName: 'Valid Name',
         message: 'AB', // Too short
         consentGiven: true,
-      }, 'key-short', TEST_SECRET);
+      }, 'key-short', TEST_SECRET, PARTNER_ACCOUNT_ID);
     },
     { message: /Failed to create message/ }
   );

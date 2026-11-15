@@ -52,7 +52,7 @@ export async function onRequestPatch(context) {
   }
 
   try {
-    const updated = await setMessageHidden(env.DB, String(body.id), body.hidden);
+    const updated = await setMessageHidden(env.DB, String(body.id), body.hidden, auth.account.id);
     return Response.json({ ok: true, message: updated }, { status: 200, headers });
   } catch (err) {
     if (err.message === 'MESSAGE_NOT_FOUND') {

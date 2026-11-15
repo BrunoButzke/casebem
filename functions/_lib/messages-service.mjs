@@ -3,11 +3,32 @@
  */
 
 import { WEDDING_KEY } from './messages-validators.mjs';
+import { PARTNER_ACCOUNT_ID } from './auth-service.mjs';
 import { 
   deriveRsvpKeys, 
   hmacHash, 
   sha256Hash
 } from './crypto-utils.mjs';
+
+function weddingKeyFor(accountId) {
+  return accountId === PARTNER_ACCOUNT_ID ? WEDDING_KEY : accountId;
+}
+
+/** @type {Map<string, Array>} */
+let memoryMessages = new Map();
+
+export function resetMemoryMessagesForTests() {
+  memoryMessages = new Map();
+}
+
+function ensureMemoryMessages(accountId) {
+  if (!memoryMessages.has(accountId)) memoryMessages.set(accountId, []);
+  return memoryMessages.get(accountId);
+}
+
+export function listMemoryMessages(accountId) {
+  return [...ensureMemoryMessages(accountId)];
+}
 
 export function generateUuid() {
   return crypto.randomUUID();
@@ -22,13 +43,13 @@ export function now() {
  * @param {object} data - Normalized message data
  * @returns {Promise<string>} SHA-256 hash of canonical representation
  */
-async function createPayloadFingerprint(data) {
+async function createPayloadFingerprint(data, accountId) {
   // Canonical representation: sorted keys, normalized values
   const canonical = JSON.stringify({
     consentGiven: data.consentGiven,
     guestName: data.guestName,
     message: data.message,
-    weddingKey: WEDDING_KEY,
+    accountId,
   });
   
   return sha256Hash(canonical);
@@ -42,12 +63,53 @@ async function createPayloadFingerprint(data) {
  * @param {string} secret - Base64 secret for HMAC
  * @returns {Promise<object>} Created message
  */
-export async function createMessage(db, data, idempotencyKey, secret) {
+export async function createMessage(db, data, idempotencyKey, secret, accountId = PARTNER_ACCOUNT_ID) {
   if (!secret) {
     throw new Error('Secret not configured');
   }
-  
-  const fingerprint = await createPayloadFingerprint(data);
+  if (!accountId) {
+    throw new Error('ACCOUNT_ID_REQUIRED');
+  }
+
+  const fingerprint = await createPayloadFingerprint(data, accountId);
+  const weddingKey = weddingKeyFor(accountId);
+
+  if (!db) {
+    const mem = ensureMemoryMessages(accountId);
+    if (idempotencyKey) {
+      const existing = mem.find((m) => m.idempotencyKey === idempotencyKey);
+      if (existing) {
+        if (existing.idempotencyFingerprint !== fingerprint) {
+          throw new Error('IDEMPOTENCY_CONFLICT');
+        }
+        return {
+          id: existing.id,
+          weddingKey,
+          guestName: existing.guestName,
+          message: existing.message,
+          createdAt: existing.createdAt,
+        };
+      }
+    }
+    const id = generateUuid();
+    const timestamp = now();
+    mem.push({
+      id,
+      guestName: data.guestName,
+      message: data.message,
+      createdAt: timestamp,
+      hidden: false,
+      idempotencyKey: idempotencyKey || null,
+      idempotencyFingerprint: fingerprint,
+    });
+    return {
+      id,
+      weddingKey,
+      guestName: data.guestName,
+      message: data.message,
+      createdAt: timestamp,
+    };
+  }
 
   // Check idempotency: same key + same fingerprint
   if (idempotencyKey) {
@@ -55,9 +117,9 @@ export async function createMessage(db, data, idempotencyKey, secret) {
       .prepare(
         `SELECT id, guest_name, message, created_at
          FROM wedding_messages
-         WHERE wedding_key = ? AND idempotency_key = ?`
+         WHERE account_id = ? AND idempotency_key = ?`
       )
-      .bind(WEDDING_KEY, idempotencyKey)
+      .bind(accountId, idempotencyKey)
       .first();
 
     if (existing) {
@@ -66,7 +128,7 @@ export async function createMessage(db, data, idempotencyKey, secret) {
         guestName: existing.guest_name,
         message: existing.message,
         consentGiven: true, // Always true in DB
-      });
+      }, accountId);
       
       if (fingerprint !== existingFingerprint) {
         // Same key, different data = conflict
@@ -76,7 +138,7 @@ export async function createMessage(db, data, idempotencyKey, secret) {
       // Valid replay: return same message
       return {
         id: existing.id,
-        weddingKey: WEDDING_KEY,
+        weddingKey,
         guestName: existing.guest_name,
         message: existing.message,
         createdAt: existing.created_at,
@@ -95,12 +157,12 @@ export async function createMessage(db, data, idempotencyKey, secret) {
         `INSERT INTO wedding_messages (
           id, wedding_key, guest_name, message,
           consent_given, created_at,
-          idempotency_key, idempotency_fingerprint
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+          idempotency_key, idempotency_fingerprint, account_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).bind(
-        id, WEDDING_KEY, data.guestName, data.message,
+        id, weddingKey, data.guestName, data.message,
         1, timestamp,
-        idempotencyKey || null, fingerprint
+        idempotencyKey || null, fingerprint, accountId
       ),
     ]);
   } catch (batchError) {
@@ -116,9 +178,9 @@ export async function createMessage(db, data, idempotencyKey, secret) {
         .prepare(
           `SELECT id, guest_name, message, created_at
            FROM wedding_messages
-           WHERE wedding_key = ? AND idempotency_key = ?`
+           WHERE account_id = ? AND idempotency_key = ?`
         )
-        .bind(WEDDING_KEY, idempotencyKey)
+        .bind(accountId, idempotencyKey)
         .first();
       
       if (existing) {
@@ -126,7 +188,7 @@ export async function createMessage(db, data, idempotencyKey, secret) {
           guestName: existing.guest_name,
           message: existing.message,
           consentGiven: true,
-        });
+        }, accountId);
         
         if (fingerprint !== existingFingerprint) {
           throw new Error('IDEMPOTENCY_CONFLICT');
@@ -135,7 +197,7 @@ export async function createMessage(db, data, idempotencyKey, secret) {
         // Valid replay
         return {
           id: existing.id,
-          weddingKey: WEDDING_KEY,
+          weddingKey,
           guestName: existing.guest_name,
           message: existing.message,
           createdAt: existing.created_at,
@@ -146,7 +208,7 @@ export async function createMessage(db, data, idempotencyKey, secret) {
   }
 
   return {
-    id, weddingKey: WEDDING_KEY,
+    id, weddingKey,
     guestName: data.guestName,
     message: data.message,
     createdAt: timestamp,

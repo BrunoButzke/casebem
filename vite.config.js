@@ -71,6 +71,7 @@ import {
   themeToCssVars,
 } from './functions/_lib/desafio-theme-service.mjs';
 import { requireAccount } from './functions/_lib/session-auth.mjs';
+import { PARTNER_ACCOUNT_ID } from './functions/_lib/auth-service.mjs';
 
 const rootDir = dirname(fileURLToPath(import.meta.url));
 
@@ -260,7 +261,7 @@ function guestListApiPlugin() {
               return sendJson(res, 400, { error: 'Dados inválidos', details: validation.errors });
             }
             const data = validation.data;
-            await markGuestResponse(null, data.guestName, data.attending);
+            await markGuestResponse(null, data.guestName, data.attending, PARTNER_ACCOUNT_ID);
             const manageToken = crypto.randomUUID().replaceAll('-', '');
             const now = new Date().toISOString();
             const rsvp = {
@@ -297,7 +298,7 @@ function guestListApiPlugin() {
                 message: 'Digite pelo menos 2 letras para buscar.',
               });
             }
-            const matches = await searchGuests(null, q);
+            const matches = await searchGuests(null, q, PARTNER_ACCOUNT_ID);
             return sendJson(res, 200, {
               ok: true,
               query: q,
@@ -307,15 +308,17 @@ function guestListApiPlugin() {
           }
 
           if (path === '/api/guests' && req.method === 'GET') {
-            const guests = await listGuestList(null);
+            const guests = await listGuestList(null, PARTNER_ACCOUNT_ID);
             return sendJson(res, 200, { ok: true, guests, count: guests.length });
           }
 
           if (path === '/api/guests' && req.method === 'POST') {
             const body = await readJsonBody(req);
             try {
-              const result = await addGuests(null, body?.names || []);
-              const guests = await listGuestList(null);
+              const result = await addGuests(null, body?.names || [], {
+                accountId: PARTNER_ACCOUNT_ID,
+              });
+              const guests = await listGuestList(null, PARTNER_ACCOUNT_ID);
               return sendJson(res, 200, { ok: true, ...result, guests });
             } catch (err) {
               const status = err.message === 'EMPTY_GUEST_LIST' ? 400 : 500;
@@ -326,8 +329,8 @@ function guestListApiPlugin() {
           if (path === '/api/guests' && req.method === 'DELETE') {
             const id = parsed.searchParams.get('id');
             try {
-              await removeGuest(null, id);
-              const guests = await listGuestList(null);
+              await removeGuest(null, id, PARTNER_ACCOUNT_ID);
+              const guests = await listGuestList(null, PARTNER_ACCOUNT_ID);
               return sendJson(res, 200, { ok: true, removed: id, guests });
             } catch (err) {
               const status =
@@ -443,10 +446,10 @@ function adminApiPlugin(env) {
           }
 
           if (path === '/api/admin/summary' && req.method === 'GET') {
-            const guests = await listGuestList(null);
-            const groups = await listGroups(null);
+            const guests = await listGuestList(null, auth.account.id);
+            const groups = await listGroups(null, auth.account.id);
             const guestStats = summarizeGuestList(guests);
-            const rsvpMode = await getRsvpMode(null);
+            const rsvpMode = await getRsvpMode(null, auth.account.id);
             const messages = localMessages.map((m) => ({
               id: m.id,
               guestName: m.guestName,
@@ -480,9 +483,9 @@ function adminApiPlugin(env) {
           if (path === '/api/admin/guest-list') {
             const snap = async () => {
               const [rsvpMode, guests, groups] = await Promise.all([
-                getRsvpMode(null),
-                listGuestList(null),
-                listGroups(null),
+                getRsvpMode(null, auth.account.id),
+                listGuestList(null, auth.account.id),
+                listGroups(null, auth.account.id),
               ]);
               return { rsvpMode, guests, groups, count: guests.length };
             };
@@ -497,7 +500,10 @@ function adminApiPlugin(env) {
                 const names = Array.isArray(body?.names)
                   ? body.names
                   : parseGuestNamesInput(body?.namesText || '');
-                const result = await addGuests(null, names, { groupId: body?.groupId || null });
+                const result = await addGuests(null, names, {
+                  groupId: body?.groupId || null,
+                  accountId: auth.account.id,
+                });
                 return sendJson(res, 200, { ok: true, ...result, ...(await snap()) });
               } catch (err) {
                 const status =
@@ -513,17 +519,19 @@ function adminApiPlugin(env) {
             if (req.method === 'PATCH') {
               const body = await readJsonBody(req);
               try {
-                if (body?.createGroup?.name) await createGroup(null, body.createGroup.name);
-                if (body?.deleteGroupId) await deleteGroup(null, String(body.deleteGroupId));
-                if (body?.removeId) await removeGuest(null, String(body.removeId));
+                if (body?.createGroup?.name) {
+                  await createGroup(null, body.createGroup.name, auth.account.id);
+                }
+                if (body?.deleteGroupId) await deleteGroup(null, String(body.deleteGroupId), auth.account.id);
+                if (body?.removeId) await removeGuest(null, String(body.removeId), auth.account.id);
                 if (body?.guestId && Object.prototype.hasOwnProperty.call(body, 'attending')) {
-                  await setGuestAttending(null, String(body.guestId), body.attending);
+                  await setGuestAttending(null, String(body.guestId), body.attending, auth.account.id);
                 }
                 if (body?.guestId && Object.prototype.hasOwnProperty.call(body, 'groupId')) {
-                  await setGuestGroup(null, String(body.guestId), body.groupId);
+                  await setGuestGroup(null, String(body.guestId), body.groupId, auth.account.id);
                 }
                 let modeResult = null;
-                if (body?.rsvpMode) modeResult = await setRsvpMode(null, body.rsvpMode);
+                if (body?.rsvpMode) modeResult = await setRsvpMode(null, body.rsvpMode, auth.account.id);
                 return sendJson(res, 200, {
                   ok: true,
                   ...(await snap()),

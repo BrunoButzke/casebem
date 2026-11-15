@@ -2,6 +2,9 @@
  * Admin read/moderation queries — D1 only (Cloudflare Free).
  */
 
+import { PARTNER_ACCOUNT_ID } from './auth-service.mjs';
+import { listMemoryMessages } from './messages-service.mjs';
+
 const WEDDING_KEY = 'dani-carine';
 
 export async function listRsvps(db, { limit = 200 } = {}) {
@@ -66,18 +69,35 @@ export function rsvpsToCsv(rsvps) {
   return lines.join('\n') + '\n';
 }
 
-export async function listMessagesAdmin(db, { includeHidden = true, limit = 200 } = {}) {
+export async function listMessagesAdmin(db, accountId, { includeHidden = true, limit = 200 } = {}) {
+  if (!accountId) throw new Error('ACCOUNT_ID_REQUIRED');
   const safeLimit = Math.min(Math.max(Number(limit) || 200, 1), 500);
+  if (!db) {
+    return listMemoryMessages(accountId)
+      .filter((m) => includeHidden || !m.hidden)
+      .sort((a, b) => {
+        if (a.createdAt !== b.createdAt) return b.createdAt.localeCompare(a.createdAt);
+        return b.id.localeCompare(a.id);
+      })
+      .slice(0, safeLimit)
+      .map((m) => ({
+        id: m.id,
+        guestName: m.guestName,
+        message: m.message,
+        createdAt: m.createdAt,
+        hidden: Boolean(m.hidden),
+      }));
+  }
   const rows = await db
     .prepare(
       `SELECT id, guest_name, message, created_at, COALESCE(hidden, 0) AS hidden
        FROM wedding_messages
-       WHERE wedding_key = ?
+       WHERE account_id = ?
          AND (? = 1 OR COALESCE(hidden, 0) = 0)
        ORDER BY created_at DESC
        LIMIT ?`
     )
-    .bind(WEDDING_KEY, includeHidden ? 1 : 0, safeLimit)
+    .bind(accountId, includeHidden ? 1 : 0, safeLimit)
     .all();
 
   return (rows?.results || []).map((m) => ({
@@ -89,7 +109,7 @@ export async function listMessagesAdmin(db, { includeHidden = true, limit = 200 
   }));
 }
 
-export async function setMessageHidden(db, messageId, hidden) {
+export async function setMessageHidden(db, messageId, hidden, accountId = PARTNER_ACCOUNT_ID) {
   if (!messageId || typeof messageId !== 'string') {
     throw new Error('INVALID_MESSAGE_ID');
   }
@@ -98,9 +118,9 @@ export async function setMessageHidden(db, messageId, hidden) {
     .prepare(
       `UPDATE wedding_messages
        SET hidden = ?
-       WHERE id = ? AND wedding_key = ?`
+       WHERE id = ? AND account_id = ?`
     )
-    .bind(flag, messageId, WEDDING_KEY)
+    .bind(flag, messageId, accountId)
     .run();
 
   const changes = Number(result?.meta?.changes ?? result?.changes ?? 0);

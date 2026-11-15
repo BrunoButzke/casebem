@@ -14,6 +14,7 @@ import {
   getMessages,
   checkRateLimit,
 } from '../_lib/messages-service.mjs';
+import { PARTNER_ACCOUNT_ID } from '../_lib/auth-service.mjs';
 
 /**
  * Get allowed origins for CORS (same-origin only)
@@ -180,7 +181,8 @@ async function handlePost(request, env) {
       env.DB,
       validation.data,
       idempotencyKey,
-      env.RSVP_SECRET
+      env.RSVP_SECRET,
+      PARTNER_ACCOUNT_ID
     );
 
     // Best-effort e-mail (Resend free). Sem key = no-op, zero custo Cloudflare.

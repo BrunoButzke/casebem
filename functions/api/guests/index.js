@@ -8,6 +8,7 @@
  */
 
 import { getCorsHeaders, validateOrigin } from '../../_lib/http-helpers.mjs';
+import { PARTNER_ACCOUNT_ID } from '../../_lib/auth-service.mjs';
 import {
   listGuestList,
   addGuests,
@@ -29,7 +30,7 @@ export async function onRequestGet(context) {
   headers.set('Cache-Control', 'no-store');
 
   try {
-    const guests = await listGuestList(env.DB || null);
+    const guests = await listGuestList(env.DB || null, PARTNER_ACCOUNT_ID);
     return json(headers, { ok: true, guests, count: guests.length });
   } catch (err) {
     return json(headers, { ok: false, error: 'LIST_FAILED', message: err?.message }, 500);
@@ -53,8 +54,10 @@ export async function onRequestPost(context) {
   }
 
   try {
-    const result = await addGuests(env.DB || null, body?.names || []);
-    const guests = await listGuestList(env.DB || null);
+    const result = await addGuests(env.DB || null, body?.names || [], {
+      accountId: PARTNER_ACCOUNT_ID,
+    });
+    const guests = await listGuestList(env.DB || null, PARTNER_ACCOUNT_ID);
     return json(headers, { ok: true, ...result, guests });
   } catch (err) {
     if (err.message === 'EMPTY_GUEST_LIST') {
@@ -78,8 +81,8 @@ export async function onRequestDelete(context) {
 
   const id = new URL(request.url).searchParams.get('id');
   try {
-    await removeGuest(env.DB || null, id);
-    const guests = await listGuestList(env.DB || null);
+    await removeGuest(env.DB || null, id, PARTNER_ACCOUNT_ID);
+    const guests = await listGuestList(env.DB || null, PARTNER_ACCOUNT_ID);
     return json(headers, { ok: true, removed: id, guests });
   } catch (err) {
     if (err.message === 'GUEST_NOT_FOUND' || err.message === 'INVALID_GUEST_ID') {

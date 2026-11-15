@@ -3,6 +3,7 @@
  */
 
 import { getCorsHeaders } from '../../_lib/http-helpers.mjs';
+import { PARTNER_ACCOUNT_ID } from '../../_lib/auth-service.mjs';
 import { searchGuests } from '../../_lib/rsvp-guest-list.mjs';
 
 export async function onRequestOptions(context) {
@@ -24,7 +25,7 @@ export async function onRequestGet(context) {
   }
 
   try {
-    const matches = await searchGuests(env.DB || null, q);
+    const matches = await searchGuests(env.DB || null, q, PARTNER_ACCOUNT_ID);
     return Response.json(
       {
         ok: true,

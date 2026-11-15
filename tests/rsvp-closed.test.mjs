@@ -21,6 +21,7 @@ import {
   setGuestGroup,
   summarizeGuestList,
 } from '../functions/_lib/rsvp-guest-list.mjs';
+import { PARTNER_ACCOUNT_ID } from '../functions/_lib/auth-service.mjs';
 
 test('nameKey: normaliza espaços e case', () => {
   assert.equal(nameKey('  Maria   Silva '), 'maria silva');
@@ -103,7 +104,7 @@ test('assertGuestAllowed: closed bloqueia fora da lista', async () => {
 
 test('assertGuestAllowed: closed libera nome na lista (case-insensitive)', async () => {
   const db = mockDb({ mode: 'closed' });
-  await addGuests(db, ['Maria Silva']);
+  await addGuests(db, ['Maria Silva'], { accountId: PARTNER_ACCOUNT_ID });
   const r = await assertGuestAllowed(db, '  maria   silva ');
   assert.equal(r.allowed, true);
 });
@@ -116,8 +117,8 @@ test('setRsvpMode + getRsvpMode', async () => {
 
 test('addGuests: ignora duplicata via UNIQUE', async () => {
   const db = mockDb();
-  const first = await addGuests(db, ['Ana']);
-  const second = await addGuests(db, ['Ana', 'Bruno']);
+  const first = await addGuests(db, ['Ana'], { accountId: PARTNER_ACCOUNT_ID });
+  const second = await addGuests(db, ['Ana', 'Bruno'], { accountId: PARTNER_ACCOUNT_ID });
   assert.equal(first.added, 1);
   assert.equal(second.added, 1);
   assert.equal(second.skipped, 1);
@@ -125,7 +126,9 @@ test('addGuests: ignora duplicata via UNIQUE', async () => {
 
 test('searchGuests: partial match (Bruno → Bruno Butzke e Familia)', async () => {
   const db = mockDb();
-  await addGuests(db, ['Bruno Butzke e Familia', 'Bruno Silva', 'Maria Silva']);
+  await addGuests(db, ['Bruno Butzke e Familia', 'Bruno Silva', 'Maria Silva'], {
+    accountId: PARTNER_ACCOUNT_ID,
+  });
   const hits = await searchGuests(db, 'Bruno');
   assert.equal(hits.length, 2);
   assert.ok(hits.every((h) => h.displayName.toLowerCase().includes('bruno')));
@@ -140,7 +143,7 @@ test('searchGuests: memory fallback sem DB', async () => {
 
 test('markGuestResponse: atualiza status na lista (memória)', async () => {
   resetMemoryGuestsForTests();
-  const before = await listGuestList(null);
+  const before = await listGuestList(null, PARTNER_ACCOUNT_ID);
   const target = before.find((g) => /bruno butzke/i.test(g.displayName));
   assert.ok(target);
   assert.equal(target.attending, null);
@@ -148,13 +151,13 @@ test('markGuestResponse: atualiza status na lista (memória)', async () => {
   const marked = await markGuestResponse(null, target.displayName, true);
   assert.equal(marked.updated, true);
 
-  const after = await listGuestList(null);
+  const after = await listGuestList(null, PARTNER_ACCOUNT_ID);
   const updated = after.find((g) => g.id === target.id);
   assert.equal(updated.attending, true);
   assert.ok(updated.respondedAt);
 
   await markGuestResponse(null, target.displayName, false);
-  const declined = (await listGuestList(null)).find((g) => g.id === target.id);
+  const declined = (await listGuestList(null, PARTNER_ACCOUNT_ID)).find((g) => g.id === target.id);
   assert.equal(declined.attending, false);
 });
 
@@ -174,8 +177,8 @@ test('grupos + status manual (memória)', async () => {
   assert.equal(groups.length, 1);
   assert.equal(groups[0].name, 'Família');
 
-  await addGuests(null, ['Zé Teste'], { groupId: group.id });
-  const listed = await listGuestList(null);
+  await addGuests(null, ['Zé Teste'], { groupId: group.id, accountId: PARTNER_ACCOUNT_ID });
+  const listed = await listGuestList(null, PARTNER_ACCOUNT_ID);
   const guest = listed.find((g) => g.displayName === 'Zé Teste');
   assert.ok(guest);
   assert.equal(guest.groupId, group.id);
@@ -183,10 +186,10 @@ test('grupos + status manual (memória)', async () => {
 
   await setGuestAttending(null, guest.id, true);
   await setGuestGroup(null, guest.id, null);
-  const after = (await listGuestList(null)).find((g) => g.id === guest.id);
+  const after = (await listGuestList(null, PARTNER_ACCOUNT_ID)).find((g) => g.id === guest.id);
   assert.equal(after.attending, true);
   assert.equal(after.groupId, null);
 
-  const stats = summarizeGuestList(await listGuestList(null));
+  const stats = summarizeGuestList(await listGuestList(null, PARTNER_ACCOUNT_ID));
   assert.ok(stats.attendingCount >= 1);
 });

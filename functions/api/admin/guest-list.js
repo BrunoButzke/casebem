@@ -27,11 +27,11 @@ function json(headers, body, status = 200) {
   return Response.json(body, { status, headers });
 }
 
-async function snapshot(db) {
+async function snapshot(db, accountId) {
   const [rsvpMode, guests, groups] = await Promise.all([
-    getRsvpMode(db),
-    listGuestList(db),
-    listGroups(db),
+    getRsvpMode(db, accountId),
+    listGuestList(db, accountId),
+    listGroups(db, accountId),
   ]);
   return { rsvpMode, guests, groups, count: guests.length };
 }
@@ -45,9 +45,9 @@ export async function onRequestGet(context) {
   const headers = getCorsHeaders(request);
   const auth = await requireAccount(request, env);
   if (!auth.ok) return json(headers, { ok: false, error: auth.error, message: auth.message }, auth.status);
-  if (!env.DB) return json(headers, { ok: false, error: 'DB_NOT_CONFIGURED' }, 503);
+  const db = env.DB || null;
 
-  return json(headers, { ok: true, ...(await snapshot(env.DB)) });
+  return json(headers, { ok: true, ...(await snapshot(db, auth.account.id)) });
 }
 
 export async function onRequestPost(context) {
@@ -61,7 +61,7 @@ export async function onRequestPost(context) {
 
   const auth = await requireAccount(request, env);
   if (!auth.ok) return json(headers, { ok: false, error: auth.error, message: auth.message }, auth.status);
-  if (!env.DB) return json(headers, { ok: false, error: 'DB_NOT_CONFIGURED' }, 503);
+  const db = env.DB || null;
 
   let body;
   try {
@@ -71,10 +71,11 @@ export async function onRequestPost(context) {
   }
 
   try {
-    const result = await addGuests(env.DB, body?.names || [], {
+    const result = await addGuests(db, body?.names || [], {
       groupId: body?.groupId || null,
+      accountId: auth.account.id,
     });
-    return json(headers, { ok: true, ...result, ...(await snapshot(env.DB)) });
+    return json(headers, { ok: true, ...result, ...(await snapshot(db, auth.account.id)) });
   } catch (err) {
     if (err.message === 'EMPTY_GUEST_LIST') {
       return json(headers, { ok: false, error: 'EMPTY_GUEST_LIST', message: 'Informe names: string[]' }, 400);
@@ -100,7 +101,8 @@ export async function onRequestPatch(context) {
 
   const auth = await requireAccount(request, env);
   if (!auth.ok) return json(headers, { ok: false, error: auth.error, message: auth.message }, auth.status);
-  if (!env.DB) return json(headers, { ok: false, error: 'DB_NOT_CONFIGURED' }, 503);
+  const db = env.DB || null;
+  const accountId = auth.account.id;
 
   let body;
   try {
@@ -113,27 +115,27 @@ export async function onRequestPatch(context) {
     let modeResult = null;
 
     if (body?.createGroup?.name) {
-      await createGroup(env.DB, body.createGroup.name);
+      await createGroup(db, body.createGroup.name, accountId);
     }
     if (body?.deleteGroupId) {
-      await deleteGroup(env.DB, String(body.deleteGroupId));
+      await deleteGroup(db, String(body.deleteGroupId), accountId);
     }
     if (body?.removeId) {
-      await removeGuest(env.DB, String(body.removeId));
+      await removeGuest(db, String(body.removeId), accountId);
     }
     if (body?.guestId && Object.prototype.hasOwnProperty.call(body, 'attending')) {
-      await setGuestAttending(env.DB, String(body.guestId), body.attending);
+      await setGuestAttending(db, String(body.guestId), body.attending, accountId);
     }
     if (body?.guestId && Object.prototype.hasOwnProperty.call(body, 'groupId')) {
-      await setGuestGroup(env.DB, String(body.guestId), body.groupId);
+      await setGuestGroup(db, String(body.guestId), body.groupId, accountId);
     }
     if (body?.rsvpMode) {
-      modeResult = await setRsvpMode(env.DB, body.rsvpMode);
+      modeResult = await setRsvpMode(db, body.rsvpMode, accountId);
     }
 
     return json(headers, {
       ok: true,
-      ...(await snapshot(env.DB)),
+      ...(await snapshot(db, accountId)),
       ...(modeResult ? { updatedAt: modeResult.updatedAt } : {}),
     });
   } catch (err) {

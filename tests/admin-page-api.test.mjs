@@ -56,3 +56,12 @@ test('PUT page claims slug and does not leak account id', async () => {
   const mine = await onRequestGet(ctx(b));
   assert.equal((await mine.json()).slug, null);
 });
+
+test('PUT with empty slug returns 400 SLUG_INVALID', async () => {
+  resetMemoryCouplePagesForTests();
+  const now = '2026-11-15T08:00:00.000Z';
+  const a = await signup(null, { email: 'adm-empty@x.com', password: 'segredo12', plan: 'basic' }, now);
+  const res = await onRequestPut(ctx(a, { method: 'PUT', body: { slug: '' } }));
+  assert.equal(res.status, 400);
+  assert.equal((await res.json()).error, 'SLUG_INVALID');
+});

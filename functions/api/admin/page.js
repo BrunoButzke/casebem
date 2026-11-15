@@ -83,7 +83,7 @@ export async function onRequestPut(context) {
   const db = env.DB || null;
   try {
     let slug = auth.account.slug ?? null;
-    if (body?.slug != null && String(body.slug).trim() !== '') {
+    if (body != null && Object.hasOwn(body, 'slug')) {
       const claimed = await claimAccountSlug(db, auth.account.id, body.slug);
       slug = claimed.slug;
     }

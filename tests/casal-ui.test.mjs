@@ -8,6 +8,8 @@ import {
   submitRsvp,
   fetchCatalog,
   submitCheckout,
+  fetchMessages,
+  postMessage,
 } from '../src/lib/casal-api.mjs';
 import { PARTNER_COPY } from '../src/pages/casal/partner-copy.mjs';
 import { readFileSync } from 'node:fs';
@@ -225,4 +227,49 @@ test('GiftsSection uses CartStorage, Pix keys from createCheckoutPayment, and sk
   assert.doesNotMatch(src, /pixQrCode|pixCopyPaste/);
   assert.match(src, /items\.length\s*===?\s*0/);
   assert.match(src, /submitCheckout/);
+});
+
+test('message helpers send slug and idempotency key', async () => {
+  globalThis.fetch = async (url, init) => {
+    if (!init || init.method === 'GET' || !init.method) {
+      assert.equal(String(url).includes('slug=dani-carine'), true);
+      return new Response(JSON.stringify({ messages: [], nextCursor: null }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    const body = JSON.parse(init.body);
+    assert.equal(body.slug, 'dani-carine');
+    const h = init.headers;
+    const key = h['Idempotency-Key'] || h['idempotency-key'];
+    assert.ok(key);
+    return new Response(JSON.stringify({ id: 'm1' }), {
+      status: 201,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+  await fetchMessages('dani-carine');
+  await postMessage('dani-carine', { guestName: 'Ana', message: 'Felicidades', consentGiven: true });
+});
+
+test('PartnerHome wires mural and still omits playlist', () => {
+  const home = readFileSync(new URL('../src/pages/casal/PartnerHome.jsx', import.meta.url), 'utf8');
+  assert.match(home, /MessagesSection/);
+  assert.match(home, /GiftsSection/);
+  assert.match(home, /RsvpSection/);
+  assert.doesNotMatch(home, /id="playlist"|Hospedagem|Papelaria/);
+  const landing = readFileSync(new URL('../src/pages/Landing.jsx', import.meta.url), 'utf8');
+  assert.match(landing, /\/casal\/dani-carine/);
+});
+
+test('MessagesSection lists recados with load more and validates the form', () => {
+  const src = readFileSync(new URL('../src/pages/casal/MessagesSection.jsx', import.meta.url), 'utf8');
+  assert.match(src, /fetchMessages/);
+  assert.match(src, /postMessage/);
+  assert.match(src, /nextCursor/);
+  assert.match(src, /Carregar mais/);
+  assert.match(src, /guestName/);
+  assert.match(src, /consentGiven/);
+  assert.match(src, /length\s*<\s*2/);
+  assert.match(src, /length\s*<\s*3|length\s*>\s*250/);
 });

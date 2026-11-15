@@ -70,3 +70,32 @@ export async function submitCheckout(slug, payload) {
   const data = await readJson(res);
   return { ok: res.ok, status: res.status, ...data };
 }
+
+export async function fetchMessages(slug, { limit = 12, cursor } = {}) {
+  const params = new URLSearchParams({
+    slug: String(slug ?? ''),
+    limit: String(limit),
+  });
+  if (cursor) params.set('cursor', String(cursor));
+  const res = await fetch(`/api/messages?${params}`, { credentials: 'omit' });
+  const data = await readJson(res);
+  if (!res.ok) {
+    return { ok: false, status: res.status, error: data.error, messages: [], nextCursor: null };
+  }
+  return data;
+}
+
+export async function postMessage(slug, payload) {
+  const key = crypto.randomUUID();
+  const res = await fetch('/api/messages', {
+    method: 'POST',
+    credentials: 'omit',
+    headers: {
+      'Content-Type': 'application/json',
+      'Idempotency-Key': key,
+    },
+    body: JSON.stringify({ ...payload, slug }),
+  });
+  const data = await readJson(res);
+  return { ok: res.ok, status: res.status, ...data };
+}

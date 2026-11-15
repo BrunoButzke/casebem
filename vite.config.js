@@ -296,7 +296,8 @@ function guestListApiPlugin(env = {}) {
             const resolved = await resolvePublicSlugOrPartner(null, parsed.searchParams.get('slug'));
             if (!resolved.ok) return sendJson(res, resolved.status, { error: resolved.error });
             const theme = await getDesafioTheme(null, resolved.account.id);
-            return sendJson(res, 200, { ok: true, theme, cssVars: themeToCssVars(theme) });
+            const { weddingKey: _weddingKey, ...publicTheme } = theme;
+            return sendJson(res, 200, { ok: true, theme: publicTheme, cssVars: themeToCssVars(theme) });
           }
 
           if (path === '/api/desafio/challenges' && req.method === 'GET') {

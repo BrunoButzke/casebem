@@ -67,6 +67,30 @@ test('theme GET unknown slug is 404', async () => {
   assert.equal(res.status, 404);
 });
 
+test('theme GET for non-partner slug does not leak account UUID as weddingKey', async () => {
+  const now = '2026-11-15T06:00:00.000Z';
+  const a = await signup(null, { email: 'theme-uuid-leak@x.com', password: 'segredo12', plan: 'pro' }, now);
+  await setAccountSlug(null, a.accountId, 'tema-uuid');
+  const res = await themeGet({
+    request: new Request('https://casebem.com/api/desafio/theme?slug=tema-uuid'),
+    env: { DB: null },
+  });
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(JSON.stringify(body).includes(a.accountId), false);
+  assert.ok(body.theme.weddingKey === undefined || body.theme.weddingKey === 'tema-uuid');
+
+  const partner = await themeGet({
+    request: new Request('https://casebem.com/api/desafio/theme'),
+    env: { DB: null },
+  });
+  assert.equal(partner.status, 200);
+  const partnerBody = await partner.json();
+  assert.ok(
+    partnerBody.theme.weddingKey === undefined || partnerBody.theme.weddingKey === 'dani-carine'
+  );
+});
+
 test('gallery list for slug B omits photo uploaded on A', async () => {
   resetMemoryGalleryForTests();
   const now = '2026-11-15T06:00:00.000Z';

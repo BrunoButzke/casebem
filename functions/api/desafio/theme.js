@@ -26,7 +26,8 @@ export async function onRequestGet(context) {
       return json(headers, { error: resolved.error }, resolved.status);
     }
     const theme = await getDesafioTheme(env.DB || null, resolved.account.id);
-    return json(headers, { ok: true, theme, cssVars: themeToCssVars(theme) });
+    const { weddingKey: _weddingKey, ...publicTheme } = theme;
+    return json(headers, { ok: true, theme: publicTheme, cssVars: themeToCssVars(theme) });
   } catch (err) {
     return json(headers, { ok: false, error: 'THEME_FAILED', message: err.message }, 500);
   }

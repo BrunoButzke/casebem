@@ -24,7 +24,7 @@ export async function onRequestGet(context) {
   if (!env.DB) return json(headers, { ok: false, error: 'DB_NOT_CONFIGURED' }, 503);
 
   try {
-    const theme = await getDesafioTheme(env.DB);
+    const theme = await getDesafioTheme(env.DB, auth.account.id);
     return json(headers, { ok: true, theme });
   } catch (err) {
     return json(headers, { ok: false, error: 'LIST_FAILED', message: err.message }, 500);
@@ -52,7 +52,7 @@ export async function onRequestPatch(context) {
   }
 
   try {
-    const theme = await updateDesafioTheme(env.DB, body || {});
+    const theme = await updateDesafioTheme(env.DB, auth.account.id, body || {});
     return json(headers, { ok: true, theme });
   } catch (err) {
     if (err.message === 'VALIDATION') {

@@ -5,6 +5,7 @@
 
 import { getActiveStationery, presentStationery } from '../_lib/stationery-service.mjs';
 import { getCorsHeaders } from '../_lib/http-helpers.mjs';
+import { PARTNER_ACCOUNT_ID } from '../_lib/auth-service.mjs';
 
 export async function onRequestOptions(context) {
   return new Response(null, { status: 204, headers: getCorsHeaders(context.request) });
@@ -18,7 +19,7 @@ export async function onRequestGet(context) {
 
   try {
     const origin = request.headers.get('Origin') || new URL(request.url).origin;
-    const templates = await getActiveStationery(env.DB || null);
+    const templates = await getActiveStationery(env.DB || null, PARTNER_ACCOUNT_ID);
     const items = presentStationery(templates, origin);
     return Response.json(
       {

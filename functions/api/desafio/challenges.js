@@ -4,6 +4,7 @@
 
 import { getCorsHeaders } from '../../_lib/http-helpers.mjs';
 import { listChallengesPublic } from '../../_lib/challenges-service.mjs';
+import { PARTNER_ACCOUNT_ID } from '../../_lib/auth-service.mjs';
 
 function json(headers, body, status = 200) {
   headers.set('Content-Type', 'application/json; charset=utf-8');
@@ -19,7 +20,7 @@ export async function onRequestGet(context) {
   const headers = getCorsHeaders(request);
 
   try {
-    const catalog = await listChallengesPublic(env.DB || null);
+    const catalog = await listChallengesPublic(env.DB || null, PARTNER_ACCOUNT_ID);
     return json(headers, { ok: true, ...catalog });
   } catch (err) {
     return json(headers, { ok: false, error: 'CATALOG_FAILED', message: err.message }, 500);

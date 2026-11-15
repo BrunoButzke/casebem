@@ -128,17 +128,19 @@ export async function setMessageHidden(db, messageId, hidden, accountId = PARTNE
   return { id: messageId, hidden: Boolean(flag) };
 }
 
-export async function listGiftsAdmin(db, { limit = 200 } = {}) {
+export async function listGiftsAdmin(db, accountId, { limit = 200 } = {}) {
+  if (!accountId) throw new Error('ACCOUNT_ID_REQUIRED');
   const safeLimit = Math.min(Math.max(Number(limit) || 200, 1), 500);
   const rows = await db
     .prepare(
       `SELECT intent_key, gifter_name, amount_cents, payment_method, status,
               provider_reference, canonical_items, created_at, updated_at, paid_at
        FROM checkout_intents
+       WHERE account_id = ?
        ORDER BY created_at DESC
        LIMIT ?`
     )
-    .bind(safeLimit)
+    .bind(accountId, safeLimit)
     .all();
 
   return (rows?.results || []).map((g) => {

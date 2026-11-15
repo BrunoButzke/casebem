@@ -48,7 +48,7 @@ export async function onRequestGet(context) {
   if (!env.DB) return json(headers, { ok: false, error: 'DB_NOT_CONFIGURED' }, 503);
 
   try {
-    const questions = await listQuestionsAdmin(env.DB);
+    const questions = await listQuestionsAdmin(env.DB, auth.account.id);
     return json(headers, { ok: true, questions });
   } catch (err) {
     return json(headers, { ok: false, error: 'LIST_FAILED', message: err.message }, 500);
@@ -76,8 +76,8 @@ export async function onRequestPost(context) {
   }
 
   try {
-    const question = await createQuestion(env.DB, body || {});
-    const questions = await listQuestionsAdmin(env.DB);
+    const question = await createQuestion(env.DB, auth.account.id, body || {});
+    const questions = await listQuestionsAdmin(env.DB, auth.account.id);
     return json(headers, { ok: true, question, questions }, 201);
   } catch (err) {
     return mapWriteError(headers, err);
@@ -107,7 +107,7 @@ export async function onRequestPatch(context) {
   if (!body?.id) return json(headers, { ok: false, error: 'MISSING_ID' }, 400);
 
   try {
-    const question = await updateQuestion(env.DB, String(body.id), body);
+    const question = await updateQuestion(env.DB, auth.account.id, String(body.id), body);
     return json(headers, { ok: true, question });
   } catch (err) {
     return mapWriteError(headers, err);
@@ -131,8 +131,8 @@ export async function onRequestDelete(context) {
   if (!id) return json(headers, { ok: false, error: 'MISSING_ID' }, 400);
 
   try {
-    await deleteQuestion(env.DB, id);
-    const questions = await listQuestionsAdmin(env.DB);
+    await deleteQuestion(env.DB, auth.account.id, id);
+    const questions = await listQuestionsAdmin(env.DB, auth.account.id);
     return json(headers, { ok: true, removed: id, questions });
   } catch (err) {
     return mapWriteError(headers, err);

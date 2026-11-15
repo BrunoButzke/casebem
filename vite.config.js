@@ -241,12 +241,12 @@ function guestListApiPlugin() {
           const path = parsed.pathname;
 
           if (path === '/api/desafio/theme' && req.method === 'GET') {
-            const theme = await getDesafioTheme(null);
+            const theme = await getDesafioTheme(null, PARTNER_ACCOUNT_ID);
             return sendJson(res, 200, { ok: true, theme, cssVars: themeToCssVars(theme) });
           }
 
           if (path === '/api/desafio/challenges' && req.method === 'GET') {
-            const catalog = await listChallengesPublic(null);
+            const catalog = await listChallengesPublic(null, PARTNER_ACCOUNT_ID);
             return sendJson(res, 200, { ok: true, ...catalog });
           }
 
@@ -314,7 +314,12 @@ function guestListApiPlugin() {
           if (path === '/api/desafio/answer' && req.method === 'POST') {
             const body = await readJsonBody(req);
             try {
-              const result = await gradeQuestion(null, String(body?.questionId || ''), body?.selectedIndex);
+              const result = await gradeQuestion(
+                null,
+                PARTNER_ACCOUNT_ID,
+                String(body?.questionId || ''),
+                body?.selectedIndex
+              );
               return sendJson(res, 200, { ok: true, ...result });
             } catch (err) {
               const map = { NOT_FOUND: 404, INVALID_ID: 400, VALIDATION: 400 };
@@ -691,34 +696,34 @@ function adminApiPlugin(env) {
             };
             try {
               if (req.method === 'GET') {
-                const templates = presentStationery(await listStationeryAdmin(null), origin);
+                const templates = presentStationery(await listStationeryAdmin(null, auth.account.id), origin);
                 return sendJson(res, 200, { ok: true, templates });
               }
               if (req.method === 'POST') {
                 const body = await readJsonBody(req);
-                const template = await createStationeryTemplate(null, body || {});
+                const template = await createStationeryTemplate(null, auth.account.id, body || {});
                 const [presented] = presentStationery([template], origin);
                 return sendJson(res, 201, {
                   ok: true,
                   template: presented,
-                  templates: presentStationery(await listStationeryAdmin(null), origin),
+                  templates: presentStationery(await listStationeryAdmin(null, auth.account.id), origin),
                 });
               }
               if (req.method === 'PATCH') {
                 const body = await readJsonBody(req);
                 if (!body?.id) return sendJson(res, 400, { ok: false, error: 'MISSING_ID' });
-                const template = await updateStationeryTemplate(null, String(body.id), body);
+                const template = await updateStationeryTemplate(null, auth.account.id, String(body.id), body);
                 const [presented] = presentStationery([template], origin);
                 return sendJson(res, 200, { ok: true, template: presented });
               }
               if (req.method === 'DELETE') {
                 const id = parsed.searchParams.get('id');
                 if (!id) return sendJson(res, 400, { ok: false, error: 'MISSING_ID' });
-                await deleteStationeryTemplate(null, id);
+                await deleteStationeryTemplate(null, auth.account.id, id);
                 return sendJson(res, 200, {
                   ok: true,
                   removed: id,
-                  templates: presentStationery(await listStationeryAdmin(null), origin),
+                  templates: presentStationery(await listStationeryAdmin(null, auth.account.id), origin),
                 });
               }
             } catch (err) {
@@ -745,31 +750,34 @@ function adminApiPlugin(env) {
           if (path === '/api/admin/challenges/questions') {
             try {
               if (req.method === 'GET') {
-                return sendJson(res, 200, { ok: true, questions: await listQuestionsAdmin(null) });
+                return sendJson(res, 200, {
+                  ok: true,
+                  questions: await listQuestionsAdmin(null, auth.account.id),
+                });
               }
               if (req.method === 'POST') {
                 const body = await readJsonBody(req);
-                const question = await createQuestion(null, body || {});
+                const question = await createQuestion(null, auth.account.id, body || {});
                 return sendJson(res, 201, {
                   ok: true,
                   question,
-                  questions: await listQuestionsAdmin(null),
+                  questions: await listQuestionsAdmin(null, auth.account.id),
                 });
               }
               if (req.method === 'PATCH') {
                 const body = await readJsonBody(req);
                 if (!body?.id) return sendJson(res, 400, { ok: false, error: 'MISSING_ID' });
-                const question = await updateQuestion(null, String(body.id), body);
+                const question = await updateQuestion(null, auth.account.id, String(body.id), body);
                 return sendJson(res, 200, { ok: true, question });
               }
               if (req.method === 'DELETE') {
                 const id = parsed.searchParams.get('id');
                 if (!id) return sendJson(res, 400, { ok: false, error: 'MISSING_ID' });
-                await deleteQuestion(null, id);
+                await deleteQuestion(null, auth.account.id, id);
                 return sendJson(res, 200, {
                   ok: true,
                   removed: id,
-                  questions: await listQuestionsAdmin(null),
+                  questions: await listQuestionsAdmin(null, auth.account.id),
                 });
               }
             } catch (err) {
@@ -782,32 +790,32 @@ function adminApiPlugin(env) {
               if (req.method === 'GET') {
                 return sendJson(res, 200, {
                   ok: true,
-                  photoMissions: await listPhotoMissionsAdmin(null),
+                  photoMissions: await listPhotoMissionsAdmin(null, auth.account.id),
                 });
               }
               if (req.method === 'POST') {
                 const body = await readJsonBody(req);
-                const photoMission = await createPhotoMission(null, body || {});
+                const photoMission = await createPhotoMission(null, auth.account.id, body || {});
                 return sendJson(res, 201, {
                   ok: true,
                   photoMission,
-                  photoMissions: await listPhotoMissionsAdmin(null),
+                  photoMissions: await listPhotoMissionsAdmin(null, auth.account.id),
                 });
               }
               if (req.method === 'PATCH') {
                 const body = await readJsonBody(req);
                 if (!body?.id) return sendJson(res, 400, { ok: false, error: 'MISSING_ID' });
-                const photoMission = await updatePhotoMission(null, String(body.id), body);
+                const photoMission = await updatePhotoMission(null, auth.account.id, String(body.id), body);
                 return sendJson(res, 200, { ok: true, photoMission });
               }
               if (req.method === 'DELETE') {
                 const id = parsed.searchParams.get('id');
                 if (!id) return sendJson(res, 400, { ok: false, error: 'MISSING_ID' });
-                await deletePhotoMission(null, id);
+                await deletePhotoMission(null, auth.account.id, id);
                 return sendJson(res, 200, {
                   ok: true,
                   removed: id,
-                  photoMissions: await listPhotoMissionsAdmin(null),
+                  photoMissions: await listPhotoMissionsAdmin(null, auth.account.id),
                 });
               }
             } catch (err) {
@@ -818,11 +826,11 @@ function adminApiPlugin(env) {
           if (path === '/api/admin/challenges/theme') {
             try {
               if (req.method === 'GET') {
-                return sendJson(res, 200, { ok: true, theme: await getDesafioTheme(null) });
+                return sendJson(res, 200, { ok: true, theme: await getDesafioTheme(null, auth.account.id) });
               }
               if (req.method === 'PATCH') {
                 const body = await readJsonBody(req);
-                const theme = await updateDesafioTheme(null, body || {});
+                const theme = await updateDesafioTheme(null, auth.account.id, body || {});
                 return sendJson(res, 200, { ok: true, theme });
               }
             } catch (err) {
@@ -847,32 +855,32 @@ function adminApiPlugin(env) {
               if (req.method === 'GET') {
                 return sendJson(res, 200, {
                   ok: true,
-                  stampCards: await listStampCardsAdmin(null),
+                  stampCards: await listStampCardsAdmin(null, auth.account.id),
                 });
               }
               if (req.method === 'POST') {
                 const body = await readJsonBody(req);
-                const stampCard = await createStampCard(null, body || {});
+                const stampCard = await createStampCard(null, auth.account.id, body || {});
                 return sendJson(res, 201, {
                   ok: true,
                   stampCard,
-                  stampCards: await listStampCardsAdmin(null),
+                  stampCards: await listStampCardsAdmin(null, auth.account.id),
                 });
               }
               if (req.method === 'PATCH') {
                 const body = await readJsonBody(req);
                 if (!body?.id) return sendJson(res, 400, { ok: false, error: 'MISSING_ID' });
-                const stampCard = await updateStampCard(null, String(body.id), body);
+                const stampCard = await updateStampCard(null, auth.account.id, String(body.id), body);
                 return sendJson(res, 200, { ok: true, stampCard });
               }
               if (req.method === 'DELETE') {
                 const id = parsed.searchParams.get('id');
                 if (!id) return sendJson(res, 400, { ok: false, error: 'MISSING_ID' });
-                await deleteStampCard(null, id);
+                await deleteStampCard(null, auth.account.id, id);
                 return sendJson(res, 200, {
                   ok: true,
                   removed: id,
-                  stampCards: await listStampCardsAdmin(null),
+                  stampCards: await listStampCardsAdmin(null, auth.account.id),
                 });
               }
             } catch (err) {

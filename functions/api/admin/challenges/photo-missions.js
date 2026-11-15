@@ -48,7 +48,7 @@ export async function onRequestGet(context) {
   if (!env.DB) return json(headers, { ok: false, error: 'DB_NOT_CONFIGURED' }, 503);
 
   try {
-    const photoMissions = await listPhotoMissionsAdmin(env.DB);
+    const photoMissions = await listPhotoMissionsAdmin(env.DB, auth.account.id);
     return json(headers, { ok: true, photoMissions });
   } catch (err) {
     return json(headers, { ok: false, error: 'LIST_FAILED', message: err.message }, 500);
@@ -76,8 +76,8 @@ export async function onRequestPost(context) {
   }
 
   try {
-    const photoMission = await createPhotoMission(env.DB, body || {});
-    const photoMissions = await listPhotoMissionsAdmin(env.DB);
+    const photoMission = await createPhotoMission(env.DB, auth.account.id, body || {});
+    const photoMissions = await listPhotoMissionsAdmin(env.DB, auth.account.id);
     return json(headers, { ok: true, photoMission, photoMissions }, 201);
   } catch (err) {
     return mapWriteError(headers, err);
@@ -107,7 +107,7 @@ export async function onRequestPatch(context) {
   if (!body?.id) return json(headers, { ok: false, error: 'MISSING_ID' }, 400);
 
   try {
-    const photoMission = await updatePhotoMission(env.DB, String(body.id), body);
+    const photoMission = await updatePhotoMission(env.DB, auth.account.id, String(body.id), body);
     return json(headers, { ok: true, photoMission });
   } catch (err) {
     return mapWriteError(headers, err);
@@ -131,8 +131,8 @@ export async function onRequestDelete(context) {
   if (!id) return json(headers, { ok: false, error: 'MISSING_ID' }, 400);
 
   try {
-    await deletePhotoMission(env.DB, id);
-    const photoMissions = await listPhotoMissionsAdmin(env.DB);
+    await deletePhotoMission(env.DB, auth.account.id, id);
+    const photoMissions = await listPhotoMissionsAdmin(env.DB, auth.account.id);
     return json(headers, { ok: true, removed: id, photoMissions });
   } catch (err) {
     return mapWriteError(headers, err);

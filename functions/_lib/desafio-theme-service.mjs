@@ -3,6 +3,7 @@
  */
 
 import { WEDDING_KEY } from './challenges-validators.mjs';
+import { PARTNER_ACCOUNT_ID } from './auth-service.mjs';
 
 const DEFAULT_THEME = {
   weddingKey: WEDDING_KEY,
@@ -26,10 +27,22 @@ const DEFAULT_THEME = {
   updatedAt: null,
 };
 
-let memoryTheme = null;
+/** @type {Map<string, object>} */
+let memoryThemes = new Map();
+
+function requireAccountId(accountId) {
+  if (!accountId || typeof accountId !== 'string') {
+    throw new Error('ACCOUNT_ID_REQUIRED');
+  }
+  return accountId;
+}
+
+function weddingKeyFor(accountId) {
+  return accountId === PARTNER_ACCOUNT_ID ? WEDDING_KEY : accountId;
+}
 
 export function resetMemoryDesafioThemeForTests() {
-  memoryTheme = null;
+  memoryThemes = new Map();
 }
 
 export function getDefaultDesafioTheme() {
@@ -124,32 +137,38 @@ export function validateDesafioThemePatch(body) {
   return { valid: errors.length === 0, errors, data: out };
 }
 
-export async function getDesafioTheme(db) {
+export async function getDesafioTheme(db, accountId) {
+  const id = requireAccountId(accountId);
+  const weddingKey = weddingKeyFor(id);
+  const fallback = { ...DEFAULT_THEME, weddingKey };
+
   if (!db) {
-    if (!memoryTheme) memoryTheme = { ...DEFAULT_THEME };
-    return { ...memoryTheme };
+    if (!memoryThemes.has(id)) memoryThemes.set(id, { ...fallback });
+    return { ...memoryThemes.get(id) };
   }
 
   try {
     const row = await db
-      .prepare(`SELECT * FROM desafio_theme WHERE wedding_key = ?`)
-      .bind(WEDDING_KEY)
+      .prepare(`SELECT * FROM desafio_theme WHERE account_id = ?`)
+      .bind(id)
       .first();
     if (!row) {
       const now = new Date().toISOString();
       await db
-        .prepare(`INSERT INTO desafio_theme (wedding_key, updated_at) VALUES (?, ?)`)
-        .bind(WEDDING_KEY, now)
+        .prepare(`INSERT INTO desafio_theme (wedding_key, updated_at, account_id) VALUES (?, ?, ?)`)
+        .bind(weddingKey, now, id)
         .run();
-      return { ...DEFAULT_THEME, updatedAt: now };
+      return { ...fallback, updatedAt: now };
     }
     return rowToTheme(row);
   } catch {
-    return { ...DEFAULT_THEME };
+    return fallback;
   }
 }
 
-export async function updateDesafioTheme(db, patch) {
+export async function updateDesafioTheme(db, accountId, patch) {
+  const id = requireAccountId(accountId);
+  const weddingKey = weddingKeyFor(id);
   const validation = validateDesafioThemePatch(patch || {});
   if (!validation.valid) {
     const err = new Error('VALIDATION');
@@ -159,11 +178,11 @@ export async function updateDesafioTheme(db, patch) {
   const d = validation.data;
   if (Object.keys(d).length === 0) throw new Error('EMPTY_PATCH');
 
-  const current = await getDesafioTheme(db);
-  const next = { ...current, ...d, updatedAt: new Date().toISOString() };
+  const current = await getDesafioTheme(db, id);
+  const next = { ...current, ...d, weddingKey, updatedAt: new Date().toISOString() };
 
   if (!db) {
-    memoryTheme = next;
+    memoryThemes.set(id, next);
     return { ...next };
   }
 
@@ -172,8 +191,8 @@ export async function updateDesafioTheme(db, patch) {
       `INSERT INTO desafio_theme (
         wedding_key, app_bg_from, app_bg_mid, app_bg_to, app_rose, app_rose_deep, app_ink, app_muted,
         card_title, card_bg, card_accent, card_accent_soft, card_text, card_border, card_slots,
-        card_reward_label, card_bar_hint, card_footer_template, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        card_reward_label, card_bar_hint, card_footer_template, updated_at, account_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(wedding_key) DO UPDATE SET
         app_bg_from = excluded.app_bg_from,
         app_bg_mid = excluded.app_bg_mid,
@@ -192,10 +211,11 @@ export async function updateDesafioTheme(db, patch) {
         card_reward_label = excluded.card_reward_label,
         card_bar_hint = excluded.card_bar_hint,
         card_footer_template = excluded.card_footer_template,
-        updated_at = excluded.updated_at`
+        updated_at = excluded.updated_at,
+        account_id = excluded.account_id`
     )
     .bind(
-      WEDDING_KEY,
+      weddingKey,
       next.appBgFrom,
       next.appBgMid,
       next.appBgTo,
@@ -213,7 +233,8 @@ export async function updateDesafioTheme(db, patch) {
       next.cardRewardLabel,
       next.cardBarHint,
       next.cardFooterTemplate,
-      next.updatedAt
+      next.updatedAt,
+      id
     )
     .run();
 

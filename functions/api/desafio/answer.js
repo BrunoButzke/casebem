@@ -4,6 +4,7 @@
 
 import { getCorsHeaders, validateOrigin } from '../../_lib/http-helpers.mjs';
 import { gradeQuestion } from '../../_lib/challenges-service.mjs';
+import { PARTNER_ACCOUNT_ID } from '../../_lib/auth-service.mjs';
 
 function json(headers, body, status = 200) {
   headers.set('Content-Type', 'application/json; charset=utf-8');
@@ -31,7 +32,12 @@ export async function onRequestPost(context) {
   }
 
   try {
-    const result = await gradeQuestion(env.DB || null, String(body?.questionId || ''), body?.selectedIndex);
+    const result = await gradeQuestion(
+      env.DB || null,
+      PARTNER_ACCOUNT_ID,
+      String(body?.questionId || ''),
+      body?.selectedIndex
+    );
     return json(headers, { ok: true, ...result });
   } catch (err) {
     if (err.message === 'NOT_FOUND') return json(headers, { ok: false, error: 'NOT_FOUND' }, 404);

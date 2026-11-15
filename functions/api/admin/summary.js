@@ -42,7 +42,7 @@ export async function onRequestGet(context) {
     const accountId = auth.account.id;
     const [messages, gifts, rsvpMode, guestList, groups] = await Promise.all([
       listMessagesAdmin(env.DB, accountId),
-      listGiftsAdmin(env.DB),
+      listGiftsAdmin(env.DB, accountId),
       getRsvpMode(env.DB, accountId),
       listGuestList(env.DB, accountId),
       listGroups(env.DB, accountId),

@@ -9,8 +9,17 @@ import {
   whatsappShareUrl,
 } from '../../data/stationery-templates.mjs';
 import { slugifyId } from './catalog-service.mjs';
+import { PARTNER_ACCOUNT_ID } from './auth-service.mjs';
 
-let memoryStationery = null;
+/** @type {Map<string, Array>} */
+let memoryStationery = new Map();
+
+function requireAccountId(accountId) {
+  if (!accountId || typeof accountId !== 'string') {
+    throw new Error('ACCOUNT_ID_REQUIRED');
+  }
+  return accountId;
+}
 
 function rowToTemplate(row) {
   return {
@@ -24,30 +33,40 @@ function rowToTemplate(row) {
   };
 }
 
-function ensureMemoryStationery() {
-  if (!memoryStationery) {
-    memoryStationery = STATIONERY_TEMPLATES.map((t, i) => ({
-      id: t.id,
-      title: t.title,
-      body: t.body,
-      kind: t.kind || 'whatsapp',
-      active: true,
-      sortOrder: i,
-      updatedAt: null,
-    }));
+function seedMemoryFromStatic() {
+  return STATIONERY_TEMPLATES.map((t, i) => ({
+    id: t.id,
+    title: t.title,
+    body: t.body,
+    kind: t.kind || 'whatsapp',
+    active: true,
+    sortOrder: i,
+    updatedAt: null,
+  }));
+}
+
+function ensureMemoryStationery(accountId) {
+  const id = requireAccountId(accountId);
+  if (!memoryStationery.has(id)) {
+    memoryStationery.set(id, id === PARTNER_ACCOUNT_ID ? seedMemoryFromStatic() : []);
   }
-  return memoryStationery;
+  return memoryStationery.get(id);
 }
 
 export function resetMemoryStationeryForTests() {
-  memoryStationery = null;
+  memoryStationery = new Map();
 }
 
-export async function seedStationeryIfEmpty(db) {
-  if (!db) return { seeded: false, count: ensureMemoryStationery().length };
-  const countRow = await db.prepare(`SELECT COUNT(*) AS c FROM stationery_templates`).first();
+export async function seedStationeryIfEmpty(db, accountId) {
+  const id = requireAccountId(accountId);
+  if (!db) return { seeded: false, count: ensureMemoryStationery(id).length };
+  const countRow = await db
+    .prepare(`SELECT COUNT(*) AS c FROM stationery_templates WHERE account_id = ?`)
+    .bind(id)
+    .first();
   const count = Number(countRow?.c || 0);
   if (count > 0) return { seeded: false, count };
+  if (id !== PARTNER_ACCOUNT_ID) return { seeded: false, count: 0 };
 
   const now = new Date().toISOString();
   let i = 0;
@@ -55,10 +74,10 @@ export async function seedStationeryIfEmpty(db) {
     await db
       .prepare(
         `INSERT INTO stationery_templates (
-          id, title, body, kind, active, sort_order, updated_at
-        ) VALUES (?, ?, ?, ?, 1, ?, ?)`
+          id, title, body, kind, active, sort_order, updated_at, account_id
+        ) VALUES (?, ?, ?, ?, 1, ?, ?, ?)`
       )
-      .bind(t.id, t.title, t.body, t.kind || 'whatsapp', i++, now)
+      .bind(t.id, t.title, t.body, t.kind || 'whatsapp', i++, now, id)
       .run();
   }
   return { seeded: true, count: STATIONERY_TEMPLATES.length };
@@ -73,42 +92,48 @@ function staticActiveList() {
   }));
 }
 
-export async function getActiveStationery(db) {
+export async function getActiveStationery(db, accountId) {
+  const id = requireAccountId(accountId);
   if (!db) {
-    return ensureMemoryStationery()
+    return ensureMemoryStationery(id)
       .filter((t) => t.active)
       .map((t) => ({ ...t }));
   }
   try {
-    await seedStationeryIfEmpty(db);
+    await seedStationeryIfEmpty(db, id);
     const rows = await db
       .prepare(
         `SELECT id, title, body, kind, active, sort_order, updated_at
          FROM stationery_templates
-         WHERE active = 1
+         WHERE active = 1 AND account_id = ?
          ORDER BY sort_order ASC, id ASC`
       )
+      .bind(id)
       .all();
     const list = (rows?.results || []).map(rowToTemplate);
-    return list.length === 0 ? staticActiveList() : list;
+    if (list.length === 0 && id === PARTNER_ACCOUNT_ID) return staticActiveList();
+    return list;
   } catch {
-    return staticActiveList();
+    return id === PARTNER_ACCOUNT_ID ? staticActiveList() : [];
   }
 }
 
-export async function listStationeryAdmin(db) {
+export async function listStationeryAdmin(db, accountId) {
+  const id = requireAccountId(accountId);
   if (!db) {
-    return [...ensureMemoryStationery()].sort(
+    return [...ensureMemoryStationery(id)].sort(
       (a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id)
     );
   }
-  await seedStationeryIfEmpty(db);
+  await seedStationeryIfEmpty(db, id);
   const rows = await db
     .prepare(
       `SELECT id, title, body, kind, active, sort_order, updated_at
        FROM stationery_templates
+       WHERE account_id = ?
        ORDER BY sort_order ASC, id ASC`
     )
+    .bind(id)
     .all();
   return (rows?.results || []).map(rowToTemplate);
 }
@@ -202,7 +227,8 @@ export function validateStationeryCreate(body) {
   };
 }
 
-export async function createStationeryTemplate(db, body) {
+export async function createStationeryTemplate(db, accountId, body) {
+  const id = requireAccountId(accountId);
   const validation = validateStationeryCreate(body);
   if (!validation.valid) {
     const err = new Error('VALIDATION');
@@ -213,7 +239,7 @@ export async function createStationeryTemplate(db, body) {
   const now = new Date().toISOString();
 
   if (!db) {
-    const mem = ensureMemoryStationery();
+    const mem = ensureMemoryStationery(id);
     if (mem.some((t) => t.id === d.id)) throw new Error('TEMPLATE_EXISTS');
     const template = {
       id: d.id,
@@ -232,10 +258,10 @@ export async function createStationeryTemplate(db, body) {
     await db
       .prepare(
         `INSERT INTO stationery_templates (
-          id, title, body, kind, active, sort_order, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)`
+          id, title, body, kind, active, sort_order, updated_at, account_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
       )
-      .bind(d.id, d.title, d.body, d.kind, d.active ? 1 : 0, d.sortOrder, now)
+      .bind(d.id, d.title, d.body, d.kind, d.active ? 1 : 0, d.sortOrder, now, id)
       .run();
   } catch (err) {
     if (err?.message?.includes('UNIQUE') || err?.message?.includes('PRIMARY')) {
@@ -255,7 +281,8 @@ export async function createStationeryTemplate(db, body) {
   });
 }
 
-export async function updateStationeryTemplate(db, templateId, patch) {
+export async function updateStationeryTemplate(db, accountId, templateId, patch) {
+  const id = requireAccountId(accountId);
   if (!templateId || typeof templateId !== 'string') throw new Error('INVALID_ID');
 
   const validation = validateStationeryPatch(patch);
@@ -269,7 +296,7 @@ export async function updateStationeryTemplate(db, templateId, patch) {
   const now = new Date().toISOString();
 
   if (!db) {
-    const mem = ensureMemoryStationery();
+    const mem = ensureMemoryStationery(id);
     const t = mem.find((x) => x.id === templateId);
     if (!t) throw new Error('TEMPLATE_NOT_FOUND');
     if (d.title !== undefined) t.title = d.title;
@@ -282,17 +309,17 @@ export async function updateStationeryTemplate(db, templateId, patch) {
   }
 
   const existing = await db
-    .prepare(`SELECT id FROM stationery_templates WHERE id = ?`)
-    .bind(templateId)
+    .prepare(`SELECT id FROM stationery_templates WHERE id = ? AND account_id = ?`)
+    .bind(templateId, id)
     .first();
   if (!existing) throw new Error('TEMPLATE_NOT_FOUND');
 
   const row = await db
     .prepare(
       `SELECT id, title, body, kind, active, sort_order
-       FROM stationery_templates WHERE id = ?`
+       FROM stationery_templates WHERE id = ? AND account_id = ?`
     )
-    .bind(templateId)
+    .bind(templateId, id)
     .first();
 
   const next = {
@@ -307,19 +334,20 @@ export async function updateStationeryTemplate(db, templateId, patch) {
     .prepare(
       `UPDATE stationery_templates
        SET title = ?, body = ?, kind = ?, active = ?, sort_order = ?, updated_at = ?
-       WHERE id = ?`
+       WHERE id = ? AND account_id = ?`
     )
-    .bind(next.title, next.body, next.kind, next.active, next.sort_order, now, templateId)
+    .bind(next.title, next.body, next.kind, next.active, next.sort_order, now, templateId, id)
     .run();
 
   return rowToTemplate({ ...next, id: templateId, updated_at: now });
 }
 
-export async function deleteStationeryTemplate(db, templateId) {
+export async function deleteStationeryTemplate(db, accountId, templateId) {
+  const id = requireAccountId(accountId);
   if (!templateId || typeof templateId !== 'string') throw new Error('INVALID_ID');
 
   if (!db) {
-    const mem = ensureMemoryStationery();
+    const mem = ensureMemoryStationery(id);
     const idx = mem.findIndex((t) => t.id === templateId);
     if (idx < 0) throw new Error('TEMPLATE_NOT_FOUND');
     mem.splice(idx, 1);
@@ -327,8 +355,8 @@ export async function deleteStationeryTemplate(db, templateId) {
   }
 
   const result = await db
-    .prepare(`DELETE FROM stationery_templates WHERE id = ?`)
-    .bind(templateId)
+    .prepare(`DELETE FROM stationery_templates WHERE id = ? AND account_id = ?`)
+    .bind(templateId, id)
     .run();
   const changes = Number(result?.meta?.changes ?? result?.changes ?? 0);
   if (changes === 0) throw new Error('TEMPLATE_NOT_FOUND');

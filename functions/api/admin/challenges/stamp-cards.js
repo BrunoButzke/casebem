@@ -48,7 +48,7 @@ export async function onRequestGet(context) {
   if (!env.DB) return json(headers, { ok: false, error: 'DB_NOT_CONFIGURED' }, 503);
 
   try {
-    const stampCards = await listStampCardsAdmin(env.DB);
+    const stampCards = await listStampCardsAdmin(env.DB, auth.account.id);
     return json(headers, { ok: true, stampCards });
   } catch (err) {
     return json(headers, { ok: false, error: 'LIST_FAILED', message: err.message }, 500);
@@ -76,8 +76,8 @@ export async function onRequestPost(context) {
   }
 
   try {
-    const stampCard = await createStampCard(env.DB, body || {});
-    const stampCards = await listStampCardsAdmin(env.DB);
+    const stampCard = await createStampCard(env.DB, auth.account.id, body || {});
+    const stampCards = await listStampCardsAdmin(env.DB, auth.account.id);
     return json(headers, { ok: true, stampCard, stampCards }, 201);
   } catch (err) {
     return mapWriteError(headers, err);
@@ -107,7 +107,7 @@ export async function onRequestPatch(context) {
   if (!body?.id) return json(headers, { ok: false, error: 'MISSING_ID' }, 400);
 
   try {
-    const stampCard = await updateStampCard(env.DB, String(body.id), body);
+    const stampCard = await updateStampCard(env.DB, auth.account.id, String(body.id), body);
     return json(headers, { ok: true, stampCard });
   } catch (err) {
     return mapWriteError(headers, err);
@@ -131,8 +131,8 @@ export async function onRequestDelete(context) {
   if (!id) return json(headers, { ok: false, error: 'MISSING_ID' }, 400);
 
   try {
-    await deleteStampCard(env.DB, id);
-    const stampCards = await listStampCardsAdmin(env.DB);
+    await deleteStampCard(env.DB, auth.account.id, id);
+    const stampCards = await listStampCardsAdmin(env.DB, auth.account.id);
     return json(headers, { ok: true, removed: id, stampCards });
   } catch (err) {
     return mapWriteError(headers, err);

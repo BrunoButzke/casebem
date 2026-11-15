@@ -17,6 +17,7 @@ import {
   updateStationeryTemplate,
 } from '../functions/_lib/stationery-service.mjs';
 import { onRequestGet as publicGet } from '../functions/api/stationery.js';
+import { PARTNER_ACCOUNT_ID } from '../functions/_lib/auth-service.mjs';
 
 class MockStatement {
   constructor(db, sql) {
@@ -29,37 +30,72 @@ class MockStatement {
     return this;
   }
   async first() {
-    if (/COUNT\(\*\)/.test(this.sql)) return { c: this.db.rows.length };
+    if (/COUNT\(\*\)/.test(this.sql)) {
+      const rows = /account_id/.test(this.sql)
+        ? this.db.rows.filter((r) => r.account_id === this.args[0])
+        : this.db.rows;
+      return { c: rows.length };
+    }
     if (/WHERE id = \?/.test(this.sql)) {
-      return this.db.rows.find((r) => r.id === this.args[0]) || null;
+      const accountId = /account_id/.test(this.sql) ? this.args[1] : undefined;
+      return (
+        this.db.rows.find(
+          (r) => r.id === this.args[0] && (accountId == null || r.account_id === accountId)
+        ) || null
+      );
     }
     return null;
   }
   async all() {
     let rows = [...this.db.rows];
-    if (/WHERE active = 1/.test(this.sql)) rows = rows.filter((r) => r.active === 1);
+    if (/account_id/.test(this.sql)) {
+      rows = rows.filter((r) => r.account_id === this.args[0]);
+    }
+    if (/active = 1/.test(this.sql)) rows = rows.filter((r) => r.active === 1);
     rows.sort((a, b) => a.sort_order - b.sort_order || a.id.localeCompare(b.id));
     return { results: rows };
   }
   async run() {
     if (/INSERT INTO stationery_templates/.test(this.sql)) {
-      const [id, title, body, kind, sort_order, updated_at] = this.args;
-      this.db.rows.push({
-        id,
-        title,
-        body,
-        kind,
-        active: 1,
-        sort_order,
-        updated_at,
-      });
+      if (this.args.length === 8) {
+        const [id, title, body, kind, active, sort_order, updated_at, account_id] = this.args;
+        this.db.rows.push({
+          id,
+          title,
+          body,
+          kind,
+          active,
+          sort_order,
+          updated_at,
+          account_id,
+        });
+      } else {
+        const [id, title, body, kind, sort_order, updated_at, account_id] = this.args;
+        this.db.rows.push({
+          id,
+          title,
+          body,
+          kind,
+          active: 1,
+          sort_order,
+          updated_at,
+          account_id,
+        });
+      }
       return { success: true, meta: { changes: 1 } };
     }
     if (/UPDATE stationery_templates/.test(this.sql)) {
-      const [title, body, kind, active, sort_order, updated_at, id] = this.args;
-      const row = this.db.rows.find((r) => r.id === id);
+      const [title, body, kind, active, sort_order, updated_at, id, account_id] = this.args;
+      const row = this.db.rows.find((r) => r.id === id && r.account_id === account_id);
       if (!row) return { success: true, meta: { changes: 0 } };
       Object.assign(row, { title, body, kind, active, sort_order, updated_at });
+      return { success: true, meta: { changes: 1 } };
+    }
+    if (/DELETE FROM stationery_templates/.test(this.sql)) {
+      const [id, account_id] = this.args;
+      const idx = this.db.rows.findIndex((r) => r.id === id && r.account_id === account_id);
+      if (idx < 0) return { success: true, meta: { changes: 0 } };
+      this.db.rows.splice(idx, 1);
       return { success: true, meta: { changes: 1 } };
     }
     return { success: true, meta: { changes: 0 } };
@@ -103,17 +139,17 @@ test('validateStationeryPatch rejeita body curto', () => {
 
 test('seed + update stationery', async () => {
   const db = new MockDB([]);
-  const seeded = await seedStationeryIfEmpty(db);
+  const seeded = await seedStationeryIfEmpty(db, PARTNER_ACCOUNT_ID);
   assert.equal(seeded.seeded, true);
   assert.equal(db.rows.length, STATIONERY_TEMPLATES.length);
 
-  const updated = await updateStationeryTemplate(db, 'convite', {
+  const updated = await updateStationeryTemplate(db, PARTNER_ACCOUNT_ID, 'convite', {
     title: 'Convite atualizado',
     active: true,
   });
   assert.equal(updated.title, 'Convite atualizado');
 
-  const active = await getActiveStationery(db);
+  const active = await getActiveStationery(db, PARTNER_ACCOUNT_ID);
   assert.ok(active.some((t) => t.id === 'convite'));
 });
 

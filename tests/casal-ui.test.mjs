@@ -58,9 +58,22 @@ test('fetchCouplePage 404 yields SLUG_NOT_FOUND', async () => {
   assert.equal(result.error, 'SLUG_NOT_FOUND');
 });
 
-test('CoupleSite catches fetchCouplePage rejection', () => {
+test('CoupleSite catches fetchCouplePage rejection as load error, not 404', () => {
   const page = readFileSync(new URL('../src/pages/casal/CoupleSite.jsx', import.meta.url), 'utf8');
   assert.match(page, /fetchCouplePage\(slug\)[\s\S]*\.catch\s*\(/);
+  assert.match(page, /Não foi possível carregar a página/);
+  assert.match(page, /status === 404/);
+  const catchMatch = page.match(/\.catch\s*\(([\s\S]*?)\)\s*;/);
+  assert.ok(catchMatch);
+  assert.doesNotMatch(catchMatch[1], /not-found/);
+  assert.match(catchMatch[1], /error/);
+});
+
+test('App.jsx lazy-loads CoupleSite behind Suspense', () => {
+  const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8');
+  assert.match(app, /lazy\(\s*\(\)\s*=>\s*import\(['"]\.\/pages\/casal\/CoupleSite\.jsx['"]\)/);
+  assert.match(app, /<Suspense[\s\S]*Carregando…/);
+  assert.doesNotMatch(app, /import CoupleSite from/);
 });
 
 test('App.jsx declares /casal/:slug and CoupleSite has no admin login', () => {
@@ -69,6 +82,26 @@ test('App.jsx declares /casal/:slug and CoupleSite has no admin login', () => {
   const page = readFileSync(new URL('../src/pages/casal/CoupleSite.jsx', import.meta.url), 'utf8');
   assert.doesNotMatch(page, /admin-login|Acesso dos noivos/);
   assert.match(page, /Página não encontrada/);
+});
+
+test('CoupleSite sets partner document title and restores CaseBem', () => {
+  const page = readFileSync(new URL('../src/pages/casal/CoupleSite.jsx', import.meta.url), 'utf8');
+  assert.match(page, /document\.title/);
+  assert.match(page, /Dani & Carine/);
+  assert.match(page, /CaseBem/);
+});
+
+test('root index.html loads Cormorant Garamond and Great Vibes', () => {
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  assert.match(html, /Cormorant\+Garamond/);
+  assert.match(html, /Great\+Vibes/);
+});
+
+test('vite local plugin forwards POST /api/gifts/checkout to onRequestPost', () => {
+  const vite = readFileSync(new URL('../vite.config.js', import.meta.url), 'utf8');
+  assert.match(vite, /\/api\/gifts\/checkout/);
+  assert.match(vite, /functions\/api\/gifts\/checkout\.js/);
+  assert.match(vite, /onRequestPost/);
 });
 
 test('partner copy names Dani and Carine and keeps venue Indaiá', () => {
@@ -84,6 +117,11 @@ test('PartnerHome markup contains required section ids and omits playlist', () =
     assert.match(src, new RegExp(`id="${id}"`));
   }
   assert.doesNotMatch(src, /id="playlist"|hospedagem|Papelaria/);
+});
+
+test('PartnerHome o-dia steps change photo on click', () => {
+  const src = readFileSync(new URL('../src/pages/casal/PartnerHome.jsx', import.meta.url), 'utf8');
+  assert.match(src, /how__step[\s\S]*onClick=\{\(\)\s*=>\s*setActiveMoment\(index\)\}/);
 });
 
 test('searchGuestsPublic and submitRsvp send slug', async () => {

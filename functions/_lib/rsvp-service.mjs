@@ -199,7 +199,7 @@ export async function getRsvpByToken(db, token) {
     .prepare(
       `SELECT id, guest_name, attending,
               adults_count, children_count, observations,
-              created_at, updated_at
+              created_at, updated_at, account_id
        FROM rsvps
        WHERE manage_token_hash = ?`
     )
@@ -217,6 +217,7 @@ export async function getRsvpByToken(db, token) {
     observations: result.observations,
     createdAt: result.created_at,
     updatedAt: result.updated_at,
+    accountId: result.account_id || result.accountId || null,
   };
 }
 

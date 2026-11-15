@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { signup, setAccountSlug, login } from '../functions/_lib/auth-service.mjs';
 import { addGuests, resetMemoryGuestsForTests } from '../functions/_lib/rsvp-guest-list.mjs';
 import { createMessage, resetMemoryMessagesForTests } from '../functions/_lib/messages-service.mjs';
@@ -332,6 +333,20 @@ test('RSVP GET by manage token returns 200 for non-partner slug', async () => {
   const getBody = await getRes.json();
   assert.equal(getBody.guestName, 'João Pedro');
   assert.equal(JSON.stringify(getBody).includes(a.accountId), false);
+});
+
+test('RSVP PUT markGuestResponse uses the RSVP row account, not partner default', () => {
+  const src = readFileSync(new URL('../functions/api/rsvp.js', import.meta.url), 'utf8');
+  const putStart = src.indexOf('async function handlePut');
+  const putEnd = src.indexOf('function handleOptions');
+  assert.ok(putStart >= 0 && putEnd > putStart);
+  const put = src.slice(putStart, putEnd);
+  assert.match(put, /markGuestResponse\(/);
+  assert.match(put, /accountId|account_id/);
+  assert.doesNotMatch(
+    put,
+    /markGuestResponse\(\s*env\.DB,\s*rsvp\.guestName,\s*rsvp\.attending\s*\)\s*;/
+  );
 });
 
 test('messages POST 201 does not leak account UUID as weddingKey', async () => {

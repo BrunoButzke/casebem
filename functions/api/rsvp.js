@@ -116,7 +116,7 @@ function jsonResponse(request, data, status = 200) {
 
 function publicRsvpPayload(rsvp) {
   if (!rsvp || typeof rsvp !== 'object') return rsvp;
-  const { weddingKey: _weddingKey, ...rest } = rsvp;
+  const { weddingKey: _weddingKey, accountId: _accountId, account_id: _account_id, ...rest } = rsvp;
   return rest;
 }
 
@@ -358,10 +358,11 @@ async function handlePut(request, env) {
 
     try {
       const { markGuestResponse } = await import('../_lib/rsvp-guest-list.mjs');
+      const accountId = rsvp.accountId;
       if (typeof rsvp.attending === 'boolean') {
-        await markGuestResponse(env.DB, rsvp.guestName, rsvp.attending);
+        await markGuestResponse(env.DB, rsvp.guestName, rsvp.attending, accountId);
       } else if (typeof validation.data.attending === 'boolean') {
-        await markGuestResponse(env.DB, rsvp.guestName, validation.data.attending);
+        await markGuestResponse(env.DB, rsvp.guestName, validation.data.attending, accountId);
       }
     } catch {
       /* lista oculta: best-effort */

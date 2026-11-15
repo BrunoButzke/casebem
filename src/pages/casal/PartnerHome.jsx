@@ -256,8 +256,10 @@ export default function PartnerHome({ slug }) {
                     key={moment.n}
                     className={index === activeMoment ? 'how__step is-active' : 'how__step'}
                     data-step={String(index)}
+                    tabIndex={0}
                     onMouseEnter={() => setActiveMoment(index)}
                     onFocus={() => setActiveMoment(index)}
+                    onClick={() => setActiveMoment(index)}
                   >
                     <span className="how__n">{moment.n}</span>
                     <div>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { meRequest, parseMe } from './lib/session-api.mjs';
 import Landing from './pages/Landing.jsx';
@@ -11,7 +11,8 @@ import Stationery from './pages/admin/Stationery.jsx';
 import Messages from './pages/admin/Messages.jsx';
 import Entertainment from './pages/admin/Entertainment.jsx';
 import Album from './pages/admin/Album.jsx';
-import CoupleSite from './pages/casal/CoupleSite.jsx';
+
+const CoupleSite = lazy(() => import('./pages/casal/CoupleSite.jsx'));
 
 function RequireAuth({ children }) {
   const [status, setStatus] = useState('loading');
@@ -47,7 +48,14 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<Landing />} />
-      <Route path="/casal/:slug" element={<CoupleSite />} />
+      <Route
+        path="/casal/:slug"
+        element={
+          <Suspense fallback={<p>Carregando…</p>}>
+            <CoupleSite />
+          </Suspense>
+        }
+      />
       <Route
         path="/entrar"
         element={

@@ -241,7 +241,7 @@ function sendBytes(res, status, bytes, contentType) {
   res.end(Buffer.from(bytes));
 }
 
-function guestListApiPlugin() {
+function guestListApiPlugin(env = {}) {
   return {
     name: 'guest-list-api',
     configureServer(server) {
@@ -265,6 +265,31 @@ function guestListApiPlugin() {
             });
             const text = await resFn.text();
             return sendJson(res, resFn.status, JSON.parse(text));
+          }
+
+          if (path === '/api/gifts/checkout' && req.method === 'POST') {
+            await ensurePartnerAccount(null, {
+              email: process.env.PARTNER_EMAIL,
+              password: process.env.PARTNER_BOOTSTRAP_PASSWORD,
+            }, new Date().toISOString());
+            const { onRequestPost } = await import('./functions/api/gifts/checkout.js');
+            const request = await nodeRequestToFetch(req);
+            const resFn = await onRequestPost({
+              request,
+              env: {
+                DB: null,
+                RSVP_SECRET: env.RSVP_SECRET || process.env.RSVP_SECRET,
+                MP_ACCESS_TOKEN: env.MP_ACCESS_TOKEN || process.env.MP_ACCESS_TOKEN,
+              },
+            });
+            const text = await resFn.text();
+            let payload;
+            try {
+              payload = JSON.parse(text);
+            } catch {
+              payload = { ok: false, error: text || 'Erro interno.' };
+            }
+            return sendJson(res, resFn.status, payload);
           }
 
           if (path === '/api/desafio/theme' && req.method === 'GET') {
@@ -1048,7 +1073,7 @@ export default defineConfig(({ mode }) => {
       mpaSpaFallbackPlugin(),
       react(),
       authApiPlugin(env),
-      guestListApiPlugin(),
+      guestListApiPlugin(env),
       adminApiPlugin(env),
       mercadopagoApiPlugin(env),
     ],

@@ -100,15 +100,18 @@ test('product routes rewrite to the root SPA', () => {
   }
 });
 
-test('/casal/dani-carine redirects to the static partner landing', () => {
-  assert.deepEqual(resolvePagesRoute('casebem.com', '/casal/dani-carine'), {
-    action: 'redirect',
-    pathname: '/dani-carine/',
-  });
-  assert.deepEqual(resolvePagesRoute('casebem.com', '/casal/dani-carine/'), {
-    action: 'redirect',
-    pathname: '/dani-carine/',
-  });
+test('/casal/dani-carine rewrites to the root SPA', () => {
+  for (const path of ['/casal/dani-carine', '/casal/dani-carine/']) {
+    assert.deepEqual(resolvePagesRoute('casebem.com', path), {
+      action: 'rewrite',
+      assetPath: '/',
+    });
+  }
+});
+
+test('legacy /dani-carine/ static site is unchanged', () => {
+  assert.deepEqual(resolvePagesRoute('casebem.com', '/dani-carine/'), { action: 'next' });
+  assert.deepEqual(resolvePagesRoute('casebem.com', '/dani-carine/index.html'), { action: 'next' });
 });
 
 test('/casal without slug redirects to /entrar', () => {
@@ -152,10 +155,11 @@ test('middleware serves casebem.com / via next (SPA at root)', async () => {
   assert.deepEqual(fetched, []);
 });
 
-test('middleware redirects /casal/dani-carine to /dani-carine/', async () => {
-  const res = await onRequest(mockContext('https://casebem.com/casal/dani-carine').context);
-  assert.equal(res.status, 302);
-  assert.equal(res.headers.get('location'), 'https://casebem.com/dani-carine/');
+test('middleware rewrites /casal/dani-carine to the root SPA asset', async () => {
+  const { context, fetched } = mockContext('https://casebem.com/casal/dani-carine');
+  const res = await onRequest(context);
+  assert.equal(res.status, 200);
+  assert.deepEqual(fetched, ['/']);
 });
 
 test('middleware redirects /games on desafio.casebem.com to the host root path', async () => {

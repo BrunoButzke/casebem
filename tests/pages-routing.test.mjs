@@ -86,14 +86,28 @@ test('desafio.casebem.com strips the leftover /games prefix', () => {
   });
 });
 
-test('casebem.com root redirects to the product landing', () => {
-  assert.deepEqual(resolvePagesRoute('casebem.com', '/'), {
+test('apex / is the SPA, not the old landing redirect', () => {
+  assert.deepEqual(resolvePagesRoute('casebem.com', '/'), { action: 'next' });
+  assert.deepEqual(resolvePagesRoute('www.casebem.com', '/'), { action: 'next' });
+});
+
+test('product routes rewrite to the root SPA', () => {
+  for (const path of ['/entrar', '/admin', '/admin/presentes', '/casal/dani-carine', '/casal/x/game/quiz']) {
+    assert.deepEqual(resolvePagesRoute('casebem.com', path), {
+      action: 'rewrite',
+      assetPath: '/',
+    });
+  }
+});
+
+test('/casal without slug redirects to /entrar', () => {
+  assert.deepEqual(resolvePagesRoute('casebem.com', '/casal'), {
     action: 'redirect',
-    pathname: '/landing-page-animada/',
+    pathname: '/entrar',
   });
-  assert.deepEqual(resolvePagesRoute('www.casebem.com', '/'), {
+  assert.deepEqual(resolvePagesRoute('casebem.com', '/casal/'), {
     action: 'redirect',
-    pathname: '/landing-page-animada/',
+    pathname: '/entrar',
   });
 });
 
@@ -120,10 +134,11 @@ test('middleware serves games HTML at desafio.casebem.com root and nested paths'
   assert.deepEqual(nested.fetched, ['/games/']);
 });
 
-test('middleware redirects casebem.com / to the landing page', async () => {
-  const res = await onRequest(mockContext('https://casebem.com/').context);
-  assert.equal(res.status, 302);
-  assert.equal(res.headers.get('location'), 'https://casebem.com/landing-page-animada/');
+test('middleware serves casebem.com / via next (SPA at root)', async () => {
+  const { context, fetched } = mockContext('https://casebem.com/', { nextStatus: 200 });
+  const res = await onRequest(context);
+  assert.equal(res.status, 200);
+  assert.deepEqual(fetched, []);
 });
 
 test('middleware redirects /games on desafio.casebem.com to the host root path', async () => {

@@ -45,16 +45,27 @@ export function resolvePagesRoute(hostname, pathname) {
     return { action: 'next' };
   }
 
+  if (path === '/casal' || path === '/casal/') {
+    return { action: 'redirect', pathname: '/entrar' };
+  }
+
+  if (!isGameHost(hostname) && (path === '/' || path === '/index.html')) {
+    return { action: 'next' };
+  }
+
+  const spaRoots = ['/entrar', '/admin', '/casal'];
+  for (const root of spaRoots) {
+    if (path === root || path.startsWith(`${root}/`)) {
+      return { action: 'rewrite', assetPath: '/' };
+    }
+  }
+
   if (isGameHost(hostname)) {
     if (path === '/games' || path.startsWith('/games/')) {
       const stripped = path.slice('/games'.length) || '/';
       return { action: 'redirect', pathname: stripped.startsWith('/') ? stripped : `/${stripped}` };
     }
     return { action: 'rewrite', assetPath: '/games/' };
-  }
-
-  if (path === '/' || path === '') {
-    return { action: 'redirect', pathname: '/landing-page-animada/' };
   }
 
   const spaIndex = spaIndexForPath(path);

@@ -2,6 +2,13 @@
 /app    /app/index.html   200
 /app/*  /app/index.html   200
 
+# SPA raiz (React multi-account) — landing, entrar, admin, casal
+/entrar   /index.html  200
+/entrar/* /index.html  200
+/admin    /index.html  200
+/admin/*  /index.html  200
+/casal/*  /index.html  200
+
 # SPA Games (React) — desafio.casebem.com → /games via middleware (path interno /games/)
 /games    /games/index.html   200
 /games/*  /games/index.html   200

@@ -6,7 +6,7 @@ export const SESSION_MAX_AGE_SEC = 1209600;
 
 let processMemoryDb = null;
 
-function resolveDb(db) {
+export function resolveDb(db) {
   if (db) return db;
   if (!processMemoryDb) processMemoryDb = new ProcessMemoryAuthDb();
   return processMemoryDb;
@@ -109,7 +109,7 @@ VALUES (?, ?, ?, ?, ?, ?, NULL, 0, ?)`
     slug: null,
     is_partner: 0,
   };
-  return { account: { ...publicAccount(row), id }, sessionId, accountId: id };
+  return { account: publicAccount(row), sessionId, accountId: id };
 }
 
 export async function login(db, { email, password }, nowIso) {
@@ -228,18 +228,34 @@ class ProcessMemoryAuthStatement {
   async run() {
     const { sql, params, db } = this;
     if (sql.includes('INSERT INTO accounts')) {
-      const [id, email, password_hash, password_salt, plan, plan_status, created_at] = params;
-      db.accounts.set(email, {
+      const [
         id,
         email,
         password_hash,
         password_salt,
         plan,
         plan_status,
-        slug: null,
-        is_partner: 0,
-        created_at,
-      });
+        slugOrCreatedAt,
+        maybePartner,
+        maybeCreatedAt,
+      ] = params;
+      const partnerInsert = params.length >= 9;
+      const occupant = db.accounts.get(email);
+      if (occupant && occupant.id !== id) {
+        throw new Error('UNIQUE constraint failed: accounts.email');
+      }
+      const row = {
+        id,
+        email,
+        password_hash,
+        password_salt,
+        plan,
+        plan_status,
+        slug: partnerInsert ? slugOrCreatedAt : null,
+        is_partner: partnerInsert ? maybePartner : 0,
+        created_at: partnerInsert ? maybeCreatedAt : slugOrCreatedAt,
+      };
+      db.accounts.set(email, row);
       return { success: true };
     }
     if (sql.includes('INSERT INTO sessions')) {
@@ -249,6 +265,29 @@ class ProcessMemoryAuthStatement {
     }
     if (sql.includes('DELETE FROM sessions WHERE id')) {
       db.sessions.delete(params[0]);
+      return { success: true };
+    }
+    if (sql.includes('UPDATE accounts SET email')) {
+      const [email, password_hash, password_salt, slug, is_partner, plan, plan_status, id] = params;
+      const occupant = db.accounts.get(email);
+      if (occupant && occupant.id !== id) {
+        throw new Error('UNIQUE constraint failed: accounts.email');
+      }
+      const row = db.findAccountById(id);
+      if (row) {
+        const previousEmail = row.email;
+        row.email = email;
+        row.password_hash = password_hash;
+        row.password_salt = password_salt;
+        row.slug = slug;
+        row.is_partner = is_partner;
+        row.plan = plan;
+        row.plan_status = plan_status;
+        if (previousEmail !== email) {
+          db.accounts.delete(previousEmail);
+          db.accounts.set(email, row);
+        }
+      }
       return { success: true };
     }
     if (sql.includes('UPDATE accounts SET plan')) {

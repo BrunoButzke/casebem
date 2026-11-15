@@ -92,6 +92,25 @@ test('me without cookie is 401; pending payment never 402', async () => {
   assert.notEqual(created.status, 402);
 });
 
+test('signup 201 JSON has no id', async () => {
+  const created = await signup(
+    ctx('http://localhost/api/auth/signup', {
+      method: 'POST',
+      body: { email: 'noid@x.com', password: 'segredo12', plan: 'basic' },
+    })
+  );
+  assert.equal(created.status, 201);
+  const json = await created.json();
+  assert.equal(json.ok, true);
+  assert.equal(json.account.email, 'noid@x.com');
+  assert.equal(json.account.plan, 'basic');
+  assert.equal(json.account.planStatus, 'active');
+  assert.equal(json.account.slug, null);
+  assert.equal(json.account.isPartner, false);
+  assert.equal(json.account.id, undefined);
+  assert.deepEqual(Object.keys(json.account).sort(), ['email', 'isPartner', 'plan', 'planStatus', 'slug']);
+});
+
 test('login 200 sets cookie; me JSON has no id', async () => {
   await signup(
     ctx('http://localhost/api/auth/signup', {

@@ -19,13 +19,17 @@ test('partner seed can log in and resolves dani-carine slug', async () => {
   assert.equal(await resolveAccountBySlug(db, 'nao-existe'), null);
 });
 
-test('ensurePartnerAccount is a no-op without email or password', async () => {
+test('ensurePartnerAccount inserts partner row without email or password', async () => {
   const db = new MemoryAuthDb();
   const now = '2026-11-14T23:00:00.000Z';
-  await ensurePartnerAccount(db, { email: '', password: 'segredo12' }, now);
-  await ensurePartnerAccount(db, { email: 'dani@casebem.com', password: '' }, now);
-  await ensurePartnerAccount(null, { email: 'dani@casebem.com', password: 'segredo12' }, now);
-  assert.equal(await resolveAccountBySlug(db, 'dani-carine'), null);
+  await ensurePartnerAccount(db, {}, now);
+  const acc = await resolveAccountBySlug(db, 'dani-carine');
+  assert.equal(acc.id, PARTNER_ACCOUNT_ID);
+  assert.equal(acc.email, '');
+  assert.equal(acc.password_hash, '');
+  assert.equal(acc.isPartner, true);
+  assert.equal(acc.plan, 'pro');
+  assert.equal(acc.plan_status, 'active');
 });
 
 test('ensurePartnerAccount does not rehash password on second call', async () => {

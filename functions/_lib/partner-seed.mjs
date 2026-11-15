@@ -1,20 +1,36 @@
 import { hashPassword, randomSaltB64 } from './password.mjs';
-import { PARTNER_ACCOUNT_ID } from './auth-service.mjs';
+import { PARTNER_ACCOUNT_ID, resolveDb } from './auth-service.mjs';
 import { isUniqueViolation } from './unique-row.mjs';
 
 const PARTNER_SLUG = 'dani-carine';
 
-export async function ensurePartnerAccount(db, { email, password } = {}, nowIso) {
-  if (!db || !email || !password) return;
+async function insertEmptyPartnerRow(db, nowIso) {
+  await db
+    .prepare(
+      `INSERT INTO accounts (id, email, password_hash, password_salt, plan, plan_status, slug, is_partner, created_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+    .bind(PARTNER_ACCOUNT_ID, '', '', '', 'pro', 'active', PARTNER_SLUG, 1, nowIso)
+    .run();
+}
 
-  const normalized = String(email).trim().toLowerCase();
-  if (!normalized) return;
+export async function ensurePartnerAccount(db, { email, password } = {}, nowIso) {
+  db = resolveDb(db);
+
+  const normalized = String(email || '').trim().toLowerCase();
+  const hasCreds = Boolean(normalized && password);
 
   try {
+    const existing = await db.prepare('SELECT * FROM accounts WHERE id = ?').bind(PARTNER_ACCOUNT_ID).first();
+
+    if (!hasCreds) {
+      if (existing) return;
+      await insertEmptyPartnerRow(db, nowIso);
+      return;
+    }
+
     const occupant = await db.prepare('SELECT * FROM accounts WHERE email = ?').bind(normalized).first();
     if (occupant && occupant.id !== PARTNER_ACCOUNT_ID) return;
-
-    const existing = await db.prepare('SELECT * FROM accounts WHERE id = ?').bind(PARTNER_ACCOUNT_ID).first();
 
     if (existing) {
       let salt = existing.password_salt;

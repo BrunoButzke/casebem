@@ -26,6 +26,15 @@ test('GET /api/casal/dani-carine returns slug without id or email', async () => 
   assert.equal('email' in body, false);
 });
 
+test('GET /api/casal/dani-carine with process memory and no partner env is 200', async () => {
+  await ensurePartnerAccount(null, {}, '2026-11-15T03:00:00.000Z');
+  const res = await onRequestGet(ctx('dani-carine', null));
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.ok, true);
+  assert.equal(body.slug, 'dani-carine');
+});
+
 test('GET /api/casal/unknown is 404 SLUG_NOT_FOUND', async () => {
   const db = new MemoryAuthDb();
   const res = await onRequestGet(ctx('nao-existe', db));
@@ -37,8 +46,8 @@ test('GET /api/casal/unknown is 404 SLUG_NOT_FOUND', async () => {
 test('GET /api/casal/:slug of a non-partner account with slug is 200 isPartner false', async () => {
   const db = new MemoryAuthDb();
   const now = '2026-11-15T03:00:00.000Z';
-  const { account } = await signup(db, { email: 'a@x.com', password: 'segredo12', plan: 'basic' }, now);
-  await db.prepare('UPDATE accounts SET slug = ? WHERE id = ?').bind('casal-a', account.id).run();
+  const { accountId } = await signup(db, { email: 'a@x.com', password: 'segredo12', plan: 'basic' }, now);
+  await db.prepare('UPDATE accounts SET slug = ? WHERE id = ?').bind('casal-a', accountId).run();
   const res = await onRequestGet(ctx('casal-a', db));
   assert.equal(res.status, 200);
   const body = await res.json();

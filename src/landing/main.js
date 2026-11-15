@@ -10,36 +10,52 @@ const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 
 let lenis = null;
-if (!reducedMotion) {
+let tickerFn = null;
+
+function ensureLenis() {
+  if (reducedMotion || lenis) return;
   lenis = new Lenis({ lerp: 0.09 });
   lenis.on('scroll', ScrollTrigger.update);
-  gsap.ticker.add((t) => lenis.raf(t * 1000));
+  tickerFn = (t) => lenis.raf(t * 1000);
+  gsap.ticker.add(tickerFn);
   gsap.ticker.lagSmoothing(0);
 }
 
-$$('a[href^="#"]').forEach((anchor) => {
-  anchor.addEventListener('click', (e) => {
-    const id = anchor.getAttribute('href');
-    if (!id || id === '#') return;
-    const target = $(id);
-    if (!target) return;
-    e.preventDefault();
-    if (lenis) lenis.scrollTo(target, { duration: 1.6 });
-    else target.scrollIntoView({ behavior: 'smooth' });
+function bindHashLinks() {
+  $$('a[href^="#"]').forEach((anchor) => {
+    if (anchor.dataset.hashBound === '1') return;
+    anchor.dataset.hashBound = '1';
+    anchor.addEventListener('click', (e) => {
+      const id = anchor.getAttribute('href');
+      if (!id || id === '#') return;
+      const target = $(id);
+      if (!target) return;
+      e.preventDefault();
+      if (lenis) lenis.scrollTo(target, { duration: 1.6 });
+      else target.scrollIntoView({ behavior: 'smooth' });
+    });
   });
-});
+}
 
-$$('a[data-plan]').forEach((btn) => {
-  btn.addEventListener('click', () => {
-    const plan = btn.dataset.plan;
-    const radio = $(`.waitlist__plans input[value="${plan}"]`);
-    if (radio) radio.checked = true;
+function bindPlanButtons() {
+  $$('a[data-plan]').forEach((btn) => {
+    if (btn.dataset.planBound === '1') return;
+    btn.dataset.planBound = '1';
+    btn.addEventListener('click', () => {
+      const plan = btn.dataset.plan;
+      const radio = $(`.waitlist__plans input[value="${plan}"]`);
+      if (radio) {
+        radio.checked = true;
+        radio.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    });
   });
-});
+}
 
 function cloneMarquee() {
   const track = $('.marquee__track');
-  if (!track) return;
+  if (!track || track.dataset.cloned === '1') return;
+  track.dataset.cloned = '1';
   track.innerHTML += track.innerHTML;
   $$('span', track).forEach((el, i, all) => {
     if (i >= all.length / 2) el.setAttribute('aria-hidden', 'true');
@@ -455,8 +471,23 @@ function initWaitlist() {
   });
 }
 
-async function boot() {
+export function destroyLandingEffects() {
+  ScrollTrigger.getAll().forEach((t) => t.kill());
+  if (tickerFn) {
+    gsap.ticker.remove(tickerFn);
+    tickerFn = null;
+  }
+  if (lenis) {
+    lenis.destroy();
+    lenis = null;
+  }
+}
+
+export async function initLandingEffects({ bindPlans = true } = {}) {
+  ensureLenis();
   cloneMarquee();
+  bindHashLinks();
+  if (bindPlans) bindPlanButtons();
   initNav();
   initProgress();
   initManifesto();
@@ -469,7 +500,6 @@ async function boot() {
   initCursor();
   initMagnetic();
   initPhoneTilt();
-  initWaitlist();
 
   if (reducedMotion) {
     $('.preloader')?.remove();
@@ -479,6 +509,14 @@ async function boot() {
 
   ScrollTrigger.sort();
   addEventListener('load', () => ScrollTrigger.refresh());
+  return destroyLandingEffects;
 }
 
-boot();
+async function boot() {
+  await initLandingEffects();
+  initWaitlist();
+}
+
+if (!document.getElementById('root')) {
+  boot();
+}

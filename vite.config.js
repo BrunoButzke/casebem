@@ -885,6 +885,7 @@ export default defineConfig(({ mode }) => {
       emptyOutDir: true,
       rollupOptions: {
         input: {
+          main: resolve(rootDir, 'index.html'),
           landing: resolve(rootDir, 'landing-page-animada/index.html'),
           daniCarine: resolve(rootDir, 'dani-carine/index.html'),
           daniCarineAdmin: resolve(rootDir, 'dani-carine/admin.html'),
@@ -896,7 +897,7 @@ export default defineConfig(({ mode }) => {
       },
     },
     server: {
-      open: '/games/',
+      open: '/',
     },
     preview: {
       open: '/games/',

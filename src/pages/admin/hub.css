@@ -1,0 +1,246 @@
+.hub {
+  --sand: #f3ebe1;
+  --salmon: #d4846a;
+  --lagoon: #2f4a40;
+  --ink: #1c1917;
+  --cream: #faf7f2;
+  --muted: #6b6560;
+  --line: color-mix(in srgb, var(--ink) 12%, transparent);
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-body: 'Outfit', system-ui, sans-serif;
+  --radius: 18px;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  min-height: 100svh;
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-body);
+  background:
+    radial-gradient(ellipse 70% 45% at 8% 0%, rgba(47, 74, 64, 0.1), transparent 55%),
+    radial-gradient(ellipse 55% 40% at 95% 15%, rgba(212, 132, 106, 0.12), transparent 50%),
+    var(--sand);
+}
+
+.hub__shell {
+  width: min(1100px, calc(100% - 2rem));
+  margin: 0 auto;
+  padding: 1.5rem 0 4rem;
+}
+
+.hub__shell--narrow {
+  width: min(440px, calc(100% - 2rem));
+  padding-top: 12vh;
+}
+
+.hub__brand {
+  margin: 0 0 1rem;
+  font-family: var(--font-display);
+  font-size: 1.55rem;
+  font-weight: 500;
+}
+
+.hub__brand em {
+  font-style: italic;
+  color: var(--lagoon);
+}
+
+.hub__eyebrow {
+  display: inline-flex;
+  margin: 0 0 0.65rem;
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--lagoon);
+}
+
+.hub__title {
+  margin: 0 0 0.5rem;
+  font-family: var(--font-display);
+  font-size: clamp(1.8rem, 4vw, 2.6rem);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.hub__lead {
+  margin: 0 0 1.5rem;
+  color: var(--muted);
+  max-width: 36rem;
+}
+
+.hub__back,
+.hub__footer-link a {
+  color: var(--lagoon);
+}
+
+.hub-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+}
+
+.hub-top__meta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.hub-top__email {
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.hub-plan-badge {
+  display: inline-flex;
+  padding: 0.25rem 0.7rem;
+  border-radius: 999px;
+  background: var(--lagoon);
+  color: var(--cream);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.hub-top__logout,
+.hub-btn {
+  font: inherit;
+  cursor: pointer;
+}
+
+.hub-top__logout {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.hub-banner {
+  margin: 0 0 1.25rem;
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--salmon) 22%, var(--cream));
+  color: var(--ink);
+}
+
+.admin-hub {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 0.9rem;
+}
+
+.hub-tile {
+  appearance: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 0.45rem;
+  min-height: 9.5rem;
+  padding: 1.25rem 1.3rem;
+  text-align: left;
+  text-decoration: none;
+  color: inherit;
+  border-radius: calc(var(--radius) + 4px);
+  border: 1px solid var(--line);
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.98), rgba(250, 247, 242, 0.92));
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--ink) 6%, transparent);
+  cursor: pointer;
+}
+
+.hub-tile__title {
+  font-family: var(--font-display);
+  font-size: clamp(1.35rem, 3.5vw, 1.7rem);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.hub-tile__lead {
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.hub-upgrade {
+  margin-top: 1.5rem;
+  padding: 1.25rem 1.35rem;
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--line);
+}
+
+.hub-upgrade h2 {
+  margin: 0 0 0.5rem;
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  font-weight: 500;
+}
+
+.hub-upgrade__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-top: 1rem;
+}
+
+.hub-form {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.hub-field {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.hub-field span {
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.hub-field input {
+  padding: 0.8rem 0.95rem;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: #fff;
+  font: inherit;
+}
+
+.hub-btn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.9rem 1.3rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: var(--lagoon);
+  color: var(--cream);
+}
+
+.hub-btn:disabled {
+  opacity: 0.7;
+}
+
+.hub-btn--ghost {
+  background: transparent;
+  border-color: var(--line);
+  color: var(--ink);
+}
+
+.hub-msg {
+  margin: 0;
+  color: #b4533a;
+}
+
+.hub__footer-link {
+  margin-top: 1.25rem;
+  color: var(--muted);
+}

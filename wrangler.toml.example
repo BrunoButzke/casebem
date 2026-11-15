@@ -17,6 +17,10 @@ database_id = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"  # Replace with actual UUID
 # Variable name: DB
 # D1 database: casebem-rsvps-production
 
+# Partner bootstrap — set in Cloudflare Pages env / wrangler secrets (never commit values):
+# PARTNER_EMAIL
+# PARTNER_BOOTSTRAP_PASSWORD
+
 # R2 — fotos da galeria / telão
 # Dashboard: Settings -> Bindings -> R2 bucket bindings
 # Variable name: GALLERY

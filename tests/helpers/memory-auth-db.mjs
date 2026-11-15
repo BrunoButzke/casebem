@@ -59,7 +59,18 @@ class MemoryAuthStatement {
   async run() {
     const { sql, params, db } = this;
     if (sql.includes('INSERT INTO accounts')) {
-      const [id, email, password_hash, password_salt, plan, plan_status, created_at] = params;
+      const [
+        id,
+        email,
+        password_hash,
+        password_salt,
+        plan,
+        plan_status,
+        slugOrCreatedAt,
+        maybePartner,
+        maybeCreatedAt,
+      ] = params;
+      const partnerInsert = params.length >= 9;
       const row = {
         id,
         email,
@@ -67,9 +78,9 @@ class MemoryAuthStatement {
         password_salt,
         plan,
         plan_status,
-        slug: null,
-        is_partner: 0,
-        created_at,
+        slug: partnerInsert ? slugOrCreatedAt : null,
+        is_partner: partnerInsert ? maybePartner : 0,
+        created_at: partnerInsert ? maybeCreatedAt : slugOrCreatedAt,
       };
       db.accounts.set(email, row);
       return { success: true };
@@ -81,6 +92,25 @@ class MemoryAuthStatement {
     }
     if (sql.includes('DELETE FROM sessions WHERE id')) {
       db.sessions.delete(params[0]);
+      return { success: true };
+    }
+    if (sql.includes('UPDATE accounts SET email')) {
+      const [email, password_hash, password_salt, slug, is_partner, plan, plan_status, id] = params;
+      const row = db.findAccountById(id);
+      if (row) {
+        const previousEmail = row.email;
+        row.email = email;
+        row.password_hash = password_hash;
+        row.password_salt = password_salt;
+        row.slug = slug;
+        row.is_partner = is_partner;
+        row.plan = plan;
+        row.plan_status = plan_status;
+        if (previousEmail !== email) {
+          db.accounts.delete(previousEmail);
+          db.accounts.set(email, row);
+        }
+      }
       return { success: true };
     }
     if (sql.includes('UPDATE accounts SET plan')) {

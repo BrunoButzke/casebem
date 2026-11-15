@@ -157,7 +157,8 @@ export async function resolveAccountBySlug(db, slug) {
   if (!slug) return null;
   db = resolveDb(db);
   const row = await db.prepare('SELECT * FROM accounts WHERE slug = ?').bind(slug).first();
-  return row ?? null;
+  if (!row) return null;
+  return { ...row, isPartner: Boolean(Number(row.is_partner)) };
 }
 
 function compactSql(sql) {

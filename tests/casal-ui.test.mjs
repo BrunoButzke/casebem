@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Window } from 'happy-dom';
 import { coupleNavItems } from '../src/pages/casal/couple-nav.mjs';
-import { fetchCouplePage } from '../src/lib/casal-api.mjs';
+import { fetchCouplePage, searchGuestsPublic, submitRsvp } from '../src/lib/casal-api.mjs';
 import { PARTNER_COPY } from '../src/pages/casal/partner-copy.mjs';
 import { readFileSync } from 'node:fs';
 
@@ -76,4 +76,55 @@ test('PartnerHome markup contains required section ids and omits playlist', () =
     assert.match(src, new RegExp(`id="${id}"`));
   }
   assert.doesNotMatch(src, /id="playlist"|hospedagem|Papelaria/);
+});
+
+test('searchGuestsPublic and submitRsvp send slug', async () => {
+  const window = new Window({ url: 'http://localhost/casal/dani-carine' });
+  globalThis.window = window;
+  const calls = [];
+  globalThis.fetch = async (url, init) => {
+    calls.push({ url: String(url), init });
+    return new Response(JSON.stringify({ ok: true, matches: [], count: 0 }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+  await searchGuestsPublic('dani-carine', 'Ana');
+  assert.equal(calls[0].url.includes('slug=dani-carine'), true);
+  assert.equal(calls[0].url.includes('q=Ana'), true);
+  globalThis.fetch = async (url, init) => {
+    calls.push({ url: String(url), init });
+    return new Response(JSON.stringify({ id: '1' }), {
+      status: 201,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+  await submitRsvp('dani-carine', {
+    guestName: 'Ana Alpha',
+    attending: true,
+    adultsCount: 1,
+    childrenCount: 0,
+    consentGiven: true,
+  });
+  const last = calls[calls.length - 1];
+  assert.equal(last.url, '/api/rsvp');
+  assert.equal(last.init.method, 'POST');
+  const body = JSON.parse(last.init.body);
+  assert.equal(body.slug, 'dani-carine');
+  const headers = last.init.headers;
+  const key = headers['Idempotency-Key'] || headers['idempotency-key'] || (headers.get && headers.get('Idempotency-Key'));
+  assert.ok(key && String(key).length >= 8);
+});
+
+test('RsvpSection asks to confirm by 15 November and has attending radios', () => {
+  const src = readFileSync(new URL('../src/pages/casal/RsvpSection.jsx', import.meta.url), 'utf8');
+  assert.match(src, /15 de novembro/);
+  assert.match(src, /attending/);
+  assert.match(src, /searchGuestsPublic/);
+});
+
+test('PartnerHome renders RsvpSection inside confirmar-presenca', () => {
+  const src = readFileSync(new URL('../src/pages/casal/PartnerHome.jsx', import.meta.url), 'utf8');
+  assert.match(src, /<section className="rsvp" id="confirmar-presenca">/);
+  assert.match(src, /<RsvpSection slug=\{slug\}/);
 });

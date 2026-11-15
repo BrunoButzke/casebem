@@ -4,6 +4,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { onRequest } from '../functions/_middleware.js';
 import { gamesRouterBasename, resolvePagesRoute } from '../functions/_lib/pages-routing.mjs';
 
@@ -141,6 +142,12 @@ test('games router basename is / on the desafio host and /games elsewhere', () =
   assert.equal(gamesRouterBasename('www.desafio.casebem.com'), '/');
   assert.equal(gamesRouterBasename('casebem.com'), '/games');
   assert.equal(gamesRouterBasename('localhost'), '/games');
+});
+
+test('games entry wires BrowserRouter basename to gamesRouterBasename', () => {
+  const main = readFileSync(new URL('../games/src/main.jsx', import.meta.url), 'utf8');
+  assert.match(main, /gamesRouterBasename/);
+  assert.match(main, /<BrowserRouter\s+basename=\{gamesRouterBasename\([^)]*\)\}/);
 });
 
 test('middleware serves /games/ HTML for nested casebem.com routes without leaking 308', async () => {

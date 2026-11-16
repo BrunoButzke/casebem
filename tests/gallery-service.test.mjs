@@ -57,6 +57,18 @@ test('replacing a mission photo creates a new id', async () => {
   await assert.rejects(() => getGalleryImage(null, first.id, null), /NOT_FOUND/);
 });
 
+test('delete by photo id', async () => {
+  const saved = await upsertGalleryPhoto(null, {
+    guestName: 'Ana',
+    missionId: 'foto-noiva',
+    title: 'Foto',
+    preview: PREVIEW,
+  });
+  await deleteGalleryPhoto(null, { id: saved.id });
+  assert.equal((await listGalleryPhotos(null)).length, 0);
+  await assert.rejects(() => getGalleryImage(null, saved.id, null), /NOT_FOUND/);
+});
+
 test('delete by guest and mission', async () => {
   const saved = await upsertGalleryPhoto(null, {
     guestName: 'Ana',

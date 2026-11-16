@@ -46,8 +46,13 @@ export async function publishGalleryPhoto(body) {
   return data.photo;
 }
 
-export async function unpublishGalleryPhoto({ guestName, missionId }) {
-  const q = new URLSearchParams({ guestName, missionId });
+export async function unpublishGalleryPhoto({ guestName, missionId, id }) {
+  const q = new URLSearchParams();
+  if (id) q.set('id', id);
+  else {
+    q.set('guestName', guestName);
+    q.set('missionId', missionId);
+  }
   const res = await fetch(`/api/desafio/gallery?${q}`, { method: 'DELETE' });
   if (res.status === 404) return false;
   const data = await res.json().catch(() => ({}));

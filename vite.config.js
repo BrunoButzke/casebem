@@ -70,6 +70,8 @@ import {
   updateDesafioTheme,
   themeToCssVars,
 } from './functions/_lib/desafio-theme-service.mjs';
+import { listRanking, upsertRanking } from './functions/_lib/ranking-service.mjs';
+import { loginGamesAdmin } from './functions/_lib/admin-auth.mjs';
 
 const rootDir = dirname(fileURLToPath(import.meta.url));
 
@@ -228,6 +230,25 @@ function guestListApiPlugin() {
             } catch (err) {
               const map = { NOT_FOUND: 404, INVALID_ID: 400 };
               return sendJson(res, map[err.message] || 500, { ok: false, error: err.message });
+            }
+          }
+
+          if (path === '/api/desafio/ranking' && req.method === 'GET') {
+            return sendJson(res, 200, { ok: true, rows: await listRanking(null) });
+          }
+
+          if (path === '/api/desafio/ranking' && req.method === 'POST') {
+            const body = await readJsonBody(req);
+            try {
+              const rows = await upsertRanking(null, body);
+              return sendJson(res, 200, { ok: true, rows });
+            } catch (err) {
+              const map = { VALIDATION: 400 };
+              return sendJson(res, map[err.message] || 500, {
+                ok: false,
+                error: err.message,
+                details: err.details,
+              });
             }
           }
 
@@ -422,6 +443,19 @@ function adminApiPlugin(env) {
           const parsed = new URL(req.url || '/', 'http://localhost');
           const path = parsed.pathname;
           if (!path.startsWith('/api/admin/')) return next();
+
+          if (path === '/api/admin/login' && req.method === 'POST') {
+            const body = await readJsonBody(req);
+            const result = loginGamesAdmin(env, body?.user, body?.pass);
+            if (!result.ok) {
+              return sendJson(res, result.status, {
+                ok: false,
+                error: result.error,
+                message: result.message,
+              });
+            }
+            return sendJson(res, 200, { ok: true, token: result.token });
+          }
 
           const secret = env.ADMIN_PANEL_SECRET || '';
           const auth = req.headers.authorization || '';

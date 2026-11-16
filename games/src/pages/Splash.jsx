@@ -18,10 +18,6 @@ export default function Splash() {
           decoding="async"
         />
         <div className="desafio__wreath-copy">
-          <span className="desafio__ring" aria-hidden="true">
-            💍
-          </span>
-          <p className="desafio__kicker">O casamento de</p>
           <h1 className="desafio__names">
             <span>Dani</span>
             <span className="desafio__amp">&amp;</span>

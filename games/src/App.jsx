@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import Welcome from './pages/Welcome.jsx';
 import Splash from './pages/Splash.jsx';
 import PlayShell from './pages/PlayShell.jsx';
@@ -9,13 +9,19 @@ import Selo from './pages/Selo.jsx';
 import Ranking from './pages/Ranking.jsx';
 import Galeria from './pages/Galeria.jsx';
 import Telao from './pages/Telao.jsx';
+import AdminGate from './pages/AdminGate.jsx';
+import AdminQuiz from './pages/AdminQuiz.jsx';
+import AdminGaleria from './pages/AdminGaleria.jsx';
+import { isGamesAdminPath } from './admin-auth.js';
 import { getGuestName } from './guest.js';
 
 const SPLASH_MS = 2600;
 const SPLASH_KEY = 'casebem_desafio_splash_done';
 
 function useEntrySplash() {
+  const { pathname } = useLocation();
   const [showSplash, setShowSplash] = useState(() => {
+    if (isGamesAdminPath(pathname)) return false;
     if (getGuestName()) return false;
     try {
       return sessionStorage.getItem(SPLASH_KEY) !== '1';
@@ -37,6 +43,7 @@ function useEntrySplash() {
     return () => window.clearTimeout(t);
   }, [showSplash]);
 
+  if (isGamesAdminPath(pathname)) return false;
   return showSplash;
 }
 
@@ -48,6 +55,10 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<Welcome />} />
+      <Route path="/admin" element={<AdminGate />}>
+        <Route path="quiz" element={<AdminQuiz />} />
+        <Route path="galeria" element={<AdminGaleria />} />
+      </Route>
       <Route element={<PlayShell />}>
         <Route path="/quiz" element={<Quiz />} />
         <Route path="/desafios" element={<Desafios />} />

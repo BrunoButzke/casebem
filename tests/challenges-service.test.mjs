@@ -87,6 +87,23 @@ test('public stamp cards expose fillMode and pointsPerSlot', async () => {
   assert.equal(card.pointsPerSlot, 15);
 });
 
+test('updating the correctIndex changes how answers are graded', async () => {
+  const q = await createQuestion(null, {
+    prompt: 'Qual o doce favorito?',
+    options: ['Brigadeiro', 'Beijinho', 'Pudim'],
+    correctIndex: 0,
+    points: 10,
+  });
+  const first = await gradeQuestion(null, q.id, 0);
+  assert.equal(first.correct, true);
+  await updateQuestion(null, q.id, { correctIndex: 2 });
+  const after = await gradeQuestion(null, q.id, 0);
+  assert.equal(after.correct, false);
+  const right = await gradeQuestion(null, q.id, 2);
+  assert.equal(right.correct, true);
+  assert.equal(right.points, 10);
+});
+
 test('public catalog omits gabarito and grades answers', async () => {
   const catalog = await listChallengesPublic(null);
   assert.ok(catalog.questions.length >= 19);

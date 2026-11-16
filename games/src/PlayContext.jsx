@@ -1,6 +1,7 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { publishGalleryPhoto, unpublishGalleryPhoto } from './gallery-api.js';
 import { loadProgress, photoEntry, saveProgress } from './progress.js';
+import { reportRankingScore } from './ranking-api.js';
 
 const PlayContext = createContext(null);
 
@@ -9,6 +10,7 @@ export function PlayProvider({ guestName, children }) {
   const [error, setError] = useState('');
   const [progress, setProgress] = useState(() => loadProgress(guestName));
   const [pending, setPending] = useState('');
+  const rankingPosted = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -155,6 +157,21 @@ export function PlayProvider({ guestName, children }) {
       done: answeredQuiz + donePhotos,
     };
   }, [catalog, progress]);
+
+  useEffect(() => {
+    if (!guestName) return undefined;
+    const empty = !scores.points && !scores.stamps && !scores.done;
+    if (empty && !rankingPosted.current) return undefined;
+    rankingPosted.current = true;
+    const t = window.setTimeout(() => {
+      reportRankingScore({
+        guestName,
+        points: scores.points,
+        stamps: scores.stamps,
+      }).catch(() => {});
+    }, 400);
+    return () => window.clearTimeout(t);
+  }, [guestName, scores.done, scores.points, scores.stamps]);
 
   const value = useMemo(
     () => ({

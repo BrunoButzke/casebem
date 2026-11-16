@@ -579,12 +579,7 @@
 
   <script type="module">
     import QRCode from 'qrcode';
-    import {
-      TEMP_ADMIN_USER,
-      TEMP_ADMIN_PASS,
-      TEMP_ADMIN_TOKEN,
-      ADMIN_STORAGE_KEY as STORAGE_KEY,
-    } from '/src/dani-carine/admin-credentials.mjs';
+    import { ADMIN_STORAGE_KEY as STORAGE_KEY } from '/src/dani-carine/admin-credentials.mjs';
 
     const $ = (id) => document.getElementById(id);
 
@@ -607,10 +602,6 @@
 
     function clearToken() {
       sessionStorage.removeItem(STORAGE_KEY);
-    }
-
-    function tryTempLogin(user, pass) {
-      return user === TEMP_ADMIN_USER && pass === TEMP_ADMIN_PASS;
     }
 
     function authHeaders() {
@@ -1448,12 +1439,22 @@
     $('login-btn').addEventListener('click', async () => {
       const user = $('admin-user').value.trim();
       const pass = $('admin-pass').value;
-      if (!tryTempLogin(user, pass)) {
-        showLogin('Usuário ou senha inválidos.');
-        return;
+      try {
+        const res = await fetch('/api/admin/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user, pass }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.ok || !data.token) {
+          showLogin(data.message || 'Usuário ou senha inválidos.');
+          return;
+        }
+        setToken(data.token);
+        await load();
+      } catch {
+        showLogin('Não deu para entrar. Tente de novo.');
       }
-      setToken(TEMP_ADMIN_TOKEN);
-      await load();
     });
 
     $('admin-pass')?.addEventListener('keydown', (e) => {
@@ -1468,7 +1469,7 @@
       showLogin();
     });
 
-    if (getToken() === TEMP_ADMIN_TOKEN) {
+    if (getToken()) {
       load();
     }
 

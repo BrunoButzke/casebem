@@ -77,6 +77,8 @@ import {
   updateRaffle,
   deleteRaffle,
   getActiveRafflePublic,
+  createRaffleCheckout,
+  finalizeRaffleSalesByIntent,
 } from './functions/_lib/raffle-service.mjs';
 import { loginGamesAdmin } from './functions/_lib/admin-auth.mjs';
 
@@ -250,6 +252,24 @@ function guestListApiPlugin() {
               });
             }
             return sendJson(res, 200, { ok: true, raffle });
+          }
+
+          if (path === '/api/desafio/raffle/checkout' && req.method === 'POST') {
+            const body = await readJsonBody(req);
+            const result = await createRaffleCheckout(null, env, body || {}, {
+              origin: `http://${req.headers.host || 'localhost:5173'}`,
+            });
+            return sendJson(res, result.ok ? 200 : result.status || 400, result);
+          }
+
+          if (path === '/api/desafio/raffle/confirm' && req.method === 'POST') {
+            const body = await readJsonBody(req);
+            const intentKey = String(body?.intentKey || '').trim();
+            if (intentKey) {
+              const fin = await finalizeRaffleSalesByIntent(null, intentKey);
+              return sendJson(res, 200, { ok: true, paid: true, finalized: fin.updated || 0 });
+            }
+            return sendJson(res, 400, { ok: false, error: 'MISSING_INTENT_KEY' });
           }
 
           if (path === '/api/desafio/ranking' && req.method === 'GET') {

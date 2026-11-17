@@ -160,7 +160,62 @@ async function deactivateOthers(db, keepId) {
     .run();
 }
 
+const HOLD_MS = 30 * 60 * 1000;
+
+function isSoldStatus(status) {
+  return !status || status === 'sold';
+}
+
+async function purgeExpiredHolds(db, raffleId = null) {
+  const cutoff = new Date(Date.now() - HOLD_MS).toISOString();
+  if (!db) {
+    for (const [id, rows] of memorySales) {
+      if (raffleId && id !== raffleId) continue;
+      memorySales.set(
+        id,
+        (rows || []).filter((s) => !(s.status === 'pending' && String(s.createdAt || '') < cutoff))
+      );
+    }
+    return;
+  }
+  if (raffleId) {
+    await db
+      .prepare(
+        `DELETE FROM desafio_raffle_sales
+         WHERE raffle_id = ? AND status = 'pending' AND created_at < ?`
+      )
+      .bind(raffleId, cutoff)
+      .run();
+    return;
+  }
+  await db
+    .prepare(
+      `DELETE FROM desafio_raffle_sales
+       WHERE status = 'pending' AND created_at < ?`
+    )
+    .bind(cutoff)
+    .run();
+}
+
 async function listSoldNumbers(db, raffleId) {
+  if (!db) {
+    return (memorySales.get(raffleId) || [])
+      .filter((s) => isSoldStatus(s.status))
+      .map((s) => s.number)
+      .sort((a, b) => a - b);
+  }
+  const result = await db
+    .prepare(
+      `SELECT number FROM desafio_raffle_sales
+       WHERE raffle_id = ? AND (status IS NULL OR status = 'sold')
+       ORDER BY number`
+    )
+    .bind(raffleId)
+    .all();
+  return (result?.results || []).map((r) => Number(r.number));
+}
+
+async function listTakenNumbers(db, raffleId) {
   if (!db) {
     return (memorySales.get(raffleId) || []).map((s) => s.number).sort((a, b) => a - b);
   }
@@ -355,6 +410,7 @@ export async function deleteRaffle(db, id) {
 }
 
 export async function getActiveRafflePublic(db) {
+  await purgeExpiredHolds(db);
   let raffle = null;
   if (!db) {
     raffle = [...memoryRaffles.values()].find((r) => r.active) || null;
@@ -376,6 +432,7 @@ export async function getActiveRafflePublic(db) {
   }
 
   const soldNumbers = await listSoldNumbers(db, raffle.id);
+  const takenNumbers = await listTakenNumbers(db, raffle.id);
   return {
     id: raffle.id,
     name: raffle.name,
@@ -383,6 +440,280 @@ export async function getActiveRafflePublic(db) {
     totalNumbers: raffle.totalNumbers,
     priceCents: raffle.priceCents,
     soldNumbers,
-    availableNumbers: availableNumbers(raffle.totalNumbers, soldNumbers),
+    availableNumbers: availableNumbers(raffle.totalNumbers, takenNumbers),
+  };
+}
+
+/**
+ * Finaliza holds pendentes → vendidos (webhook / confirm).
+ */
+export async function finalizeRaffleSalesByIntent(db, intentKey) {
+  const key = String(intentKey || '').trim();
+  if (!key) return { updated: 0 };
+  const now = new Date().toISOString();
+
+  if (!db) {
+    let updated = 0;
+    for (const [raffleId, rows] of memorySales) {
+      const next = (rows || []).map((s) => {
+        if (s.intentKey === key && s.status === 'pending') {
+          updated += 1;
+          return { ...s, status: 'sold', createdAt: now };
+        }
+        return s;
+      });
+      memorySales.set(raffleId, next);
+    }
+    return { updated };
+  }
+
+  const result = await db
+    .prepare(
+      `UPDATE desafio_raffle_sales
+       SET status = 'sold', created_at = ?
+       WHERE intent_key = ? AND status = 'pending'`
+    )
+    .bind(now, key)
+    .run();
+  return { updated: Number(result?.meta?.changes ?? result?.changes ?? 0) };
+}
+
+/**
+ * Cria Pix + hold dos números selecionados.
+ */
+export async function createRaffleCheckout(db, env, body, { origin = null } = {}) {
+  if (!db) {
+    return {
+      ok: false,
+      status: 503,
+      error: 'DB_NOT_CONFIGURED',
+      message: 'Banco não configurado',
+    };
+  }
+  if (!env?.MP_ACCESS_TOKEN) {
+    return {
+      ok: false,
+      status: 503,
+      error: 'PAYMENT_SERVICE_NOT_CONFIGURED',
+      message: 'Serviço de pagamento não configurado',
+    };
+  }
+
+  const { isValidIntentKey, createCheckoutFingerprint, getOrCreateIntent, updateIntentWithPayment, generateMPIdempotencyKey } =
+    await import('./checkout-idempotency.mjs');
+
+  const raffleId = String(body?.raffleId || '').trim();
+  const guestName = String(body?.guestName || '').trim();
+  const payerEmail = String(body?.payerEmail || body?.email || '').trim().toLowerCase();
+  const intentKey = String(body?.intentKey || '').trim();
+  const numbers = [...new Set((Array.isArray(body?.numbers) ? body.numbers : []).map(Number))]
+    .filter((n) => Number.isInteger(n) && n >= 1)
+    .sort((a, b) => a - b);
+
+  if (!isValidIntentKey(intentKey)) {
+    return { ok: false, status: 400, error: 'INVALID_INTENT_KEY', message: 'intentKey inválido' };
+  }
+  if (guestName.length < 2 || guestName.length > 80) {
+    return { ok: false, status: 400, error: 'VALIDATION', message: 'Informe seu nome' };
+  }
+  if (!numbers.length) {
+    return { ok: false, status: 400, error: 'VALIDATION', message: 'Selecione ao menos um número' };
+  }
+  if (!payerEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(payerEmail)) {
+    return { ok: false, status: 400, error: 'VALIDATION', message: 'Informe um e-mail válido para o Pix' };
+  }
+
+  await purgeExpiredHolds(db, raffleId);
+
+  const raffleRow = await db
+    .prepare(
+      `SELECT id, name, total_numbers, price_cents, active
+       FROM desafio_raffles WHERE id = ? AND wedding_key = ? AND active = 1`
+    )
+    .bind(raffleId, WEDDING_KEY)
+    .first();
+  if (!raffleRow) {
+    return { ok: false, status: 404, error: 'NO_ACTIVE_RAFFLE', message: 'Sorteio não encontrado ou inativo' };
+  }
+
+  const totalNumbers = Number(raffleRow.total_numbers);
+  const priceCents = Number(raffleRow.price_cents);
+  if (numbers.some((n) => n > totalNumbers)) {
+    return { ok: false, status: 400, error: 'VALIDATION', message: 'Número inválido para este sorteio' };
+  }
+
+  const taken = new Set(await listTakenNumbers(db, raffleId));
+  const blocked = numbers.filter((n) => taken.has(n));
+  if (blocked.length) {
+    return {
+      ok: false,
+      status: 409,
+      error: 'NUMBERS_UNAVAILABLE',
+      message: `Número(s) indisponível(is): ${blocked.join(', ')}`,
+      numbers: blocked,
+    };
+  }
+
+  const amountCents = numbers.length * priceCents;
+  if (amountCents < 100) {
+    return { ok: false, status: 400, error: 'VALIDATION', message: 'Valor mínimo é R$ 1,00' };
+  }
+
+  const items = numbers.map((n) => ({
+    giftId: `raffle-${raffleId}-${n}`,
+    name: `${raffleRow.name} · nº ${n}`,
+    quantity: 1,
+    priceInCents: priceCents,
+  }));
+
+  const fingerprint = await createCheckoutFingerprint({
+    gifterName: guestName,
+    items,
+    paymentMethod: 'pix',
+    amountCents,
+  });
+
+  if (!env.RSVP_SECRET) {
+    return {
+      ok: false,
+      status: 503,
+      error: 'RSVP_SECRET_MISSING',
+      message: 'Configuração de checkout incompleta (RSVP_SECRET)',
+    };
+  }
+
+  let intentResult;
+  try {
+    intentResult = await getOrCreateIntent(
+      db,
+      {
+        intentKey,
+        fingerprint,
+        gifterName: guestName,
+        items,
+        paymentMethod: 'pix',
+        amountCents,
+      },
+      env.RSVP_SECRET
+    );
+  } catch (err) {
+    if (err.message === 'INVALID_INTENT_KEY') {
+      return { ok: false, status: 400, error: 'INVALID_INTENT_KEY', message: 'intentKey inválido' };
+    }
+    throw err;
+  }
+
+  if (intentResult.conflict) {
+    return { ok: false, status: 409, error: 'INTENT_CONFLICT', message: 'Pedido já usado com outro conteúdo' };
+  }
+
+  if (intentResult.status === 'pending' && intentResult.intent?.qrCode) {
+    return {
+      ok: true,
+      method: 'pix',
+      status: 'pending',
+      payment: {
+        id: intentResult.intent.providerReference,
+        qrCode: intentResult.intent.qrCode,
+        qrCodeBase64: intentResult.intent.qrCodeBase64 || '',
+      },
+      amountCents,
+      numbers,
+    };
+  }
+
+  const now = new Date().toISOString();
+  try {
+    for (const n of numbers) {
+      await db
+        .prepare(
+          `INSERT INTO desafio_raffle_sales (raffle_id, number, guest_name, created_at, status, intent_key, payment_id)
+           VALUES (?, ?, ?, ?, 'pending', ?, NULL)`
+        )
+        .bind(raffleId, n, guestName, now, intentKey)
+        .run();
+    }
+  } catch (err) {
+    await db.prepare(`DELETE FROM desafio_raffle_sales WHERE intent_key = ? AND status = 'pending'`).bind(intentKey).run();
+    if (String(err?.message || '').includes('UNIQUE') || String(err?.message || '').includes('PRIMARY')) {
+      return {
+        ok: false,
+        status: 409,
+        error: 'NUMBERS_UNAVAILABLE',
+        message: 'Alguns números acabaram de ser reservados. Escolha outros.',
+      };
+    }
+    throw err;
+  }
+
+  const notificationUrl = (() => {
+    if (env.MP_NOTIFICATION_URL) return String(env.MP_NOTIFICATION_URL);
+    const base = origin || '';
+    if (base.startsWith('https://') && !base.includes('localhost')) {
+      return `${base.replace(/\/$/, '')}/api/webhooks/mercadopago`;
+    }
+    return null;
+  })();
+
+  const { createPixPayment } = await import('./mercadopago.mjs');
+  const mpIdempotencyKey = await generateMPIdempotencyKey(intentKey, env.RSVP_SECRET);
+
+  const result = await createPixPayment({
+    accessToken: env.MP_ACCESS_TOKEN,
+    gifterName: guestName,
+    items,
+    totalInCents: amountCents,
+    intentKey,
+    idempotencyKey: mpIdempotencyKey,
+    payerEmail,
+    notificationUrl,
+    testPayerEmail: env.MP_TEST_PAYER_EMAIL || '',
+    kind: 'raffle',
+    description: `Sorteio ${raffleRow.name} — ${guestName}`.slice(0, 200),
+  });
+
+  if (!result.ok) {
+    await db.prepare(`DELETE FROM desafio_raffle_sales WHERE intent_key = ? AND status = 'pending'`).bind(intentKey).run();
+    await updateIntentWithPayment(db, intentKey, {}, 'failed');
+    return {
+      ok: false,
+      status: result.status >= 400 && result.status < 600 ? result.status : 503,
+      error: 'PAYMENT_SERVICE_ERROR',
+      message: result.error || 'Erro ao gerar Pix',
+      details: result.details,
+    };
+  }
+
+  const payment = result.payment;
+  if (!payment?.id || !payment?.qrCode) {
+    await db.prepare(`DELETE FROM desafio_raffle_sales WHERE intent_key = ? AND status = 'pending'`).bind(intentKey).run();
+    await updateIntentWithPayment(db, intentKey, payment || {}, 'failed');
+    return {
+      ok: false,
+      status: 502,
+      error: 'MISSING_PIX_DATA',
+      message: 'Dados Pix incompletos',
+    };
+  }
+
+  await db
+    .prepare(`UPDATE desafio_raffle_sales SET payment_id = ? WHERE intent_key = ? AND status = 'pending'`)
+    .bind(String(payment.id), intentKey)
+    .run();
+  await updateIntentWithPayment(db, intentKey, payment, 'pending');
+
+  return {
+    ok: true,
+    method: 'pix',
+    status: 'pending',
+    payment: {
+      id: payment.id,
+      qrCode: payment.qrCode,
+      qrCodeBase64: payment.qrCodeBase64 || '',
+      ticketUrl: payment.ticketUrl || '',
+    },
+    amountCents,
+    numbers,
+    intentKey,
   };
 }

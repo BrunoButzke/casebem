@@ -77,6 +77,8 @@ export async function createPixPayment({
   notificationUrl = null,
   payerIdentification = null, // { type: 'CPF', number: '...' } opcional
   testPayerEmail = '',
+  kind = 'gift',
+  description = null,
 }) {
   if (!accessToken) {
     return jsonError(500, 'MP_ACCESS_TOKEN não configurado no servidor.');
@@ -97,8 +99,14 @@ export async function createPixPayment({
 
   if (isNewSignature) {
     finalAmount = totalInCents / 100;
-    finalDescription = `Presentes CaseBem - ${gifterName || 'Convidado'}`.slice(0, 200);
-    finalExternalRef = `casebem:gift:${intentKey}`;
+    const isRaffle = kind === 'raffle';
+    finalDescription = String(
+      description ||
+        (isRaffle
+          ? `Sorteio CaseBem - ${gifterName || 'Convidado'}`
+          : `Presentes CaseBem - ${gifterName || 'Convidado'}`)
+    ).slice(0, 200);
+    finalExternalRef = isRaffle ? `casebem:raffle:${intentKey}` : `casebem:gift:${intentKey}`;
     finalIdempotencyKey = idempotencyKey || intentKey;
     finalPayerEmail = resolvePixPayerEmail(payerEmail || email, accessToken, emailEnv);
     finalPayerName = String(gifterName || 'Convidado').slice(0, 60);
@@ -175,10 +183,11 @@ export async function createPixPayment({
     date_of_expiration: expires,
     payer,
     metadata: {
-      gift_id: isNewSignature ? 'multi' : String(giftId).slice(0, 60),
+      gift_id: isNewSignature ? (kind === 'raffle' ? 'raffle' : 'multi') : String(giftId).slice(0, 60),
       message: String(message || '').slice(0, 300),
       source: 'casebem-dani-carine',
       intent_key: intentKey || null,
+      kind: kind === 'raffle' ? 'raffle' : 'gift',
     },
     external_reference: finalExternalRef,
   };

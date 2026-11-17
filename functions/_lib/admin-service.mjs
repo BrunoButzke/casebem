@@ -170,9 +170,10 @@ export async function markIntentPaidByExternalRef(db, externalReference, payment
   if (!externalReference || typeof externalReference !== 'string') {
     return { updated: false };
   }
-  const match = externalReference.match(/^casebem:gift:([0-9a-f-]{36})$/i);
+  const match = externalReference.match(/^casebem:(?:gift|raffle):([0-9a-f-]{36})$/i);
   if (!match) return { updated: false };
   const intentKey = match[1];
+  const kind = /^casebem:raffle:/i.test(externalReference) ? 'raffle' : 'gift';
 
   const result = await db
     .prepare(
@@ -186,5 +187,5 @@ export async function markIntentPaidByExternalRef(db, externalReference, payment
     .run();
 
   const changes = Number(result?.meta?.changes ?? result?.changes ?? 0);
-  return { updated: changes > 0, intentKey };
+  return { updated: changes > 0, intentKey, kind };
 }

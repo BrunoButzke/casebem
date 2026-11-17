@@ -1501,3 +1501,31 @@ button.sorteio-num {
   text-align: center;
   font-weight: 700;
 }
+
+.sorteio-email input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid color-mix(in oklch, var(--rose) 24%, #fff);
+  border-radius: 0.85rem;
+  padding: 0.7rem 0.85rem;
+  font: inherit;
+  background: #fff;
+}
+
+.sorteio-pix-qr {
+  display: block;
+  width: min(220px, 70%);
+  margin: 0.5rem auto 0.85rem;
+  border-radius: 0.75rem;
+}
+
+.sorteio-pix-code {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0 0 0.65rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.75rem;
+  border: 1px solid color-mix(in oklch, var(--ink) 12%, #fff);
+  font-size: 0.78rem;
+  resize: vertical;
+}

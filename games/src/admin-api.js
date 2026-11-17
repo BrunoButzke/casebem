@@ -42,6 +42,17 @@ export async function listAdminQuestions() {
   return Array.isArray(data.questions) ? data.questions : [];
 }
 
+export async function listRaffleDrawEntries() {
+  const res = await fetch('/api/admin/raffles/draw', { headers: adminHeaders() });
+  const data = await res.json().catch(() => ({}));
+  throwIfAuthFailed(res, data);
+  if (!res.ok || !data.ok) throw new Error(data.message || 'Não deu para carregar os números vendidos');
+  return {
+    raffle: data.raffle || null,
+    entries: Array.isArray(data.entries) ? data.entries : [],
+  };
+}
+
 export async function setQuestionCorrectIndex(id, correctIndex) {
   const res = await fetch('/api/admin/challenges/questions', {
     method: 'PATCH',

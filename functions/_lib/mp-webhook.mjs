@@ -8,6 +8,7 @@ import {
   markIntentPaidByProviderRef,
   markIntentPaidByExternalRef,
 } from './admin-service.mjs';
+import { finalizeRaffleSalesByIntent } from './raffle-service.mjs';
 import { sendAdminNotification } from './notify-email.mjs';
 
 /**
@@ -71,7 +72,16 @@ export async function processMercadoPagoWebhook({ db, env, payload }) {
     );
   }
 
-  if (mark.updated) {
+  let raffleFinalized = 0;
+  const raffleIntent =
+    mark.intentKey ||
+    (String(payment.externalReference || '').match(/^casebem:raffle:([0-9a-f-]{36})$/i) || [])[1];
+  if (raffleIntent && (mark.kind === 'raffle' || String(payment.externalReference || '').includes(':raffle:'))) {
+    const fin = await finalizeRaffleSalesByIntent(db, raffleIntent);
+    raffleFinalized = fin.updated || 0;
+  }
+
+  if (mark.updated || raffleFinalized) {
     await sendAdminNotification(env, {
       subject: `[CaseBem] Pagamento aprovado — #${payment.id}`,
       text: `Pagamento Mercado Pago aprovado.\nID: ${payment.id}\nValor: R$ ${Number(payment.amount || 0).toFixed(2)}\nRef: ${payment.externalReference || '-'}\nHorário: ${now}`,
@@ -82,6 +92,7 @@ export async function processMercadoPagoWebhook({ db, env, payload }) {
     ok: true,
     handled: true,
     paid: mark.updated,
+    raffleFinalized,
     paymentId: payment.id,
     paymentStatus: payment.status,
   };

@@ -13,6 +13,7 @@ import Telao from './pages/Telao.jsx';
 import AdminGate from './pages/AdminGate.jsx';
 import AdminQuiz from './pages/AdminQuiz.jsx';
 import AdminGaleria from './pages/AdminGaleria.jsx';
+import AdminSorteio from './pages/AdminSorteio.jsx';
 import { isGamesAdminPath } from './admin-auth.js';
 import { getGuestName } from './guest.js';
 
@@ -59,6 +60,7 @@ export default function App() {
       <Route path="/admin" element={<AdminGate />}>
         <Route path="quiz" element={<AdminQuiz />} />
         <Route path="galeria" element={<AdminGaleria />} />
+        <Route path="sorteio" element={<AdminSorteio />} />
       </Route>
       <Route element={<PlayShell />}>
         <Route path="/quiz" element={<Quiz />} />

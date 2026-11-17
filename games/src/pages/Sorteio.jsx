@@ -28,8 +28,10 @@ export default function Sorteio() {
   const [pix, setPix] = useState(null);
   const [paid, setPaid] = useState(false);
   const [paidNumbers, setPaidNumbers] = useState([]);
+  const [page, setPage] = useState(0);
   const intentRef = useRef(newIntentKey());
   const pollRef = useRef(null);
+  const PAGE_SIZE = 40;
 
   async function reload() {
     const next = await fetchActiveRaffle(guestName || '');
@@ -72,10 +74,20 @@ export default function Sorteio() {
 
   const available = raffle?.availableNumbers || [];
   const myNumbers = raffle?.myNumbers || [];
+  const pageCount = Math.max(1, Math.ceil(available.length / PAGE_SIZE));
+  const safePage = Math.min(page, pageCount - 1);
+  const pageNumbers = useMemo(() => {
+    const start = safePage * PAGE_SIZE;
+    return available.slice(start, start + PAGE_SIZE);
+  }, [available, safePage]);
   const total = useMemo(
     () => selected.size * (Number(raffle?.priceCents) || 0),
     [selected, raffle?.priceCents]
   );
+
+  useEffect(() => {
+    setPage(0);
+  }, [raffle?.id, available.length]);
 
   function toggleNumber(n) {
     if (pix || pending) return;
@@ -220,9 +232,33 @@ export default function Sorteio() {
       ) : null}
 
       <section className="sorteio-section" aria-labelledby="sorteio-disponiveis">
-        <h2 id="sorteio-disponiveis">Disponíveis</h2>
+        <div className="sorteio-section__head">
+          <h2 id="sorteio-disponiveis">Disponíveis</h2>
+          {available.length > PAGE_SIZE ? (
+            <div className="sorteio-pager" role="group" aria-label="Páginas dos números">
+              <button
+                type="button"
+                className="sorteio-pager__btn"
+                aria-label="Página anterior"
+                disabled={safePage <= 0}
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
+              >
+                ‹
+              </button>
+              <button
+                type="button"
+                className="sorteio-pager__btn"
+                aria-label="Próxima página"
+                disabled={safePage >= pageCount - 1}
+                onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
+              >
+                ›
+              </button>
+            </div>
+          ) : null}
+        </div>
         <div className="sorteio-grid">
-          {available.map((n) => {
+          {pageNumbers.map((n) => {
             const on = selected.has(n);
             return (
               <button
@@ -247,7 +283,7 @@ export default function Sorteio() {
             type="email"
             inputMode="email"
             autoComplete="email"
-            placeholder="E-mail para o Pix"
+            placeholder="coloque seu email aqui"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             disabled={pending || Boolean(pix)}

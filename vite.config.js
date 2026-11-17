@@ -79,6 +79,7 @@ import {
   getActiveRafflePublic,
   createRaffleCheckout,
   finalizeRaffleSalesByIntent,
+  listActiveRaffleSoldEntries,
 } from './functions/_lib/raffle-service.mjs';
 import { loginGamesAdmin } from './functions/_lib/admin-auth.mjs';
 
@@ -863,6 +864,22 @@ function adminApiPlugin(env) {
             } catch (err) {
               return mapChallengeErr(err);
             }
+          }
+
+          if (path === '/api/admin/raffles/draw' && req.method === 'GET') {
+            const { raffle, entries } = await listActiveRaffleSoldEntries(null);
+            if (!raffle) {
+              return sendJson(res, 404, {
+                ok: false,
+                error: 'NO_ACTIVE_RAFFLE',
+                message: 'Nenhuma rifa ativa',
+              });
+            }
+            return sendJson(res, 200, {
+              ok: true,
+              raffle: { id: raffle.id, name: raffle.name, totalNumbers: raffle.totalNumbers },
+              entries,
+            });
           }
 
           if (path === '/api/admin/raffles') {

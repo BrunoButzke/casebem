@@ -466,6 +466,59 @@ async function listMySoldNumbers(db, raffleId, guestName) {
   return (result?.results || []).map((r) => Number(r.number));
 }
 
+/**
+ * Números vendidos da rifa ativa (para sorteio no painel).
+ * @returns {Promise<{raffle: object|null, entries: Array<{number:number, guestName:string}>}>}
+ */
+export async function listActiveRaffleSoldEntries(db) {
+  await purgeExpiredHolds(db);
+
+  let raffle = null;
+  if (!db) {
+    raffle = [...memoryRaffles.values()].find((r) => r.active) || null;
+    if (!raffle) return { raffle: null, entries: [] };
+    raffle = rowToRaffle(raffle);
+    const entries = (memorySales.get(raffle.id) || [])
+      .filter((s) => isSoldStatus(s.status))
+      .map((s) => ({
+        number: Number(s.number),
+        guestName: String(s.guestName || 'Convidado').trim() || 'Convidado',
+      }))
+      .sort((a, b) => a.number - b.number);
+    return { raffle, entries };
+  }
+
+  const row = await db
+    .prepare(
+      `SELECT id, name, image_data, total_numbers, price_cents, active, created_at, updated_at
+       FROM desafio_raffles
+       WHERE wedding_key = ? AND active = 1
+       ORDER BY updated_at DESC
+       LIMIT 1`
+    )
+    .bind(WEDDING_KEY)
+    .first();
+  if (!row) return { raffle: null, entries: [] };
+  raffle = rowToRaffle(row);
+
+  const result = await db
+    .prepare(
+      `SELECT number, guest_name AS guestName
+       FROM desafio_raffle_sales
+       WHERE raffle_id = ? AND (status IS NULL OR status = 'sold')
+       ORDER BY number`
+    )
+    .bind(raffle.id)
+    .all();
+
+  const entries = (result?.results || []).map((r) => ({
+    number: Number(r.number),
+    guestName: String(r.guestName || 'Convidado').trim() || 'Convidado',
+  }));
+
+  return { raffle, entries };
+}
+
 export async function getActiveRafflePublic(db, { guestName = '' } = {}) {
   await purgeExpiredHolds(db);
   let raffle = null;

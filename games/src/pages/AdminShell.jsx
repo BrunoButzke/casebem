@@ -22,9 +22,21 @@ function IconGaleria() {
   );
 }
 
+function IconSorteio() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        fill="currentColor"
+        d="M7.2 4.8h9.6A2.4 2.4 0 0 1 19.2 7.2v9.6a2.4 2.4 0 0 1-2.4 2.4H7.2a2.4 2.4 0 0 1-2.4-2.4V7.2A2.4 2.4 0 0 1 7.2 4.8Zm1.2 3.6v2.4h2.4V8.4H8.4Zm4.8 0v2.4h2.4V8.4h-2.4ZM8.4 13.2v2.4h2.4v-2.4H8.4Zm4.8 0v2.4h2.4v-2.4h-2.4Z"
+      />
+    </svg>
+  );
+}
+
 const TABS = [
   { to: '/admin/quiz', label: 'Quiz', icon: IconQuiz },
   { to: '/admin/galeria', label: 'Galeria', icon: IconGaleria },
+  { to: '/admin/sorteio', label: 'Sorteio', icon: IconSorteio },
 ];
 
 export default function AdminShell() {
@@ -53,7 +65,7 @@ export default function AdminShell() {
         <Outlet />
       </main>
 
-      <nav className="play-tabs play-tabs--two" aria-label="Seções do painel">
+      <nav className="play-tabs play-tabs--three" aria-label="Seções do painel">
         {TABS.map((tab) => {
           const Icon = tab.icon;
           return (

@@ -1483,6 +1483,12 @@ button.sorteio-num {
   background: color-mix(in oklch, var(--ink) 8%, #fff);
 }
 
+.sorteio-num.is-mine {
+  background: color-mix(in oklch, var(--rose) 18%, #fff);
+  border-color: var(--rose);
+  color: var(--rose-deep, var(--rose));
+}
+
 .sorteio-checkout {
   position: sticky;
   bottom: calc(4.6rem + env(safe-area-inset-bottom));

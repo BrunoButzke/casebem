@@ -27,13 +27,15 @@ export default function Sorteio() {
   const [checkoutError, setCheckoutError] = useState('');
   const [pix, setPix] = useState(null);
   const [paid, setPaid] = useState(false);
+  const [paidNumbers, setPaidNumbers] = useState([]);
   const intentRef = useRef(newIntentKey());
   const pollRef = useRef(null);
 
   async function reload() {
-    const next = await fetchActiveRaffle();
+    const next = await fetchActiveRaffle(guestName || '');
     setRaffle(next);
     setError('');
+    return next;
   }
 
   useEffect(() => {
@@ -41,7 +43,7 @@ export default function Sorteio() {
     async function load() {
       setLoading(true);
       try {
-        const next = await fetchActiveRaffle();
+        const next = await fetchActiveRaffle(guestName || '');
         if (!cancelled) {
           setRaffle(next);
           setError('');
@@ -60,7 +62,7 @@ export default function Sorteio() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [guestName]);
 
   useEffect(() => {
     return () => {
@@ -69,7 +71,7 @@ export default function Sorteio() {
   }, []);
 
   const available = raffle?.availableNumbers || [];
-  const sold = raffle?.soldNumbers || [];
+  const myNumbers = raffle?.myNumbers || [];
   const total = useMemo(
     () => selected.size * (Number(raffle?.priceCents) || 0),
     [selected, raffle?.priceCents]
@@ -93,6 +95,7 @@ export default function Sorteio() {
     if (paid) {
       setPix(null);
       setPaid(false);
+      setPaidNumbers([]);
       setSelected(new Set());
       intentRef.current = newIntentKey();
       reload().catch(() => {});
@@ -115,8 +118,9 @@ export default function Sorteio() {
         if (st === 'approved') {
           window.clearInterval(pollRef.current);
           pollRef.current = null;
-          await confirmRafflePayment(paymentId);
+          const confirmed = await confirmRafflePayment(paymentId);
           setPaid(true);
+          setPaidNumbers(Array.isArray(confirmed.numbers) ? confirmed.numbers : []);
           await reload();
         } else if (st === 'cancelled' || st === 'rejected') {
           window.clearInterval(pollRef.current);
@@ -134,6 +138,7 @@ export default function Sorteio() {
     setCheckoutOpen(true);
     setCheckoutError('');
     setPaid(false);
+    setPaidNumbers([]);
     setPix(null);
     setPending(true);
     try {
@@ -201,6 +206,19 @@ export default function Sorteio() {
         </div>
       ) : null}
 
+      {myNumbers.length ? (
+        <section className="sorteio-section" aria-labelledby="sorteio-meus">
+          <h2 id="sorteio-meus">Meus números</h2>
+          <div className="sorteio-grid">
+            {myNumbers.map((n) => (
+              <span key={n} className="sorteio-num is-mine">
+                {n}
+              </span>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
       <section className="sorteio-section" aria-labelledby="sorteio-disponiveis">
         <h2 id="sorteio-disponiveis">Disponíveis</h2>
         <div className="sorteio-grid">
@@ -220,21 +238,6 @@ export default function Sorteio() {
           })}
         </div>
         {!available.length ? <p className="hub-empty">Todos os números já foram vendidos.</p> : null}
-      </section>
-
-      <section className="sorteio-section" aria-labelledby="sorteio-comprados">
-        <h2 id="sorteio-comprados">Comprados</h2>
-        {sold.length ? (
-          <div className="sorteio-grid">
-            {sold.map((n) => (
-              <span key={n} className="sorteio-num is-sold">
-                {n}
-              </span>
-            ))}
-          </div>
-        ) : (
-          <p className="hub-empty">Nenhum número comprado ainda.</p>
-        )}
       </section>
 
       <div className="sorteio-checkout">
@@ -273,7 +276,18 @@ export default function Sorteio() {
             <h2 id="sorteio-pay-title">{paid ? 'Pagamento confirmado!' : 'Pague com Pix'}</h2>
             {checkoutError ? <p className="hub-error">{checkoutError}</p> : null}
             {paid ? (
-              <p className="play-sub">Seus números estão garantidos. Obrigado!</p>
+              <>
+                <p className="play-sub">Seus números estão garantidos. Obrigado!</p>
+                {paidNumbers.length ? (
+                  <div className="sorteio-grid">
+                    {paidNumbers.map((n) => (
+                      <span key={n} className="sorteio-num is-mine">
+                        {n}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+              </>
             ) : pix ? (
               <>
                 {pix.qrCodeBase64 ? (
@@ -298,13 +312,13 @@ export default function Sorteio() {
                 >
                   Copiar código
                 </button>
-                <p className="play-sub">Confirmamos automaticamente após o pagamento.</p>
+                <p className="play-sub">Reserva válida por 5 minutos. Confirmamos após o pagamento.</p>
               </>
             ) : pending ? (
               <p className="play-sub">Gerando Pix…</p>
             ) : null}
             <button type="button" className="desafio__cta" onClick={closeCheckout}>
-              {paid ? 'Fechar' : 'Fechar'}
+              Fechar
             </button>
           </div>
         </div>

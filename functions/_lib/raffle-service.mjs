@@ -8,7 +8,7 @@ const MAX_IMAGE_DATA = 180_000;
 const NAME_MIN = 2;
 const NAME_MAX = 120;
 const TOTAL_MIN = 1;
-const TOTAL_MAX = 200;
+const TOTAL_MAX = 2000;
 const PRICE_MIN = 100;
 const PRICE_MAX = 100_000_000;
 
@@ -160,7 +160,42 @@ async function deactivateOthers(db, keepId) {
     .run();
 }
 
-const HOLD_MS = 30 * 60 * 1000;
+const HOLD_MS = 5 * 60 * 1000;
+
+/**
+ * Preferidos livres primeiro; depois preenche com os menores livres.
+ * Se faltar cupo, expande além de totalNumbers.
+ */
+export function allocateRaffleNumbers({ preferred = [], taken = [], count, totalNumbers }) {
+  const need = Math.max(0, Number(count) || 0);
+  const takenSet = new Set((taken || []).map(Number));
+  const preferredList = [...new Set((preferred || []).map(Number))]
+    .filter((n) => Number.isInteger(n) && n >= 1)
+    .sort((a, b) => a - b);
+  const assigned = [];
+
+  for (const n of preferredList) {
+    if (assigned.length >= need) break;
+    if (!takenSet.has(n)) {
+      assigned.push(n);
+      takenSet.add(n);
+    }
+  }
+
+  let candidate = 1;
+  while (assigned.length < need) {
+    if (!takenSet.has(candidate)) {
+      assigned.push(candidate);
+      takenSet.add(candidate);
+    }
+    candidate += 1;
+    if (candidate > 2000) break;
+  }
+
+  const maxAssigned = assigned.length ? Math.max(...assigned) : 0;
+  const newTotal = Math.max(Number(totalNumbers) || 0, maxAssigned);
+  return { assigned: assigned.sort((a, b) => a - b), newTotal };
+}
 
 function isSoldStatus(status) {
   return !status || status === 'sold';
@@ -409,7 +444,29 @@ export async function deleteRaffle(db, id) {
     .run();
 }
 
-export async function getActiveRafflePublic(db) {
+async function listMySoldNumbers(db, raffleId, guestName) {
+  const name = String(guestName || '').trim().toLowerCase();
+  if (!name) return [];
+  if (!db) {
+    return (memorySales.get(raffleId) || [])
+      .filter((s) => isSoldStatus(s.status) && String(s.guestName || '').trim().toLowerCase() === name)
+      .map((s) => s.number)
+      .sort((a, b) => a - b);
+  }
+  const result = await db
+    .prepare(
+      `SELECT number FROM desafio_raffle_sales
+       WHERE raffle_id = ?
+         AND (status IS NULL OR status = 'sold')
+         AND lower(trim(guest_name)) = ?
+       ORDER BY number`
+    )
+    .bind(raffleId, name)
+    .all();
+  return (result?.results || []).map((r) => Number(r.number));
+}
+
+export async function getActiveRafflePublic(db, { guestName = '' } = {}) {
   await purgeExpiredHolds(db);
   let raffle = null;
   if (!db) {
@@ -431,51 +488,184 @@ export async function getActiveRafflePublic(db) {
     raffle = rowToRaffle(row);
   }
 
-  const soldNumbers = await listSoldNumbers(db, raffle.id);
   const takenNumbers = await listTakenNumbers(db, raffle.id);
+  const myNumbers = await listMySoldNumbers(db, raffle.id, guestName);
   return {
     id: raffle.id,
     name: raffle.name,
     imageUrl: raffle.imageUrl,
     totalNumbers: raffle.totalNumbers,
     priceCents: raffle.priceCents,
-    soldNumbers,
+    myNumbers,
     availableNumbers: availableNumbers(raffle.totalNumbers, takenNumbers),
   };
 }
 
+function parseRaffleItems(canonicalItems) {
+  let items = [];
+  try {
+    items = JSON.parse(canonicalItems || '[]');
+  } catch {
+    items = [];
+  }
+  const numbers = [];
+  let raffleId = null;
+  for (const item of items) {
+    const id = String(item?.giftId || '');
+    const match = id.match(/^raffle-([a-z0-9-]+)-(\d+)$/i);
+    if (match) {
+      raffleId = raffleId || match[1];
+      numbers.push(Number(match[2]));
+    }
+  }
+  return { raffleId, numbers: [...new Set(numbers)].sort((a, b) => a - b) };
+}
+
+async function bumpRaffleTotal(db, raffleId, newTotal) {
+  const now = new Date().toISOString();
+  if (!db) {
+    const row = memoryRaffles.get(raffleId);
+    if (row && Number(row.totalNumbers) < newTotal) {
+      memoryRaffles.set(raffleId, { ...row, totalNumbers: newTotal, updatedAt: now });
+    }
+    return;
+  }
+  await db
+    .prepare(
+      `UPDATE desafio_raffles
+       SET total_numbers = CASE WHEN total_numbers < ? THEN ? ELSE total_numbers END,
+           updated_at = ?
+       WHERE id = ? AND wedding_key = ?`
+    )
+    .bind(newTotal, newTotal, now, raffleId, WEDDING_KEY)
+    .run();
+}
+
 /**
- * Finaliza holds pendentes → vendidos (webhook / confirm).
+ * Finaliza holds pendentes → vendidos.
+ * Se o hold expirou, realoca números livres / sequenciais e expande o total se preciso.
  */
 export async function finalizeRaffleSalesByIntent(db, intentKey) {
   const key = String(intentKey || '').trim();
-  if (!key) return { updated: 0 };
+  if (!key) return { updated: 0, numbers: [] };
   const now = new Date().toISOString();
 
   if (!db) {
     let updated = 0;
+    const numbers = [];
     for (const [raffleId, rows] of memorySales) {
       const next = (rows || []).map((s) => {
         if (s.intentKey === key && s.status === 'pending') {
           updated += 1;
+          numbers.push(s.number);
           return { ...s, status: 'sold', createdAt: now };
         }
         return s;
       });
       memorySales.set(raffleId, next);
     }
-    return { updated };
+    if (updated > 0) return { updated, numbers: numbers.sort((a, b) => a - b) };
+    return { updated: 0, numbers: [] };
   }
 
-  const result = await db
+  const pendingRows = await db
     .prepare(
-      `UPDATE desafio_raffle_sales
-       SET status = 'sold', created_at = ?
-       WHERE intent_key = ? AND status = 'pending'`
+      `SELECT raffle_id AS raffleId, number, guest_name AS guestName
+       FROM desafio_raffle_sales
+       WHERE intent_key = ? AND status = 'pending'
+       ORDER BY number`
     )
-    .bind(now, key)
-    .run();
-  return { updated: Number(result?.meta?.changes ?? result?.changes ?? 0) };
+    .bind(key)
+    .all();
+  const pending = pendingRows?.results || [];
+
+  if (pending.length) {
+    await db
+      .prepare(
+        `UPDATE desafio_raffle_sales
+         SET status = 'sold', created_at = ?
+         WHERE intent_key = ? AND status = 'pending'`
+      )
+      .bind(now, key)
+      .run();
+    return {
+      updated: pending.length,
+      numbers: pending.map((r) => Number(r.number)),
+      guestName: pending[0]?.guestName || null,
+      raffleId: pending[0]?.raffleId || null,
+    };
+  }
+
+  // Hold expirou: realoca a partir do intent
+  const intent = await db
+    .prepare(
+      `SELECT gifter_name AS guestName, canonical_items AS canonicalItems, provider_reference AS paymentId
+       FROM checkout_intents WHERE intent_key = ?`
+    )
+    .bind(key)
+    .first();
+  if (!intent) return { updated: 0, numbers: [], reassigned: false };
+
+  const { raffleId, numbers: preferred } = parseRaffleItems(intent.canonicalItems);
+  if (!raffleId || !preferred.length) return { updated: 0, numbers: [], reassigned: false };
+
+  const already = await db
+    .prepare(
+      `SELECT number FROM desafio_raffle_sales
+       WHERE intent_key = ? AND (status IS NULL OR status = 'sold')`
+    )
+    .bind(key)
+    .all();
+  if ((already?.results || []).length) {
+    return {
+      updated: 0,
+      numbers: (already.results || []).map((r) => Number(r.number)),
+      reassigned: false,
+      alreadySold: true,
+    };
+  }
+
+  const raffleRow = await db
+    .prepare(
+      `SELECT id, total_numbers AS totalNumbers FROM desafio_raffles
+       WHERE id = ? AND wedding_key = ?`
+    )
+    .bind(raffleId, WEDDING_KEY)
+    .first();
+  if (!raffleRow) return { updated: 0, numbers: [], reassigned: false };
+
+  const taken = await listTakenNumbers(db, raffleId);
+  const { assigned, newTotal } = allocateRaffleNumbers({
+    preferred,
+    taken,
+    count: preferred.length,
+    totalNumbers: Number(raffleRow.totalNumbers) || preferred.length,
+  });
+
+  if (newTotal > Number(raffleRow.totalNumbers)) {
+    await bumpRaffleTotal(db, raffleId, newTotal);
+  }
+
+  const guestName = String(intent.guestName || 'Convidado').trim();
+  const paymentId = intent.paymentId ? String(intent.paymentId) : null;
+  for (const n of assigned) {
+    await db
+      .prepare(
+        `INSERT INTO desafio_raffle_sales (raffle_id, number, guest_name, created_at, status, intent_key, payment_id)
+         VALUES (?, ?, ?, ?, 'sold', ?, ?)`
+      )
+      .bind(raffleId, n, guestName, now, key, paymentId)
+      .run();
+  }
+
+  return {
+    updated: assigned.length,
+    numbers: assigned,
+    guestName,
+    raffleId,
+    reassigned: true,
+    expandedTo: newTotal,
+  };
 }
 
 /**
@@ -545,11 +735,12 @@ export async function createRaffleCheckout(db, env, body, { origin = null } = {}
   const taken = new Set(await listTakenNumbers(db, raffleId));
   const blocked = numbers.filter((n) => taken.has(n));
   if (blocked.length) {
+    const label = blocked.length === 1 ? 'esse número' : 'esses números';
     return {
       ok: false,
       status: 409,
       error: 'NUMBERS_UNAVAILABLE',
-      message: `Número(s) indisponível(is): ${blocked.join(', ')}`,
+      message: `Opa, alguém pegou ${label}. Escolha outro(s).`,
       numbers: blocked,
     };
   }
@@ -640,7 +831,7 @@ export async function createRaffleCheckout(db, env, body, { origin = null } = {}
         ok: false,
         status: 409,
         error: 'NUMBERS_UNAVAILABLE',
-        message: 'Alguns números acabaram de ser reservados. Escolha outros.',
+        message: 'Opa, alguém pegou esse número. Escolha outro(s).',
       };
     }
     throw err;

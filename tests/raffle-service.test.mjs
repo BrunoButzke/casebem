@@ -12,6 +12,7 @@ import {
   deleteRaffle,
   getActiveRafflePublic,
   availableNumbers,
+  allocateRaffleNumbers,
 } from '../functions/_lib/raffle-service.mjs';
 
 const TINY_PNG =
@@ -56,7 +57,7 @@ test('activating one raffle deactivates the others', async () => {
   assert.equal(after.find((r) => r.id === b.id).active, false);
 });
 
-test('public active raffle exposes soldNumbers empty and derived available', async () => {
+test('public active raffle hides sold list and exposes myNumbers + available', async () => {
   await createRaffle(null, {
     name: 'Prêmio',
     imageData: TINY_PNG,
@@ -64,11 +65,41 @@ test('public active raffle exposes soldNumbers empty and derived available', asy
     priceCents: 1500,
     active: true,
   });
-  const pub = await getActiveRafflePublic(null);
+  const pub = await getActiveRafflePublic(null, { guestName: 'Bruno' });
   assert.equal(pub.name, 'Prêmio');
-  assert.deepEqual(pub.soldNumbers, []);
+  assert.equal(pub.soldNumbers, undefined);
+  assert.deepEqual(pub.myNumbers, []);
   assert.deepEqual(pub.availableNumbers, [1, 2, 3, 4, 5]);
   assert.equal(pub.imageUrl, TINY_PNG);
+});
+
+test('allocateRaffleNumbers keeps preferred when free and expands total', () => {
+  const a = allocateRaffleNumbers({
+    preferred: [2, 5],
+    taken: [],
+    count: 2,
+    totalNumbers: 5,
+  });
+  assert.deepEqual(a.assigned, [2, 5]);
+  assert.equal(a.newTotal, 5);
+
+  const b = allocateRaffleNumbers({
+    preferred: [2, 5],
+    taken: [2, 5],
+    count: 2,
+    totalNumbers: 5,
+  });
+  assert.deepEqual(b.assigned, [1, 3]);
+  assert.equal(b.newTotal, 5);
+
+  const c = allocateRaffleNumbers({
+    preferred: [1, 2],
+    taken: [1, 2, 3, 4, 5],
+    count: 2,
+    totalNumbers: 5,
+  });
+  assert.deepEqual(c.assigned, [6, 7]);
+  assert.equal(c.newTotal, 7);
 });
 
 test('availableNumbers subtracts sold set', () => {

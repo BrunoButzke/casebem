@@ -54,9 +54,6 @@ export default function Login() {
         <button type="submit" className="btn btn--block">
           Entrar
         </button>
-        <p className="hint">
-          Temporário: <code>Dani</code> / <code>Carine</code>
-        </p>
       </form>
     </div>
   );

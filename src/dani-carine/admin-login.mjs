@@ -1,9 +1,4 @@
-import {
-  TEMP_ADMIN_USER,
-  TEMP_ADMIN_PASS,
-  TEMP_ADMIN_TOKEN,
-  ADMIN_STORAGE_KEY,
-} from './admin-credentials.mjs';
+import { ADMIN_STORAGE_KEY } from './admin-credentials.mjs';
 
 /**
  * Modal de login na página principal → painel admin.
@@ -48,17 +43,27 @@ export function setupAdminLogin(windowContext = window) {
     if (e.key === 'Escape' && !modal.hidden) close();
   });
 
-  form.addEventListener('submit', (e) => {
+  form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const user = String(userInput?.value || '').trim();
     const pass = String(passInput?.value || '');
+    const fetchFn = windowContext.fetch || fetch;
 
-    if (user !== TEMP_ADMIN_USER || pass !== TEMP_ADMIN_PASS) {
-      showError('Usuário ou senha inválidos.');
-      return;
+    try {
+      const res = await fetchFn('/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user, pass }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok || !data.token) {
+        showError(data.message || 'Usuário ou senha inválidos.');
+        return;
+      }
+      windowContext.sessionStorage.setItem(ADMIN_STORAGE_KEY, data.token);
+      windowContext.location.href = '/dani-carine/admin.html';
+    } catch {
+      showError('Não deu para entrar. Tente de novo.');
     }
-
-    windowContext.sessionStorage.setItem(ADMIN_STORAGE_KEY, TEMP_ADMIN_TOKEN);
-    windowContext.location.href = '/dani-carine/admin.html';
   });
 }

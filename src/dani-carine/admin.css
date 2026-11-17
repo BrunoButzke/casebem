@@ -351,6 +351,23 @@ select {
   object-fit: cover;
 }
 
+.admin-raffle-card__media {
+  margin-bottom: 0.65rem;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  background: #f3ece6;
+  aspect-ratio: 4 / 3;
+  display: grid;
+  place-items: center;
+}
+
+.admin-raffle-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
 .gift-photo-preview span {
   color: var(--muted);
   font-size: 0.88rem;

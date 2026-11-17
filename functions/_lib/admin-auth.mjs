@@ -58,10 +58,16 @@ export function requireAdmin(request, env) {
 
 export const GAMES_ADMIN_USER = 'Carine';
 export const GAMES_ADMIN_PASS = 'Dani';
+export const SITE_ADMIN_USER = 'Dani';
+export const SITE_ADMIN_PASS = 'Carine';
+
+function matchesAdminPair(user, pass, expectedUser, expectedPass) {
+  return timingSafeEqual(user, expectedUser) && timingSafeEqual(pass, expectedPass);
+}
 
 /**
- * Troca login/senha do jogo pelo ADMIN_PANEL_SECRET de produção.
- * Assim o front não precisa hardcodar o Bearer.
+ * Troca login/senha pelo ADMIN_PANEL_SECRET de produção.
+ * Jogo: Carine / Dani. Site: Dani / Carine.
  */
 export function loginGamesAdmin(env, user, pass) {
   const secret = env?.ADMIN_PANEL_SECRET;
@@ -76,7 +82,10 @@ export function loginGamesAdmin(env, user, pass) {
 
   const u = String(user || '').trim();
   const p = String(pass || '');
-  if (!timingSafeEqual(u, GAMES_ADMIN_USER) || !timingSafeEqual(p, GAMES_ADMIN_PASS)) {
+  const ok =
+    matchesAdminPair(u, p, GAMES_ADMIN_USER, GAMES_ADMIN_PASS) ||
+    matchesAdminPair(u, p, SITE_ADMIN_USER, SITE_ADMIN_PASS);
+  if (!ok) {
     return {
       ok: false,
       status: 401,

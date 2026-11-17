@@ -71,6 +71,13 @@ import {
   themeToCssVars,
 } from './functions/_lib/desafio-theme-service.mjs';
 import { listRanking, upsertRanking } from './functions/_lib/ranking-service.mjs';
+import {
+  listRafflesAdmin,
+  createRaffle,
+  updateRaffle,
+  deleteRaffle,
+  getActiveRafflePublic,
+} from './functions/_lib/raffle-service.mjs';
 import { loginGamesAdmin } from './functions/_lib/admin-auth.mjs';
 
 const rootDir = dirname(fileURLToPath(import.meta.url));
@@ -231,6 +238,18 @@ function guestListApiPlugin() {
               const map = { NOT_FOUND: 404, INVALID_ID: 400 };
               return sendJson(res, map[err.message] || 500, { ok: false, error: err.message });
             }
+          }
+
+          if (path === '/api/desafio/raffle' && req.method === 'GET') {
+            const raffle = await getActiveRafflePublic(null);
+            if (!raffle) {
+              return sendJson(res, 404, {
+                ok: false,
+                error: 'NO_ACTIVE_RAFFLE',
+                message: 'Nenhum sorteio ativo',
+              });
+            }
+            return sendJson(res, 200, { ok: true, raffle });
           }
 
           if (path === '/api/desafio/ranking' && req.method === 'GET') {
@@ -822,6 +841,56 @@ function adminApiPlugin(env) {
               }
             } catch (err) {
               return mapChallengeErr(err);
+            }
+          }
+
+          if (path === '/api/admin/raffles') {
+            const mapErr = (err) => {
+              const map = {
+                NOT_FOUND: 404,
+                EXISTS: 409,
+                VALIDATION: 400,
+                EMPTY_PATCH: 400,
+                INVALID_ID: 400,
+              };
+              return sendJson(res, map[err.message] || 500, {
+                ok: false,
+                error: err.message,
+                details: err.details,
+                message: err.message,
+              });
+            };
+            try {
+              if (req.method === 'GET') {
+                return sendJson(res, 200, { ok: true, raffles: await listRafflesAdmin(null) });
+              }
+              if (req.method === 'POST') {
+                const body = await readJsonBody(req);
+                const raffle = await createRaffle(null, body || {});
+                return sendJson(res, 201, {
+                  ok: true,
+                  raffle,
+                  raffles: await listRafflesAdmin(null),
+                });
+              }
+              if (req.method === 'PATCH') {
+                const body = await readJsonBody(req);
+                if (!body?.id) return sendJson(res, 400, { ok: false, error: 'MISSING_ID' });
+                const raffle = await updateRaffle(null, String(body.id), body);
+                return sendJson(res, 200, { ok: true, raffle });
+              }
+              if (req.method === 'DELETE') {
+                const id = parsed.searchParams.get('id');
+                if (!id) return sendJson(res, 400, { ok: false, error: 'MISSING_ID' });
+                await deleteRaffle(null, id);
+                return sendJson(res, 200, {
+                  ok: true,
+                  removed: id,
+                  raffles: await listRafflesAdmin(null),
+                });
+              }
+            } catch (err) {
+              return mapErr(err);
             }
           }
 

@@ -27,7 +27,7 @@ export function loyaltyCardCopy(card, scores = {}) {
     ...progress,
     stamps: progress.filled,
     title: card?.name || '',
-    bannerStrong: `🥂 ${progress.filled} ${reward}`.trim(),
+    bannerStrong: reward,
     bannerHint: String(card?.barHint || '').trim(),
     footer: String(card?.footerTemplate || '').replace('{n}', String(progress.remaining)),
   };

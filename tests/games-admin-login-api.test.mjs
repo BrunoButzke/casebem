@@ -30,8 +30,18 @@ test('login Carine / Dani returns the env admin secret', async () => {
   assert.equal(body.token, 'production-secret-16');
 });
 
-test('login Dani / Carine is rejected', async () => {
-  const res = await onRequestPost(ctx({ user: 'Dani', pass: 'Carine' }));
+test('login Dani / Carine returns the env admin secret', async () => {
+  const res = await onRequestPost(
+    ctx({ user: 'Dani', pass: 'Carine' }, { ADMIN_PANEL_SECRET: 'production-secret-16' })
+  );
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.ok, true);
+  assert.equal(body.token, 'production-secret-16');
+});
+
+test('login with the wrong pair is rejected', async () => {
+  const res = await onRequestPost(ctx({ user: 'Ana', pass: 'errada' }));
   assert.equal(res.status, 401);
   const body = await res.json();
   assert.equal(body.ok, false);

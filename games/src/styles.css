@@ -830,7 +830,7 @@ body {
   bottom: 0;
   z-index: 6;
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   padding: 0.4rem 0.2rem calc(0.45rem + env(safe-area-inset-bottom));
   background: #fff;
   border-top: 1px solid color-mix(in oklch, var(--rose) 12%, white);
@@ -1398,4 +1398,106 @@ body {
   to {
     width: 100%;
   }
+}
+
+.sorteio-title {
+  margin: 0 auto 0.35rem;
+  width: 100%;
+  max-width: 22ch;
+  justify-self: center;
+  font-family: var(--font-body);
+  font-size: clamp(1.45rem, 5.5vw, 1.85rem);
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+  text-align: center;
+  text-wrap: balance;
+  color: var(--rose-deep, var(--rose));
+}
+
+.sorteio-page > .play-sub {
+  justify-self: center;
+  width: 100%;
+  text-align: center;
+}
+
+.sorteio-photo {
+  width: 100%;
+  margin: 0.35rem 0 1rem;
+  border-radius: 1.1rem;
+  overflow: hidden;
+  background: color-mix(in oklch, var(--rose) 12%, #fff);
+  aspect-ratio: 4 / 3;
+}
+
+.sorteio-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.sorteio-section {
+  width: 100%;
+  margin-bottom: 1.15rem;
+}
+
+.sorteio-section h2 {
+  margin: 0 0 0.55rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.sorteio-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(2.6rem, 1fr));
+  gap: 0.4rem;
+}
+
+.sorteio-num {
+  appearance: none;
+  min-height: 2.6rem;
+  border: 1px solid color-mix(in oklch, var(--rose) 28%, #fff);
+  border-radius: 0.7rem;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+}
+
+button.sorteio-num {
+  cursor: pointer;
+}
+
+.sorteio-num.is-selected {
+  background: var(--rose);
+  border-color: var(--rose);
+  color: #fff;
+}
+
+.sorteio-num.is-sold {
+  opacity: 0.45;
+  background: color-mix(in oklch, var(--ink) 8%, #fff);
+}
+
+.sorteio-checkout {
+  position: sticky;
+  bottom: calc(4.6rem + env(safe-area-inset-bottom));
+  width: 100%;
+  margin-top: 0.5rem;
+  padding: 0.85rem 0.9rem;
+  border-radius: 1rem;
+  background: color-mix(in oklch, #fff 88%, var(--rose));
+  box-shadow: 0 10px 28px color-mix(in oklch, var(--ink) 12%, transparent);
+  display: grid;
+  gap: 0.65rem;
+}
+
+.sorteio-total {
+  margin: 0;
+  text-align: center;
+  font-weight: 700;
 }

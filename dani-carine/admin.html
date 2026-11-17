@@ -37,7 +37,6 @@
         </div>
         <button type="button" class="btn btn--block" id="login-btn">Entrar</button>
         <p class="err" id="login-err" hidden></p>
-        <p class="admin-login-hint">Temporário: <code>Dani</code> / <code>Carine</code></p>
       </section>
 
       <section id="panel" hidden>
@@ -195,12 +194,26 @@
                   <p class="admin-entertainment-card__lead">Paleta e cartões de selos</p>
                   <p class="sub">Abrir</p>
                 </button>
-                <article class="admin-entertainment-card">
+                <button type="button" class="admin-entertainment-card" id="open-raffles-section">
                   <h3 class="admin-entertainment-card__title">Vendas e sorteios</h3>
                   <p class="admin-entertainment-card__lead">Loja e rifas da festa</p>
-                  <p class="sub">Em breve</p>
-                </article>
+                  <p class="sub">Abrir cadastro</p>
+                </button>
               </div>
+            </article>
+
+            <article class="admin-card admin-section" data-section="raffles" hidden>
+              <div class="admin-card__head">
+                <div>
+                  <h2>Vendas e sorteios</h2>
+                  <p class="admin-card__lead">Cadastre o prêmio, a foto, os números e o valor de cada um</p>
+                  <p class="sub" id="raffles-summary">Carregando…</p>
+                </div>
+                <div class="card-actions">
+                  <button type="button" class="btn btn--icon" id="open-create-raffle" title="Nova rifa" aria-label="Nova rifa">+</button>
+                </div>
+              </div>
+              <div id="raffles-grid" class="admin-challenges-grid"></div>
             </article>
 
             <article class="admin-card admin-section" data-section="game-visual" hidden>
@@ -451,6 +464,48 @@
     </form>
   </dialog>
 
+  <dialog class="admin-modal" id="modal-create-raffle">
+    <form method="dialog" class="admin-modal__panel">
+      <header class="admin-modal__head">
+        <h3 id="raffle-modal-title">Nova rifa</h3>
+        <button type="submit" class="admin-modal__close" value="cancel" aria-label="Fechar">×</button>
+      </header>
+      <input type="hidden" id="raffle-edit-id" value="" />
+      <div class="gift-photo-field">
+        <div class="gift-photo-preview" id="raffle-photo-preview">
+          <img id="raffle-photo-img" alt="" hidden />
+          <span id="raffle-photo-placeholder">Sem foto</span>
+        </div>
+        <div class="admin-field">
+          <label for="raffle-photo">Foto do prêmio</label>
+          <input id="raffle-photo" type="file" accept="image/*" />
+        </div>
+      </div>
+      <div class="admin-field">
+        <label for="raffle-name">Nome do que vai ser sorteado</label>
+        <input id="raffle-name" type="text" maxlength="120" placeholder="Ex.: Cesta de vinhos" />
+      </div>
+      <div class="toolbar">
+        <div class="admin-field admin-field--compact">
+          <label for="raffle-total">Números disponíveis</label>
+          <input id="raffle-total" type="number" min="1" max="200" step="1" placeholder="50" />
+        </div>
+        <div class="admin-field admin-field--compact">
+          <label for="raffle-price">Valor de cada número (R$)</label>
+          <input id="raffle-price" type="number" min="1" step="0.01" placeholder="10,00" />
+        </div>
+      </div>
+      <label class="gift-active-row">
+        <input id="raffle-active" type="checkbox" />
+        <span>Sorteio ativo (só um por vez)</span>
+      </label>
+      <div class="admin-modal__actions">
+        <button type="submit" class="btn btn--ghost" value="cancel">Cancelar</button>
+        <button type="button" class="btn" id="create-raffle-btn">Salvar</button>
+      </div>
+    </form>
+  </dialog>
+
   <dialog class="admin-modal" id="modal-entertainment-access">
     <div class="admin-modal__panel">
       <header class="admin-modal__head">
@@ -653,6 +708,7 @@
       if (id === 'game-visual') void loadGameVisualEditor();
       if (id === 'catalog') void loadCatalogEditor();
       if (id === 'stationery') void loadStationeryEditor();
+      if (id === 'raffles') void loadRafflesEditor();
     }
 
     $('admin-hub')?.addEventListener('click', (ev) => {
@@ -663,6 +719,7 @@
 
     $('open-challenges-section')?.addEventListener('click', () => openSection('challenges'));
     $('open-game-section')?.addEventListener('click', () => openSection('game-visual'));
+    $('open-raffles-section')?.addEventListener('click', () => openSection('raffles'));
 
     $('hub-back')?.addEventListener('click', () => showHub());
 
@@ -755,8 +812,10 @@
     let cachedQuestions = [];
     let cachedPhotoMissions = [];
     let cachedStampCards = [];
+    let cachedRaffles = [];
 
     let pendingGiftImageData = null;
+    let pendingRaffleImageData = null;
 
     function formatGiftPrice(cents) {
       return (Number(cents || 0) / 100).toLocaleString('pt-BR', {
@@ -777,6 +836,80 @@
         img.hidden = true;
         ph.hidden = false;
       }
+    }
+
+    function setRafflePhotoPreview(src) {
+      const img = $('raffle-photo-img');
+      const ph = $('raffle-photo-placeholder');
+      if (!img || !ph) return;
+      if (src) {
+        img.src = src;
+        img.hidden = false;
+        ph.hidden = true;
+      } else {
+        img.removeAttribute('src');
+        img.hidden = true;
+        ph.hidden = false;
+      }
+    }
+
+    function renderRaffles(rows) {
+      if (!rows.length) {
+        return '<p class="sub">Nenhuma rifa cadastrada ainda.</p>';
+      }
+      return rows
+        .map((r) => {
+          const photo = r.imageUrl || r.imageData
+            ? `<img src="${escapeHtml(r.imageUrl || r.imageData)}" alt="" class="admin-raffle-thumb" />`
+            : '<span class="sub">Sem foto</span>';
+          return `<article class="admin-challenge-card" data-raffle-id="${escapeHtml(r.id)}">
+            <div class="admin-raffle-card__media">${photo}</div>
+            <h4>${escapeHtml(r.name)}</h4>
+            <p>${escapeHtml(formatGiftPrice(r.priceCents))} · ${Number(r.totalNumbers) || 0} números</p>
+            <p class="sub">${r.active ? 'Ativo no /games/sorteio' : 'Inativo'}</p>
+            <div class="card-actions">
+              <button type="button" class="btn btn--ghost" data-edit-raffle="${escapeHtml(r.id)}">Editar</button>
+              <button type="button" class="btn btn--ghost" data-del-raffle="${escapeHtml(r.id)}">Excluir</button>
+            </div>
+          </article>`;
+        })
+        .join('');
+    }
+
+    function openRaffleForm(raffle) {
+      $('raffle-edit-id').value = raffle?.id || '';
+      $('raffle-modal-title').textContent = raffle ? 'Editar rifa' : 'Nova rifa';
+      $('raffle-name').value = raffle?.name || '';
+      $('raffle-total').value = raffle ? String(raffle.totalNumbers || '') : '50';
+      $('raffle-price').value = raffle ? (Number(raffle.priceCents || 0) / 100).toFixed(2) : '';
+      $('raffle-active').checked = Boolean(raffle?.active);
+      pendingRaffleImageData = raffle?.imageData || raffle?.imageUrl || null;
+      if (pendingRaffleImageData && !String(pendingRaffleImageData).startsWith('data:image/')) {
+        pendingRaffleImageData = null;
+      }
+      setRafflePhotoPreview(raffle?.imageUrl || raffle?.imageData || null);
+      if ($('raffle-photo')) $('raffle-photo').value = '';
+      openModal('modal-create-raffle');
+    }
+
+    async function loadRafflesEditor() {
+      const grid = $('raffles-grid');
+      const summary = $('raffles-summary');
+      if (!grid || !summary) return;
+      const res = await fetch('/api/admin/raffles', { headers: authHeaders() });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        summary.textContent = data.message || data.error || 'Rifas indisponíveis';
+        grid.innerHTML = `<p class="sub">${escapeHtml(data.message || data.error || 'Rifas indisponíveis')}</p>`;
+        return;
+      }
+      cachedRaffles = data.raffles || [];
+      const active = cachedRaffles.filter((r) => r.active).length;
+      summary.textContent =
+        cachedRaffles.length === 0
+          ? 'Nenhuma rifa cadastrada.'
+          : `${cachedRaffles.length} rifa(s) · ${active} ativa(s)`;
+      grid.innerHTML = renderRaffles(cachedRaffles);
     }
 
     function compressImageFile(file) {
@@ -964,7 +1097,7 @@
           }).join('')}
         </div>
         <div class="loyalty-card__banner">
-          <strong>🥂 ${progress.filled} ${escapeHtml(card.rewardText || 'prêmio')}</strong>
+          <strong>${escapeHtml(card.rewardText || 'prêmio')}</strong>
           <span>${escapeHtml(card.barHint)}</span>
         </div>
         <p class="loyalty-card__footer">${escapeHtml(footer)}</p>
@@ -1676,6 +1809,7 @@
     }
 
     bindModalDismiss('modal-create-gift');
+    bindModalDismiss('modal-create-raffle');
     bindModalDismiss('modal-create-stationery');
     bindModalDismiss('modal-question');
     bindModalDismiss('modal-photo-mission');
@@ -1918,6 +2052,76 @@
     });
 
     $('open-create-gift').addEventListener('click', () => openGiftForm(null));
+    $('open-create-raffle')?.addEventListener('click', () => openRaffleForm(null));
+
+    $('raffle-photo')?.addEventListener('change', async () => {
+      const file = $('raffle-photo').files?.[0];
+      if (!file) return;
+      try {
+        pendingRaffleImageData = await compressImageFile(file);
+        setRafflePhotoPreview(pendingRaffleImageData);
+      } catch (err) {
+        pendingRaffleImageData = null;
+        $('panel-err').hidden = false;
+        $('panel-err').textContent = err.message || 'Falha ao processar a foto';
+      }
+    });
+
+    $('create-raffle-btn')?.addEventListener('click', async () => {
+      const editId = $('raffle-edit-id').value.trim();
+      const name = $('raffle-name').value.trim();
+      const totalNumbers = Number($('raffle-total').value);
+      const reais = Number(String($('raffle-price').value).replace(',', '.'));
+      const priceCents = Math.round(reais * 100);
+      const payload = {
+        name,
+        totalNumbers,
+        priceCents,
+        active: Boolean($('raffle-active').checked),
+      };
+      if (pendingRaffleImageData) payload.imageData = pendingRaffleImageData;
+
+      const res = await fetch('/api/admin/raffles', {
+        method: editId ? 'PATCH' : 'POST',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify(editId ? { id: editId, ...payload } : payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        $('panel-err').hidden = false;
+        $('panel-err').textContent =
+          (data.details && data.details.join(', ')) || data.message || data.error || 'Falha ao salvar rifa';
+        return;
+      }
+      closeModal('modal-create-raffle');
+      pendingRaffleImageData = null;
+      await loadRafflesEditor();
+    });
+
+    $('raffles-grid')?.addEventListener('click', async (ev) => {
+      const editBtn = ev.target.closest('[data-edit-raffle]');
+      if (editBtn) {
+        const id = editBtn.getAttribute('data-edit-raffle');
+        const raffle = cachedRaffles.find((r) => r.id === id);
+        if (raffle) openRaffleForm(raffle);
+        return;
+      }
+      const delBtn = ev.target.closest('[data-del-raffle]');
+      if (!delBtn) return;
+      const id = delBtn.getAttribute('data-del-raffle');
+      if (!id || !window.confirm('Excluir esta rifa?')) return;
+      const res = await fetch(`/api/admin/raffles?id=${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        headers: authHeaders(),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        $('panel-err').hidden = false;
+        $('panel-err').textContent = data.message || data.error || 'Falha ao excluir rifa';
+        return;
+      }
+      await loadRafflesEditor();
+    });
 
     $('gift-photo').addEventListener('change', async () => {
       const file = $('gift-photo').files?.[0];

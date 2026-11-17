@@ -17,7 +17,7 @@ test('loyalty card copy matches admin preview layout', () => {
     },
     1
   );
-  assert.equal(copy.bannerStrong, '🥂 1 123');
+  assert.equal(copy.bannerStrong, '123');
   assert.equal(copy.bannerHint, 'Mostre este cartão no bar');
   assert.equal(copy.footer, 'Faltam 4 pontos para o próximo drink 🍸');
   assert.equal(copy.slots, 5);
@@ -53,7 +53,7 @@ test('loyalty card copy uses remaining stamps in footer, not bar hint as footer'
     },
     0
   );
-  assert.equal(copy.bannerStrong, '🥂 0 Acesso a um drink que não está no cardápio');
+  assert.equal(copy.bannerStrong, 'Acesso a um drink que não está no cardápio');
   assert.equal(copy.bannerHint, 'Mostre este cartão no bar');
   assert.equal(copy.footer, 'Algumas fotos valem selos');
 });

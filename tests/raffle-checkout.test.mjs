@@ -30,9 +30,9 @@ test('pending holds leave numbers unavailable but not in soldNumbers until final
   assert.deepEqual(availableNumbers(5, [2, 3]), [1, 4, 5]);
 
   await finalizeRaffleSalesByIntent(null, '00000000-0000-4000-8000-000000000001');
-  const pub = await getActiveRafflePublic(null);
+  const pub = await getActiveRafflePublic(null, { guestName: 'Ana' });
   assert.equal(pub.id, raffle.id);
-  assert.deepEqual(pub.soldNumbers, []);
+  assert.deepEqual(pub.myNumbers, []);
 });
 
 test('finalizeRaffleSalesByIntent is safe with empty memory', async () => {

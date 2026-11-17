@@ -18,7 +18,8 @@ export async function onRequestGet(context) {
   const { request, env } = context;
   const headers = getCorsHeaders(request);
   try {
-    const raffle = await getActiveRafflePublic(env.DB || null);
+    const guestName = new URL(request.url).searchParams.get('guestName') || '';
+    const raffle = await getActiveRafflePublic(env.DB || null, { guestName });
     if (!raffle) {
       return json(headers, { ok: false, error: 'NO_ACTIVE_RAFFLE', message: 'Nenhum sorteio ativo' }, 404);
     }

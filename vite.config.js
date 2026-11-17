@@ -243,7 +243,8 @@ function guestListApiPlugin() {
           }
 
           if (path === '/api/desafio/raffle' && req.method === 'GET') {
-            const raffle = await getActiveRafflePublic(null);
+            const guestName = parsed.searchParams.get('guestName') || '';
+            const raffle = await getActiveRafflePublic(null, { guestName });
             if (!raffle) {
               return sendJson(res, 404, {
                 ok: false,

@@ -75,9 +75,13 @@ export async function onRequestPost(context) {
     (String(payment.externalReference || '').match(/^casebem:raffle:([0-9a-f-]{36})$/i) || [])[1];
 
   let finalized = 0;
+  let numbers = [];
+  let reassigned = false;
   if (raffleIntent) {
     const fin = await finalizeRaffleSalesByIntent(env.DB, raffleIntent);
     finalized = fin.updated || 0;
+    numbers = fin.numbers || [];
+    reassigned = Boolean(fin.reassigned);
   }
 
   return json(headers, {
@@ -85,6 +89,8 @@ export async function onRequestPost(context) {
     paid: true,
     paymentStatus: payment.status,
     finalized,
+    numbers,
+    reassigned,
     intentKey: raffleIntent || null,
   });
 }

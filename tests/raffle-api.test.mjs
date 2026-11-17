@@ -74,7 +74,8 @@ test('public GET returns active raffle from memory when DB null', async () => {
   const body = await res.json();
   assert.equal(body.ok, true);
   assert.equal(body.raffle.name, 'Cesta');
-  assert.deepEqual(body.raffle.soldNumbers, []);
+  assert.equal(body.raffle.soldNumbers, undefined);
+  assert.deepEqual(body.raffle.myNumbers, []);
   assert.deepEqual(body.raffle.availableNumbers, [1, 2, 3, 4]);
 });
 

@@ -1,4 +1,10 @@
-import { WEDDING_KEY } from './challenges-validators.mjs';
+import { WEDDING_KEY as DEFAULT_WEDDING_KEY } from './challenges-validators.mjs';
+
+function resolveWeddingKey(weddingKey) {
+  const k = String(weddingKey || DEFAULT_WEDDING_KEY).trim();
+  return k || DEFAULT_WEDDING_KEY;
+}
+
 
 export const GALLERY_IMAGE_MAX_BYTES = 8 * 1024 * 1024;
 const DATA_URL = /^data:image\/(jpeg|jpg|png|webp);base64,([A-Za-z0-9+/=\s]+)$/i;
@@ -32,7 +38,7 @@ function extensionFor(contentType) {
 }
 
 function objectKeyFor(id, contentType) {
-  return `desafio/${WEDDING_KEY}/${id}${extensionFor(contentType)}`;
+  return `desafio/${DEFAULT_WEDDING_KEY}/${id}${extensionFor(contentType)}`;
 }
 
 export function decodeDataUrl(preview) {
@@ -145,12 +151,13 @@ async function existingRows(db, guestName, missionId) {
       `SELECT id, object_key FROM desafio_gallery
        WHERE wedding_key = ? AND guest_name = ? AND mission_id = ?`
     )
-    .bind(WEDDING_KEY, guestName, missionId)
+    .bind(DEFAULT_WEDDING_KEY, guestName, missionId)
     .all();
   return rows?.results || [];
 }
 
-export async function listGalleryPhotos(db) {
+export async function listGalleryPhotos(db, weddingKey = DEFAULT_WEDDING_KEY) {
+  const weddingKeyResolved = resolveWeddingKey(weddingKey);
   if (!db) return [...memoryGallery].sort(sortByCreated).map(toMeta);
   const rows = await db
     .prepare(
@@ -159,12 +166,13 @@ export async function listGalleryPhotos(db) {
        WHERE wedding_key = ?
        ORDER BY created_at ASC, id ASC`
     )
-    .bind(WEDDING_KEY)
+    .bind(weddingKeyResolved)
     .all();
   return (rows?.results || []).map(toMeta);
 }
 
-export async function getGalleryPhoto(db, id) {
+export async function getGalleryPhoto(db, id, weddingKey = DEFAULT_WEDDING_KEY) {
+  const weddingKeyResolved = resolveWeddingKey(weddingKey);
   if (!id) throw new Error('INVALID_ID');
   if (!db) {
     const row = memoryGallery.find((p) => p.id === id);
@@ -176,13 +184,14 @@ export async function getGalleryPhoto(db, id) {
       `SELECT id, wedding_key, guest_name, mission_id, title, created_at
        FROM desafio_gallery WHERE id = ? AND wedding_key = ?`
     )
-    .bind(id, WEDDING_KEY)
+    .bind(id, weddingKeyResolved)
     .first();
   if (!row) throw new Error('NOT_FOUND');
   return toMeta(row);
 }
 
-export async function getGalleryImage(db, id, bucket) {
+export async function getGalleryImage(db, id, bucket, weddingKey = DEFAULT_WEDDING_KEY) {
+  const weddingKeyResolved = resolveWeddingKey(weddingKey);
   if (!id) throw new Error('INVALID_ID');
   if (!db) {
     const row = memoryGallery.find((p) => p.id === id);
@@ -197,7 +206,7 @@ export async function getGalleryImage(db, id, bucket) {
     .prepare(
       `SELECT id, object_key, preview FROM desafio_gallery WHERE id = ? AND wedding_key = ?`
     )
-    .bind(id, WEDDING_KEY)
+    .bind(id, weddingKeyResolved)
     .first();
   if (!row) throw new Error('NOT_FOUND');
   const stored = await getObject(bucket, row.object_key);
@@ -207,7 +216,8 @@ export async function getGalleryImage(db, id, bucket) {
   throw new Error('NOT_FOUND');
 }
 
-export async function upsertGalleryPhoto(db, body, bucket) {
+export async function upsertGalleryPhoto(db, body, bucket, weddingKey = DEFAULT_WEDDING_KEY) {
+  const weddingKeyResolved = resolveWeddingKey(weddingKey);
   const meta = validateGalleryMeta(body);
   if (!meta.valid) throwValidation(meta.errors);
 
@@ -235,7 +245,7 @@ export async function upsertGalleryPhoto(db, body, bucket) {
 
   const row = {
     id,
-    weddingKey: WEDDING_KEY,
+    weddingKey: weddingKeyResolved,
     guestName: d.guestName,
     missionId: d.missionId,
     title: d.title,
@@ -252,20 +262,21 @@ export async function upsertGalleryPhoto(db, body, bucket) {
 
   await db
     .prepare(`DELETE FROM desafio_gallery WHERE wedding_key = ? AND guest_name = ? AND mission_id = ?`)
-    .bind(WEDDING_KEY, d.guestName, d.missionId)
+    .bind(weddingKeyResolved, d.guestName, d.missionId)
     .run();
   await db
     .prepare(
       `INSERT INTO desafio_gallery (id, wedding_key, guest_name, mission_id, title, preview, object_key, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
     )
-    .bind(id, WEDDING_KEY, d.guestName, d.missionId, d.title, '', objectKey, now)
+    .bind(id, weddingKeyResolved, d.guestName, d.missionId, d.title, '', objectKey, now)
     .run();
   await Promise.all(previous.map((old) => deleteObject(bucket, old.object_key)));
   return toMeta(row);
 }
 
-export async function deleteGalleryPhoto(db, query, bucket) {
+export async function deleteGalleryPhoto(db, query, bucket, weddingKey = DEFAULT_WEDDING_KEY) {
+  const weddingKeyResolved = resolveWeddingKey(weddingKey);
   const id = String(query?.id || '').trim();
   const guestName = String(query?.guestName || '').trim();
   const missionId = String(query?.missionId || '').trim();
@@ -283,14 +294,14 @@ export async function deleteGalleryPhoto(db, query, bucket) {
   if (id) {
     rows = await db
       .prepare(`SELECT id, object_key FROM desafio_gallery WHERE id = ? AND wedding_key = ?`)
-      .bind(id, WEDDING_KEY)
+      .bind(id, weddingKeyResolved)
       .all();
   } else if (guestName && missionId) {
     rows = await db
       .prepare(
         `SELECT id, object_key FROM desafio_gallery WHERE wedding_key = ? AND guest_name = ? AND mission_id = ?`
       )
-      .bind(WEDDING_KEY, guestName, missionId)
+      .bind(weddingKeyResolved, guestName, missionId)
       .all();
   } else {
     throw new Error('INVALID_ID');
@@ -300,11 +311,11 @@ export async function deleteGalleryPhoto(db, query, bucket) {
   if (!found.length) throw new Error('NOT_FOUND');
 
   if (id) {
-    await db.prepare(`DELETE FROM desafio_gallery WHERE id = ? AND wedding_key = ?`).bind(id, WEDDING_KEY).run();
+    await db.prepare(`DELETE FROM desafio_gallery WHERE id = ? AND wedding_key = ?`).bind(id, weddingKeyResolved).run();
   } else {
     await db
       .prepare(`DELETE FROM desafio_gallery WHERE wedding_key = ? AND guest_name = ? AND mission_id = ?`)
-      .bind(WEDDING_KEY, guestName, missionId)
+      .bind(weddingKeyResolved, guestName, missionId)
       .run();
   }
   await Promise.all(found.map((row) => deleteObject(bucket, row.object_key)));

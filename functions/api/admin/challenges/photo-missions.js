@@ -43,12 +43,14 @@ export async function onRequestOptions(context) {
 export async function onRequestGet(context) {
   const { request, env } = context;
   const headers = getCorsHeaders(request);
-  const auth = requireAdmin(request, env);
+  const auth = await requireAdmin(request, env);
   if (!auth.ok) return json(headers, { ok: false, error: auth.error, message: auth.message }, auth.status);
   if (!env.DB) return json(headers, { ok: false, error: 'DB_NOT_CONFIGURED' }, 503);
 
+  const wk = auth.weddingKey;
+
   try {
-    const photoMissions = await listPhotoMissionsAdmin(env.DB);
+    const photoMissions = await listPhotoMissionsAdmin(env.DB, wk);
     return json(headers, { ok: true, photoMissions });
   } catch (err) {
     return json(headers, { ok: false, error: 'LIST_FAILED', message: err.message }, 500);
@@ -64,7 +66,7 @@ export async function onRequestPost(context) {
     return json(headers, { ok: false, error: 'ORIGIN_DENIED', message: originCheck.error }, 403);
   }
 
-  const auth = requireAdmin(request, env);
+  const auth = await requireAdmin(request, env);
   if (!auth.ok) return json(headers, { ok: false, error: auth.error, message: auth.message }, auth.status);
   if (!env.DB) return json(headers, { ok: false, error: 'DB_NOT_CONFIGURED' }, 503);
 
@@ -75,9 +77,11 @@ export async function onRequestPost(context) {
     return json(headers, { ok: false, error: 'INVALID_JSON' }, 400);
   }
 
+  const wk = auth.weddingKey;
+
   try {
-    const photoMission = await createPhotoMission(env.DB, body || {});
-    const photoMissions = await listPhotoMissionsAdmin(env.DB);
+    const photoMission = await createPhotoMission(env.DB, body || {}, wk);
+    const photoMissions = await listPhotoMissionsAdmin(env.DB, wk);
     return json(headers, { ok: true, photoMission, photoMissions }, 201);
   } catch (err) {
     return mapWriteError(headers, err);
@@ -93,7 +97,7 @@ export async function onRequestPatch(context) {
     return json(headers, { ok: false, error: 'ORIGIN_DENIED', message: originCheck.error }, 403);
   }
 
-  const auth = requireAdmin(request, env);
+  const auth = await requireAdmin(request, env);
   if (!auth.ok) return json(headers, { ok: false, error: auth.error, message: auth.message }, auth.status);
   if (!env.DB) return json(headers, { ok: false, error: 'DB_NOT_CONFIGURED' }, 503);
 
@@ -106,8 +110,10 @@ export async function onRequestPatch(context) {
 
   if (!body?.id) return json(headers, { ok: false, error: 'MISSING_ID' }, 400);
 
+  const wk = auth.weddingKey;
+
   try {
-    const photoMission = await updatePhotoMission(env.DB, String(body.id), body);
+    const photoMission = await updatePhotoMission(env.DB, String(body.id), body, wk);
     return json(headers, { ok: true, photoMission });
   } catch (err) {
     return mapWriteError(headers, err);
@@ -123,16 +129,18 @@ export async function onRequestDelete(context) {
     return json(headers, { ok: false, error: 'ORIGIN_DENIED', message: originCheck.error }, 403);
   }
 
-  const auth = requireAdmin(request, env);
+  const auth = await requireAdmin(request, env);
   if (!auth.ok) return json(headers, { ok: false, error: auth.error, message: auth.message }, auth.status);
   if (!env.DB) return json(headers, { ok: false, error: 'DB_NOT_CONFIGURED' }, 503);
 
   const id = new URL(request.url).searchParams.get('id');
   if (!id) return json(headers, { ok: false, error: 'MISSING_ID' }, 400);
 
+  const wk = auth.weddingKey;
+
   try {
-    await deletePhotoMission(env.DB, id);
-    const photoMissions = await listPhotoMissionsAdmin(env.DB);
+    await deletePhotoMission(env.DB, id, wk);
+    const photoMissions = await listPhotoMissionsAdmin(env.DB, wk);
     return json(headers, { ok: true, removed: id, photoMissions });
   } catch (err) {
     return mapWriteError(headers, err);

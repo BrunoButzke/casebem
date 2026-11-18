@@ -2,6 +2,28 @@
  * Playlist / vídeo YouTube — D1 Free-tier (sem seed obrigatório).
  */
 
+import { WEDDING_KEY as DEFAULT_WEDDING_KEY } from './messages-validators.mjs';
+
+function resolveWeddingKey(weddingKey) {
+  const k = String(weddingKey || DEFAULT_WEDDING_KEY).trim();
+  return k || DEFAULT_WEDDING_KEY;
+}
+
+/** @type {Map<string, object[]>} */
+let memoryMediaByWedding = new Map();
+
+function ensureMemoryMedia(weddingKey = DEFAULT_WEDDING_KEY) {
+  const key = resolveWeddingKey(weddingKey);
+  if (!memoryMediaByWedding.has(key)) {
+    memoryMediaByWedding.set(key, []);
+  }
+  return memoryMediaByWedding.get(key);
+}
+
+export function resetMemoryMediaForTests() {
+  memoryMediaByWedding = new Map();
+}
+
 /**
  * Extrai videoId de URLs youtube.com / youtu.be / embed.
  * @param {string} raw
@@ -62,16 +84,23 @@ function slugify(name) {
   return base || 'video';
 }
 
-export async function getActiveMedia(db) {
-  if (!db) return [];
+export async function getActiveMedia(db, weddingKey = DEFAULT_WEDDING_KEY) {
+  const key = resolveWeddingKey(weddingKey);
+  if (!db) {
+    return ensureMemoryMedia(key)
+      .filter((i) => i.active)
+      .map((i) => ({ ...i }))
+      .filter((i) => i.videoId);
+  }
   try {
     const rows = await db
       .prepare(
         `SELECT id, title, youtube_url, active, sort_order, updated_at
          FROM media_playlist
-         WHERE active = 1
+         WHERE wedding_key = ? AND active = 1
          ORDER BY sort_order ASC, id ASC`
       )
+      .bind(key)
       .all();
     return (rows?.results || []).map(rowToItem).filter((i) => i.videoId);
   } catch {
@@ -79,13 +108,21 @@ export async function getActiveMedia(db) {
   }
 }
 
-export async function listMediaAdmin(db) {
+export async function listMediaAdmin(db, weddingKey = DEFAULT_WEDDING_KEY) {
+  const key = resolveWeddingKey(weddingKey);
+  if (!db) {
+    return [...ensureMemoryMedia(key)].sort(
+      (a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id)
+    );
+  }
   const rows = await db
     .prepare(
       `SELECT id, title, youtube_url, active, sort_order, updated_at
        FROM media_playlist
+       WHERE wedding_key = ?
        ORDER BY sort_order ASC, id ASC`
     )
+    .bind(key)
     .all();
   return (rows?.results || []).map(rowToItem);
 }
@@ -138,7 +175,8 @@ export function validateMediaPatch(body) {
   return { valid: errors.length === 0, errors, data: out };
 }
 
-export async function createMediaItem(db, body) {
+export async function createMediaItem(db, body, weddingKey = DEFAULT_WEDDING_KEY) {
+  const key = resolveWeddingKey(weddingKey);
   const validation = validateMediaCreate(body);
   if (!validation.valid) {
     const err = new Error('VALIDATION');
@@ -147,16 +185,37 @@ export async function createMediaItem(db, body) {
   }
   const d = validation.data;
   let id = slugify(d.title);
-  const existing = await db.prepare(`SELECT id FROM media_playlist WHERE id = ?`).bind(id).first();
+  const now = new Date().toISOString();
+
+  if (!db) {
+    const mem = ensureMemoryMedia(key);
+    if (mem.some((i) => i.id === id)) {
+      id = `${id.slice(0, 28)}-${Math.random().toString(36).slice(2, 6)}`;
+    }
+    const item = rowToItem({
+      id,
+      title: d.title,
+      youtube_url: d.youtubeUrl,
+      active: 1,
+      sort_order: d.sortOrder ?? 0,
+      updated_at: now,
+    });
+    mem.push(item);
+    return item;
+  }
+
+  const existing = await db
+    .prepare(`SELECT id FROM media_playlist WHERE id = ? AND wedding_key = ?`)
+    .bind(id, key)
+    .first();
   if (existing) id = `${id.slice(0, 28)}-${Math.random().toString(36).slice(2, 6)}`;
 
-  const now = new Date().toISOString();
   await db
     .prepare(
-      `INSERT INTO media_playlist (id, title, youtube_url, active, sort_order, updated_at)
-       VALUES (?, ?, ?, 1, ?, ?)`
+      `INSERT INTO media_playlist (id, wedding_key, title, youtube_url, active, sort_order, updated_at)
+       VALUES (?, ?, ?, ?, 1, ?, ?)`
     )
-    .bind(id, d.title, d.youtubeUrl, d.sortOrder ?? 0, now)
+    .bind(id, key, d.title, d.youtubeUrl, d.sortOrder ?? 0, now)
     .run();
 
   return rowToItem({
@@ -169,11 +228,38 @@ export async function createMediaItem(db, body) {
   });
 }
 
-export async function updateMediaItem(db, itemId, patch) {
+export async function updateMediaItem(db, itemId, patch, weddingKey = DEFAULT_WEDDING_KEY) {
   if (!itemId || typeof itemId !== 'string') throw new Error('INVALID_ID');
+  const key = resolveWeddingKey(weddingKey);
+
+  if (!db) {
+    const mem = ensureMemoryMedia(key);
+    const item = mem.find((x) => x.id === itemId);
+    if (!item) throw new Error('MEDIA_NOT_FOUND');
+    const validation = validateMediaPatch(patch);
+    if (!validation.valid) {
+      const err = new Error('VALIDATION');
+      err.details = validation.errors;
+      throw err;
+    }
+    const d = validation.data;
+    if (Object.keys(d).length === 0) throw new Error('EMPTY_PATCH');
+    const now = new Date().toISOString();
+    if (d.title !== undefined) item.title = d.title;
+    if (d.youtubeUrl !== undefined) {
+      item.youtubeUrl = d.youtubeUrl;
+      item.videoId = extractYoutubeId(d.youtubeUrl);
+      item.embedUrl = item.videoId ? youtubeEmbedUrl(item.videoId) : null;
+    }
+    if (d.active !== undefined) item.active = d.active;
+    if (d.sortOrder !== undefined) item.sortOrder = d.sortOrder;
+    item.updatedAt = now;
+    return { ...item };
+  }
+
   const existing = await db
-    .prepare(`SELECT id FROM media_playlist WHERE id = ?`)
-    .bind(itemId)
+    .prepare(`SELECT id FROM media_playlist WHERE id = ? AND wedding_key = ?`)
+    .bind(itemId, key)
     .first();
   if (!existing) throw new Error('MEDIA_NOT_FOUND');
 
@@ -189,9 +275,9 @@ export async function updateMediaItem(db, itemId, patch) {
   const now = new Date().toISOString();
   const row = await db
     .prepare(
-      `SELECT id, title, youtube_url, active, sort_order FROM media_playlist WHERE id = ?`
+      `SELECT id, title, youtube_url, active, sort_order FROM media_playlist WHERE id = ? AND wedding_key = ?`
     )
-    .bind(itemId)
+    .bind(itemId, key)
     .first();
 
   const next = {
@@ -205,10 +291,31 @@ export async function updateMediaItem(db, itemId, patch) {
     .prepare(
       `UPDATE media_playlist
        SET title = ?, youtube_url = ?, active = ?, sort_order = ?, updated_at = ?
-       WHERE id = ?`
+       WHERE id = ? AND wedding_key = ?`
     )
-    .bind(next.title, next.youtube_url, next.active, next.sort_order, now, itemId)
+    .bind(next.title, next.youtube_url, next.active, next.sort_order, now, itemId, key)
     .run();
 
   return rowToItem({ ...next, id: itemId, updated_at: now });
+}
+
+export async function deleteMediaItem(db, itemId, weddingKey = DEFAULT_WEDDING_KEY) {
+  if (!itemId || typeof itemId !== 'string') throw new Error('INVALID_ID');
+  const key = resolveWeddingKey(weddingKey);
+
+  if (!db) {
+    const mem = ensureMemoryMedia(key);
+    const idx = mem.findIndex((i) => i.id === itemId);
+    if (idx < 0) throw new Error('MEDIA_NOT_FOUND');
+    mem.splice(idx, 1);
+    return { id: itemId, removed: true };
+  }
+
+  const result = await db
+    .prepare(`DELETE FROM media_playlist WHERE id = ? AND wedding_key = ?`)
+    .bind(itemId, key)
+    .run();
+  const changes = Number(result?.meta?.changes ?? result?.changes ?? 0);
+  if (changes === 0) throw new Error('MEDIA_NOT_FOUND');
+  return { id: itemId, removed: true };
 }

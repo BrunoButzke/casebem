@@ -1,10 +1,17 @@
-const SPA_PREFIXES = ['/games', '/app'];
+import { resolveTenantAssetRewrite } from '../functions/_lib/pages-routing.mjs';
+
+const SPA_PREFIXES = ['/games', '/app', '/demo/game'];
 
 export function rewriteMpaSpaUrl(url) {
   const raw = String(url || '/');
   const qIndex = raw.indexOf('?');
   const path = qIndex >= 0 ? raw.slice(0, qIndex) : raw;
   const query = qIndex >= 0 ? raw.slice(qIndex) : '';
+
+  const tenant = resolveTenantAssetRewrite(path);
+  if (tenant?.action === 'rewrite') {
+    return `${tenant.assetPath}${query}`;
+  }
 
   for (const prefix of SPA_PREFIXES) {
     if (path === prefix || path === `${prefix}/`) return raw;

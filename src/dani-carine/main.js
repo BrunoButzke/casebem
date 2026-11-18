@@ -4,7 +4,95 @@ import Lenis from 'lenis';
 import { setupRsvp } from './rsvp.mjs';
 import { initMessages } from './messages.mjs';
 import { setupAdminLogin } from './admin-login.mjs';
+import { applySitePage } from './site-page-apply.mjs';
+import {
+  isPublishedWeddingSite,
+  weddingKeyFromPathname,
+} from '../../functions/_lib/wedding-path.mjs';
 gsap.registerPlugin(ScrollTrigger);
+
+function applyCoupleInitials(left, right) {
+  const L = String(left || '').toUpperCase().slice(0, 1);
+  const R = String(right || '').toUpperCase().slice(0, 1);
+  if (!L && !R) return;
+  document.querySelectorAll('[data-initial-left]').forEach((el) => {
+    if (L) el.textContent = L;
+  });
+  document.querySelectorAll('[data-initial-right]').forEach((el) => {
+    if (R) el.textContent = R;
+  });
+}
+
+function initialsFromCoupleNames(coupleNames, weddingKey) {
+  const fromNames = String(coupleNames || '')
+    .split('&')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (fromNames.length >= 2) {
+    return {
+      left: fromNames[0][0]?.toUpperCase() || '',
+      right: fromNames[1][0]?.toUpperCase() || '',
+    };
+  }
+  const parts = String(weddingKey || '')
+    .split('-')
+    .filter(Boolean);
+  return {
+    left: parts[0]?.[0]?.toUpperCase() || '',
+    right: parts[1]?.[0]?.toUpperCase() || '',
+  };
+}
+
+function hideMapsCtas() {
+  document.querySelectorAll('[data-maps-cta]').forEach((el) => {
+    el.hidden = true;
+  });
+}
+
+async function setupComingSoon() {
+  const weddingKey = weddingKeyFromPathname(location.pathname);
+  const guess = initialsFromCoupleNames('', weddingKey);
+  applyCoupleInitials(guess.left, guess.right);
+  if (!isPublishedWeddingSite(weddingKey)) hideMapsCtas();
+
+  if (isPublishedWeddingSite(weddingKey)) return { comingSoon: false, weddingKey };
+
+  const root = document.getElementById('coming-soon');
+  let coupleNames = weddingKey
+    .split('-')
+    .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+    .join(' & ');
+  let comingSoon = true;
+
+  try {
+    const res = await fetch(`/api/wedding?w=${encodeURIComponent(weddingKey)}`);
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.ok) {
+      if (data.coupleNames) coupleNames = data.coupleNames;
+      comingSoon = Boolean(data.comingSoon);
+      applyCoupleInitials(
+        data.initialLeft || initialsFromCoupleNames(coupleNames, weddingKey).left,
+        data.initialRight || initialsFromCoupleNames(coupleNames, weddingKey).right
+      );
+    }
+  } catch {
+    /* fallback: em breve até ter conteúdo */
+  }
+
+  if (!comingSoon || !root) {
+    document.title = coupleNames;
+    return { comingSoon: false, weddingKey, coupleNames };
+  }
+
+  const coupleEl = root.querySelector('[data-coming-soon-couple]');
+  if (coupleEl) coupleEl.textContent = coupleNames;
+  document.title = `${coupleNames} · Em breve`;
+  root.hidden = false;
+  document.body.classList.add('is-coming-soon');
+  document.body.classList.remove('has-cursor');
+  document.querySelector('.preloader')?.remove();
+  return { comingSoon: true, weddingKey, coupleNames };
+}
 
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const finePointer = matchMedia('(hover: hover) and (pointer: fine)').matches;
@@ -160,7 +248,7 @@ function setupManifesto() {
 }
 
 /** Casamento: 21 nov 2026, 8h — America/Sao_Paulo (UTC−3) */
-const WEDDING_AT = Date.parse('2026-11-21T08:00:00-03:00');
+let WEDDING_AT = Date.parse('2026-11-21T08:00:00-03:00');
 
 function setupCountdown() {
   const root = document.querySelector('.countdown');
@@ -169,6 +257,7 @@ function setupCountdown() {
   const hoursEl = root.querySelector('[data-unit="hours"]');
   const minutesEl = root.querySelector('[data-unit="minutes"]');
   const secondsEl = root.querySelector('[data-unit="seconds"]');
+  if (!daysEl || !hoursEl || !minutesEl || !secondsEl) return;
 
   const pad = (n) => String(Math.max(0, n)).padStart(2, '0');
 
@@ -198,6 +287,11 @@ function setupCountdown() {
   const id = setInterval(() => {
     if (!tick()) clearInterval(id);
   }, 1000);
+
+  window.addEventListener('casebem:event-date', (ev) => {
+    const parsed = Date.parse(ev.detail?.eventDate || '');
+    if (Number.isFinite(parsed)) WEDDING_AT = parsed;
+  });
 }
 
 function formatBRL(value) {
@@ -225,6 +319,8 @@ function setupGifts() {
   const payBtn = modal.querySelector('#gift-pay');
   const formBox = modal.querySelector('[data-gift-form]');
   const pixBox = modal.querySelector('[data-gift-pix]');
+  const successBox = modal.querySelector('[data-gift-success]');
+  const chromeEls = [...modal.querySelectorAll('[data-gift-chrome]')];
   const errorEl = modal.querySelector('[data-gift-error]');
   const pixStatus = modal.querySelector('[data-pix-status]');
   const pixQr = modal.querySelector('[data-pix-qr]');
@@ -261,9 +357,17 @@ function setupGifts() {
     }
   };
 
+  const setChromeVisible = (visible) => {
+    chromeEls.forEach((el) => {
+      el.hidden = !visible;
+    });
+  };
+
   const showForm = () => {
+    setChromeVisible(true);
     formBox.hidden = false;
     pixBox.hidden = true;
+    if (successBox) successBox.hidden = true;
     pixBack.hidden = true;
     pixQr.hidden = true;
     pixQr.removeAttribute('src');
@@ -279,9 +383,11 @@ function setupGifts() {
   };
 
   const showPix = (payment) => {
+    setChromeVisible(true);
     formBox.hidden = true;
     customBox.hidden = true;
     fixedBox.hidden = true;
+    if (successBox) successBox.hidden = true;
     pixBox.hidden = false;
     pixBack.hidden = false;
     pixBack.textContent = 'Voltar';
@@ -296,6 +402,16 @@ function setupGifts() {
       pixQr.hidden = true;
       pixQr.removeAttribute('src');
     }
+  };
+
+  const showSuccess = () => {
+    stopPolling();
+    setChromeVisible(false);
+    formBox.hidden = true;
+    customBox.hidden = true;
+    fixedBox.hidden = true;
+    pixBox.hidden = true;
+    if (successBox) successBox.hidden = false;
   };
 
   const closeModal = () => {
@@ -353,10 +469,7 @@ function setupGifts() {
         const data = await res.json();
         if (!res.ok) return;
         if (data.status === 'approved') {
-          stopPolling();
-          pixStatus.textContent = 'Pagamento confirmado. Obrigado!';
-          pixBack.hidden = false;
-          pixBack.textContent = 'Fechar';
+          showSuccess();
         } else if (data.status === 'cancelled' || data.status === 'rejected') {
           stopPolling();
           pixStatus.textContent = 'Pagamento não concluído. Tente de novo.';
@@ -459,11 +572,8 @@ function setupGifts() {
   });
 
   pixBack?.addEventListener('click', () => {
-    if (pixStatus.textContent.includes('confirmado')) closeModal();
-    else {
-      stopPolling();
-      showForm();
-    }
+    stopPolling();
+    showForm();
   });
 }
 
@@ -640,10 +750,16 @@ async function runPreloader() {
 }
 
 
-function boot() {
+async function boot() {
   cloneMarquee();
   setupCursor();
   setupMagnetic();
+  const gate = await setupComingSoon();
+  if (gate.comingSoon) {
+    setupAdminLogin();
+    return;
+  }
+
   setupNav();
   setupProgress();
   setupParallax();
@@ -654,6 +770,7 @@ function boot() {
   setupRsvp();
   initMessages();
   setupAdminLogin();
+  await applySitePage(fetch, gate.weddingKey);
   setupReveals();
   ScrollTrigger.sort();
   window.addEventListener('load', () => ScrollTrigger.refresh());

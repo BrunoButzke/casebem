@@ -4,6 +4,7 @@
 
 import { CartStorage } from './cart-storage.mjs';
 import { GIFTS_CATALOG, getGiftById as getStaticGiftById, formatPrice } from '../../data/gifts-catalog.mjs';
+import { weddingKeyFromPathname } from '../../functions/_lib/wedding-path.mjs';
 
 let cart = null;
 let _window = null;
@@ -21,7 +22,8 @@ function getGiftById(giftId) {
 async function refreshCatalogFromApi() {
   if (!_fetch) return;
   try {
-    const res = await _fetch('/api/gifts/catalog');
+    const w = weddingKeyFromPathname(_window?.location?.pathname || '/dani-carine/');
+    const res = await _fetch(`/api/gifts/catalog?w=${encodeURIComponent(w)}`);
     const data = await res.json().catch(() => ({}));
     if (res.ok && data?.ok && Array.isArray(data.gifts) && data.gifts.length > 0) {
       liveCatalog = data.gifts;

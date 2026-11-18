@@ -1,4 +1,5 @@
 import { createPixPayment } from '../_lib/mercadopago.mjs';
+import { recordGiftCheckoutIntent } from '../_lib/admin-service.mjs';
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -24,6 +25,23 @@ export async function onRequestPost(context) {
       { error: result.error, details: result.details },
       { status: result.status || 500 },
     );
+  }
+
+  if (env.DB) {
+    try {
+      await recordGiftCheckoutIntent(env.DB, {
+        paymentId: result.payment.id,
+        amount: result.payment.amount,
+        giftId: body.giftId,
+        title: body.title,
+        gifterName: body.payerName || body.email,
+        email: body.email,
+        qrCode: result.payment.qrCode,
+        qrCodeBase64: result.payment.qrCodeBase64,
+      });
+    } catch (err) {
+      console.error('recordGiftCheckoutIntent failed', err?.message || err);
+    }
   }
 
   return Response.json(result.payment);

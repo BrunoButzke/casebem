@@ -61,7 +61,16 @@ export function setupAdminLogin(windowContext = window) {
         return;
       }
       windowContext.sessionStorage.setItem(ADMIN_STORAGE_KEY, data.token);
-      windowContext.location.href = '/dani-carine/admin.html';
+      windowContext.sessionStorage.setItem(
+        `${ADMIN_STORAGE_KEY}:role`,
+        data.role || 'tenant'
+      );
+      const dest =
+        data.role === 'super'
+          ? '/dani-carine/admin'
+          : data.adminPath ||
+            (data.weddingKey ? `/${data.weddingKey}/admin` : '/dani-carine/admin');
+      windowContext.location.href = dest;
     } catch {
       showError('Não deu para entrar. Tente de novo.');
     }

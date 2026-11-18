@@ -1,6 +1,7 @@
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import Lenis from 'lenis';
+import { setupAdminLogin } from '../dani-carine/admin-login.mjs';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -366,92 +367,120 @@ function confetti(originEl) {
   }
 }
 
-function initWaitlist() {
+function isStrongPassword(password) {
+  const p = String(password || '');
+  return (
+    p.length >= 8 &&
+    /[A-Z]/.test(p) &&
+    /[0-9]/.test(p) &&
+    /[^A-Za-z0-9]/.test(p)
+  );
+}
+
+function initRegister() {
   const root = $('.waitlist');
   if (!root) return;
-  const form = $('.waitlist__form', root);
+  const form = $('#register-form', root) || $('.waitlist__form', root);
   const success = $('.waitlist__success', root);
   const msg = $('.waitlist__msg', root);
+  if (!form || !success || !msg) return;
   const button = form.querySelector('button[type="submit"]');
-  const payBtn = $('[data-pay-plan]', success);
-  const payMsg = $('[data-pay-msg]', success);
   const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-  let savedEmail = '';
-  let savedPlan = 'pro';
-
-  const updatePayButton = () => {
-    if (!payBtn) return;
-    if (success.hidden) return;
-    // Checkout pausado — reativar quando MP estiver ok
-    payBtn.hidden = false;
-    payBtn.disabled = true;
-    payBtn.textContent = 'Pagamento em breve';
-    if (savedPlan === 'basic') {
-      payMsg.textContent = 'Plano Básico é gratuito. Entraremos em contato em breve!';
-    } else {
-      payMsg.textContent = 'Checkout temporariamente pausado — em breve liberamos.';
-    }
-  };
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const name = form.name.value.trim();
+    const yourName = form.yourName.value.trim();
+    const partnerName = form.partnerName.value.trim();
+    const role = form.querySelector('input[name="role"]:checked')?.value || '';
     const email = form.email.value.trim().toLowerCase();
+    const password = form.password.value;
+    const passwordConfirm = form.passwordConfirm.value;
     const consent = form.consent.checked;
-    const plan = form.querySelector('input[name="plan"]:checked')?.value || 'pro';
-    const emailField = form.email.closest('.waitlist__field');
-    const nameField = form.name.closest('.waitlist__field');
 
-    emailField.classList.remove('is-error');
-    nameField.classList.remove('is-error');
+    $$('.waitlist__field', form).forEach((el) => el.classList.remove('is-error'));
     msg.textContent = '';
 
-    if (!name) {
-      nameField.classList.add('is-error');
-      msg.textContent = 'Conta pra gente como te chamamos.';
+    if (yourName.length < 2) {
+      form.yourName.closest('.waitlist__field')?.classList.add('is-error');
+      msg.textContent = 'Informe seu nome.';
+      return;
+    }
+    if (partnerName.length < 2) {
+      form.partnerName.closest('.waitlist__field')?.classList.add('is-error');
+      msg.textContent = 'Informe o nome de quem vai casar com você.';
+      return;
+    }
+    if (!role) {
+      msg.textContent = 'Escolha se você é Noiva ou Noivo.';
       return;
     }
     if (!EMAIL_RE.test(email)) {
-      emailField.classList.add('is-error');
+      form.email.closest('.waitlist__field')?.classList.add('is-error');
       msg.textContent = 'Digite um e-mail válido.';
       return;
     }
+    if (!isStrongPassword(password)) {
+      form.password.closest('.waitlist__field')?.classList.add('is-error');
+      msg.textContent =
+        'Senha com pelo menos 8 caracteres, uma maiúscula, um número e um caractere especial.';
+      return;
+    }
+    if (password !== passwordConfirm) {
+      form.passwordConfirm.closest('.waitlist__field')?.classList.add('is-error');
+      msg.textContent = 'A confirmação da senha não confere.';
+      return;
+    }
     if (!consent) {
-      msg.textContent = 'Marque o consentimento para receber o aviso.';
+      msg.textContent = 'Aceite os termos para criar a conta.';
       return;
     }
 
-    savedEmail = email;
-    savedPlan = plan;
     button.disabled = true;
-    button.textContent = 'Enviando…';
-    await new Promise((r) => setTimeout(r, 700));
+    button.textContent = 'Criando…';
 
-    $('[data-success-email]', success).textContent = email;
-    confetti(button);
-    gsap.to(form, {
-      opacity: 0,
-      y: -20,
-      duration: 0.4,
-      onComplete: () => {
-        form.hidden = true;
-        success.hidden = false;
-        gsap.from(success, { opacity: 0, y: 30, duration: 0.6, ease: 'power3.out' });
-        updatePayButton();
-      },
-    });
-  });
+    try {
+      const res = await fetch('/api/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          yourName,
+          partnerName,
+          role,
+          email,
+          password,
+          passwordConfirm,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        msg.textContent = data.message || 'Não foi possível criar o cadastro. Tente de novo.';
+        button.disabled = false;
+        button.textContent = 'Criar cadastro';
+        return;
+      }
 
-  form.addEventListener('change', (e) => {
-    if (e.target.name === 'plan') {
-      savedPlan = e.target.value;
-      updatePayButton();
+      $('[data-success-email]', success).textContent = email;
+      const tenantEl = $('[data-success-tenant]', success);
+      if (tenantEl) tenantEl.textContent = data.tenantId || '—';
+      const adminLink = $('[data-success-admin]', success);
+      if (adminLink && data.adminPath) adminLink.setAttribute('href', data.adminPath);
+
+      confetti(button);
+      gsap.to(form, {
+        opacity: 0,
+        y: -20,
+        duration: 0.4,
+        onComplete: () => {
+          form.hidden = true;
+          success.hidden = false;
+          gsap.from(success, { opacity: 0, y: 30, duration: 0.6, ease: 'power3.out' });
+        },
+      });
+    } catch {
+      msg.textContent = 'Falha de rede. Tente de novo em instantes.';
+      button.disabled = false;
+      button.textContent = 'Criar cadastro';
     }
-  });
-
-  payBtn?.addEventListener('click', async () => {
-    if (payBtn.disabled) return;
-    payMsg.textContent = 'Checkout temporariamente pausado — em breve liberamos.';
   });
 }
 
@@ -469,7 +498,8 @@ async function boot() {
   initCursor();
   initMagnetic();
   initPhoneTilt();
-  initWaitlist();
+  initRegister();
+  setupAdminLogin();
 
   if (reducedMotion) {
     $('.preloader')?.remove();

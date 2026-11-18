@@ -4,6 +4,15 @@
  */
 
 import { LODGING_TIPS } from '../../data/lodging-tips.mjs';
+import { WEDDING_KEY as DEFAULT_WEDDING_KEY } from './messages-validators.mjs';
+
+function resolveWeddingKey(weddingKey) {
+  const k = String(weddingKey || DEFAULT_WEDDING_KEY).trim();
+  return k || DEFAULT_WEDDING_KEY;
+}
+
+/** @type {Map<string, object[]>} */
+let memoryLodgingByWedding = new Map();
 
 function rowToTip(row) {
   return {
@@ -19,6 +28,36 @@ function rowToTip(row) {
   };
 }
 
+function staticActiveLodgingFallback() {
+  return LODGING_TIPS.map((t, i) => ({
+    ...t,
+    active: true,
+    sortOrder: i,
+    updatedAt: null,
+  }));
+}
+
+function ensureMemoryLodging(weddingKey = DEFAULT_WEDDING_KEY) {
+  const key = resolveWeddingKey(weddingKey);
+  if (!memoryLodgingByWedding.has(key)) {
+    const list =
+      key === DEFAULT_WEDDING_KEY
+        ? LODGING_TIPS.map((t, i) => ({
+            ...t,
+            active: true,
+            sortOrder: i,
+            updatedAt: null,
+          }))
+        : [];
+    memoryLodgingByWedding.set(key, list);
+  }
+  return memoryLodgingByWedding.get(key);
+}
+
+export function resetMemoryLodgingForTests() {
+  memoryLodgingByWedding = new Map();
+}
+
 export function slugifyLodgingId(name) {
   const base = String(name || '')
     .normalize('NFD')
@@ -30,8 +69,22 @@ export function slugifyLodgingId(name) {
   return base || 'dica';
 }
 
-export async function seedLodgingIfEmpty(db) {
-  const countRow = await db.prepare(`SELECT COUNT(*) AS c FROM lodging_tips`).first();
+export async function seedLodgingIfEmpty(db, weddingKey = DEFAULT_WEDDING_KEY) {
+  const key = resolveWeddingKey(weddingKey);
+  if (!db) {
+    return { seeded: false, count: ensureMemoryLodging(key).length };
+  }
+  if (key !== DEFAULT_WEDDING_KEY) {
+    const countRow = await db
+      .prepare(`SELECT COUNT(*) AS c FROM lodging_tips WHERE wedding_key = ?`)
+      .bind(key)
+      .first();
+    return { seeded: false, count: Number(countRow?.c || 0) };
+  }
+  const countRow = await db
+    .prepare(`SELECT COUNT(*) AS c FROM lodging_tips WHERE wedding_key = ?`)
+    .bind(key)
+    .first();
   const count = Number(countRow?.c || 0);
   if (count > 0) return { seeded: false, count };
 
@@ -41,11 +94,12 @@ export async function seedLodgingIfEmpty(db) {
     await db
       .prepare(
         `INSERT INTO lodging_tips (
-          id, name, description, area, maps_url, website_url, active, sort_order, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)`
+          id, wedding_key, name, description, area, maps_url, website_url, active, sort_order, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`
       )
       .bind(
         tip.id,
+        key,
         tip.name,
         tip.description,
         tip.area || '',
@@ -60,56 +114,52 @@ export async function seedLodgingIfEmpty(db) {
 }
 
 /**
- * Active tips for public site. Falls back to static if D1 empty/unavailable.
+ * Active tips for public site. Falls back to static if D1 empty/unavailable (default tenant only).
  */
-export async function getActiveLodging(db) {
+export async function getActiveLodging(db, weddingKey = DEFAULT_WEDDING_KEY) {
+  const key = resolveWeddingKey(weddingKey);
   if (!db) {
-    return LODGING_TIPS.map((t, i) => ({
-      ...t,
-      active: true,
-      sortOrder: i,
-      updatedAt: null,
-    }));
+    return ensureMemoryLodging(key)
+      .filter((t) => t.active)
+      .map((t) => ({ ...t }));
   }
 
   try {
-    await seedLodgingIfEmpty(db);
+    await seedLodgingIfEmpty(db, key);
     const rows = await db
       .prepare(
         `SELECT id, name, description, area, maps_url, website_url, active, sort_order, updated_at
          FROM lodging_tips
-         WHERE active = 1
+         WHERE wedding_key = ? AND active = 1
          ORDER BY sort_order ASC, id ASC`
       )
+      .bind(key)
       .all();
     const list = (rows?.results || []).map(rowToTip);
-    if (list.length === 0) {
-      return LODGING_TIPS.map((t, i) => ({
-        ...t,
-        active: true,
-        sortOrder: i,
-        updatedAt: null,
-      }));
-    }
+    if (list.length === 0 && key === DEFAULT_WEDDING_KEY) return staticActiveLodgingFallback();
     return list;
   } catch {
-    return LODGING_TIPS.map((t, i) => ({
-      ...t,
-      active: true,
-      sortOrder: i,
-      updatedAt: null,
-    }));
+    if (key === DEFAULT_WEDDING_KEY) return staticActiveLodgingFallback();
+    return [];
   }
 }
 
-export async function listLodgingAdmin(db) {
-  await seedLodgingIfEmpty(db);
+export async function listLodgingAdmin(db, weddingKey = DEFAULT_WEDDING_KEY) {
+  const key = resolveWeddingKey(weddingKey);
+  if (!db) {
+    return [...ensureMemoryLodging(key)].sort(
+      (a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id)
+    );
+  }
+  await seedLodgingIfEmpty(db, key);
   const rows = await db
     .prepare(
       `SELECT id, name, description, area, maps_url, website_url, active, sort_order, updated_at
        FROM lodging_tips
+       WHERE wedding_key = ?
        ORDER BY sort_order ASC, id ASC`
     )
+    .bind(key)
     .all();
   return (rows?.results || []).map(rowToTip);
 }
@@ -205,7 +255,8 @@ export function validateLodgingPatch(body) {
   return { valid: errors.length === 0, errors, data: out };
 }
 
-export async function createLodgingTip(db, body) {
+export async function createLodgingTip(db, body, weddingKey = DEFAULT_WEDDING_KEY) {
+  const key = resolveWeddingKey(weddingKey);
   const validation = validateLodgingCreate(body);
   if (!validation.valid) {
     const err = new Error('VALIDATION');
@@ -214,21 +265,45 @@ export async function createLodgingTip(db, body) {
   }
   const d = validation.data;
   let id = d.id || slugifyLodgingId(d.name);
+  const now = new Date().toISOString();
 
-  const existing = await db.prepare(`SELECT id FROM lodging_tips WHERE id = ?`).bind(id).first();
+  if (!db) {
+    const mem = ensureMemoryLodging(key);
+    if (mem.some((t) => t.id === id)) {
+      id = `${id.slice(0, 28)}-${Math.random().toString(36).slice(2, 6)}`;
+    }
+    const tip = {
+      id,
+      name: d.name,
+      description: d.description,
+      area: d.area || '',
+      mapsUrl: d.mapsUrl || '',
+      websiteUrl: d.websiteUrl || '',
+      active: true,
+      sortOrder: d.sortOrder ?? 0,
+      updatedAt: now,
+    };
+    mem.push(tip);
+    return tip;
+  }
+
+  const existing = await db
+    .prepare(`SELECT id FROM lodging_tips WHERE id = ? AND wedding_key = ?`)
+    .bind(id, key)
+    .first();
   if (existing) {
     id = `${id.slice(0, 28)}-${Math.random().toString(36).slice(2, 6)}`;
   }
 
-  const now = new Date().toISOString();
   await db
     .prepare(
       `INSERT INTO lodging_tips (
-        id, name, description, area, maps_url, website_url, active, sort_order, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)`
+        id, wedding_key, name, description, area, maps_url, website_url, active, sort_order, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`
     )
     .bind(
       id,
+      key,
       d.name,
       d.description,
       d.area || '',
@@ -252,11 +327,37 @@ export async function createLodgingTip(db, body) {
   });
 }
 
-export async function updateLodgingTip(db, tipId, patch) {
+export async function updateLodgingTip(db, tipId, patch, weddingKey = DEFAULT_WEDDING_KEY) {
   if (!tipId || typeof tipId !== 'string') throw new Error('INVALID_TIP_ID');
+  const key = resolveWeddingKey(weddingKey);
+
+  if (!db) {
+    const mem = ensureMemoryLodging(key);
+    const t = mem.find((x) => x.id === tipId);
+    if (!t) throw new Error('TIP_NOT_FOUND');
+    const validation = validateLodgingPatch(patch);
+    if (!validation.valid) {
+      const err = new Error('VALIDATION');
+      err.details = validation.errors;
+      throw err;
+    }
+    const d = validation.data;
+    if (Object.keys(d).length === 0) throw new Error('EMPTY_PATCH');
+    const now = new Date().toISOString();
+    if (d.name !== undefined) t.name = d.name;
+    if (d.description !== undefined) t.description = d.description;
+    if (d.area !== undefined) t.area = d.area;
+    if (d.mapsUrl !== undefined) t.mapsUrl = d.mapsUrl;
+    if (d.websiteUrl !== undefined) t.websiteUrl = d.websiteUrl;
+    if (d.active !== undefined) t.active = d.active;
+    if (d.sortOrder !== undefined) t.sortOrder = d.sortOrder;
+    t.updatedAt = now;
+    return { ...t };
+  }
+
   const existing = await db
-    .prepare(`SELECT id FROM lodging_tips WHERE id = ?`)
-    .bind(tipId)
+    .prepare(`SELECT id FROM lodging_tips WHERE id = ? AND wedding_key = ?`)
+    .bind(tipId, key)
     .first();
   if (!existing) throw new Error('TIP_NOT_FOUND');
 
@@ -273,9 +374,9 @@ export async function updateLodgingTip(db, tipId, patch) {
   const row = await db
     .prepare(
       `SELECT id, name, description, area, maps_url, website_url, active, sort_order
-       FROM lodging_tips WHERE id = ?`
+       FROM lodging_tips WHERE id = ? AND wedding_key = ?`
     )
-    .bind(tipId)
+    .bind(tipId, key)
     .first();
 
   const next = {
@@ -293,7 +394,7 @@ export async function updateLodgingTip(db, tipId, patch) {
       `UPDATE lodging_tips
        SET name = ?, description = ?, area = ?, maps_url = ?, website_url = ?,
            active = ?, sort_order = ?, updated_at = ?
-       WHERE id = ?`
+       WHERE id = ? AND wedding_key = ?`
     )
     .bind(
       next.name,
@@ -304,7 +405,8 @@ export async function updateLodgingTip(db, tipId, patch) {
       next.active,
       next.sort_order,
       now,
-      tipId
+      tipId,
+      key
     )
     .run();
 

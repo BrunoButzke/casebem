@@ -2,7 +2,13 @@
  * Rifas / vendas e sorteios — D1 + memory fallback (Vite local).
  */
 
-import { WEDDING_KEY } from './challenges-validators.mjs';
+import { WEDDING_KEY as DEFAULT_WEDDING_KEY } from './challenges-validators.mjs';
+
+function resolveWeddingKey(weddingKey) {
+  const k = String(weddingKey || DEFAULT_WEDDING_KEY).trim();
+  return k || DEFAULT_WEDDING_KEY;
+}
+
 
 const MAX_IMAGE_DATA = 180_000;
 const NAME_MIN = 2;
@@ -144,10 +150,13 @@ function validatePatch(body) {
   return { valid: errors.length === 0, errors, data: out };
 }
 
-async function deactivateOthers(db, keepId) {
+async function deactivateOthers(db, keepId, weddingKey = DEFAULT_WEDDING_KEY) {
+  const key = resolveWeddingKey(weddingKey);
   if (!db) {
     for (const [id, row] of memoryRaffles) {
-      if (id !== keepId) memoryRaffles.set(id, { ...row, active: false });
+      if (id !== keepId && (row.weddingKey || DEFAULT_WEDDING_KEY) === key) {
+        memoryRaffles.set(id, { ...row, active: false });
+      }
     }
     return;
   }
@@ -156,7 +165,7 @@ async function deactivateOthers(db, keepId) {
       `UPDATE desafio_raffles SET active = 0, updated_at = ?
        WHERE wedding_key = ? AND id != ? AND active = 1`
     )
-    .bind(new Date().toISOString(), WEDDING_KEY, keepId)
+    .bind(new Date().toISOString(), key, keepId)
     .run();
 }
 
@@ -261,9 +270,11 @@ async function listTakenNumbers(db, raffleId) {
   return (result?.results || []).map((r) => Number(r.number));
 }
 
-export async function listRafflesAdmin(db) {
+export async function listRafflesAdmin(db, weddingKey = DEFAULT_WEDDING_KEY) {
+  const weddingKeyResolved = resolveWeddingKey(weddingKey);
   if (!db) {
     return [...memoryRaffles.values()]
+      .filter((r) => (r.weddingKey || DEFAULT_WEDDING_KEY) === weddingKeyResolved)
       .map(rowToRaffle)
       .sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
   }
@@ -274,12 +285,63 @@ export async function listRafflesAdmin(db) {
        WHERE wedding_key = ?
        ORDER BY updated_at DESC, id`
     )
-    .bind(WEDDING_KEY)
+    .bind(weddingKeyResolved)
     .all();
   return (result?.results || []).map(rowToRaffle);
 }
 
-export async function createRaffle(db, body) {
+/** Vendas de rifa (números vendidos) para o painel financeiro / rifas. */
+export async function listRaffleSalesAdmin(db, { limit = 200 } = {}, weddingKey = DEFAULT_WEDDING_KEY) {
+  const weddingKeyResolved = resolveWeddingKey(weddingKey);
+  const safeLimit = Math.min(Math.max(Number(limit) || 200, 1), 500);
+
+  if (!db) {
+    const out = [];
+    for (const raffle of memoryRaffles.values()) {
+      if ((raffle.weddingKey || DEFAULT_WEDDING_KEY) !== weddingKeyResolved) continue;
+      for (const s of memorySales.get(raffle.id) || []) {
+        if (!isSoldStatus(s.status)) continue;
+        out.push({
+          raffleId: raffle.id,
+          raffleName: raffle.name,
+          number: Number(s.number),
+          guestName: s.guestName || 'Convidado',
+          priceCents: Number(raffle.priceCents) || 0,
+          createdAt: s.createdAt || '',
+        });
+      }
+    }
+    return out
+      .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
+      .slice(0, safeLimit);
+  }
+
+  const result = await db
+    .prepare(
+      `SELECT s.raffle_id AS raffleId, r.name AS raffleName, s.number, s.guest_name AS guestName,
+              r.price_cents AS priceCents, s.created_at AS createdAt
+       FROM desafio_raffle_sales s
+       INNER JOIN desafio_raffles r ON r.id = s.raffle_id
+       WHERE r.wedding_key = ?
+         AND (s.status IS NULL OR s.status = 'sold')
+       ORDER BY s.created_at DESC
+       LIMIT ?`
+    )
+    .bind(weddingKeyResolved, safeLimit)
+    .all();
+
+  return (result?.results || []).map((r) => ({
+    raffleId: r.raffleId,
+    raffleName: r.raffleName,
+    number: Number(r.number),
+    guestName: r.guestName || 'Convidado',
+    priceCents: Number(r.priceCents) || 0,
+    createdAt: r.createdAt || '',
+  }));
+}
+
+export async function createRaffle(db, body, weddingKey = DEFAULT_WEDDING_KEY) {
+  const weddingKeyResolved = resolveWeddingKey(weddingKey);
   const validation = validateCreate(body);
   if (!validation.valid) throwValidation(validation.errors);
   const d = validation.data;
@@ -287,9 +349,10 @@ export async function createRaffle(db, body) {
 
   if (!db) {
     if (memoryRaffles.has(d.id)) throw new Error('EXISTS');
-    if (d.active) await deactivateOthers(null, d.id);
+    if (d.active) await deactivateOthers(null, d.id, weddingKeyResolved);
     const row = {
       id: d.id,
+      weddingKey: weddingKeyResolved,
       name: d.name,
       imageData: d.imageData,
       totalNumbers: d.totalNumbers,
@@ -303,7 +366,7 @@ export async function createRaffle(db, body) {
     return rowToRaffle(row);
   }
 
-  if (d.active) await deactivateOthers(db, d.id);
+  if (d.active) await deactivateOthers(db, d.id, weddingKeyResolved);
 
   try {
     await db
@@ -314,7 +377,7 @@ export async function createRaffle(db, body) {
       )
       .bind(
         d.id,
-        WEDDING_KEY,
+        weddingKeyResolved,
         d.name,
         d.imageData,
         d.totalNumbers,
@@ -343,7 +406,8 @@ export async function createRaffle(db, body) {
   });
 }
 
-export async function updateRaffle(db, id, body) {
+export async function updateRaffle(db, id, body, weddingKey = DEFAULT_WEDDING_KEY) {
+  const weddingKeyResolved = resolveWeddingKey(weddingKey);
   const raffleId = String(id || '').trim();
   if (!raffleId) throw new Error('INVALID_ID');
   const validation = validatePatch(body || {});
@@ -357,7 +421,7 @@ export async function updateRaffle(db, id, body) {
   if (!db) {
     const existing = memoryRaffles.get(raffleId);
     if (!existing) throw new Error('NOT_FOUND');
-    if (d.active === true) await deactivateOthers(null, raffleId);
+    if (d.active === true) await deactivateOthers(null, raffleId, weddingKeyResolved);
     const next = {
       ...existing,
       name: d.name ?? existing.name,
@@ -376,11 +440,11 @@ export async function updateRaffle(db, id, body) {
       `SELECT id, name, image_data, total_numbers, price_cents, active, created_at, updated_at
        FROM desafio_raffles WHERE id = ? AND wedding_key = ?`
     )
-    .bind(raffleId, WEDDING_KEY)
+    .bind(raffleId, weddingKeyResolved)
     .first();
   if (!existing) throw new Error('NOT_FOUND');
 
-  if (d.active === true) await deactivateOthers(db, raffleId);
+  if (d.active === true) await deactivateOthers(db, raffleId, weddingKeyResolved);
 
   const next = {
     name: d.name ?? existing.name,
@@ -404,7 +468,7 @@ export async function updateRaffle(db, id, body) {
       next.active ? 1 : 0,
       now,
       raffleId,
-      WEDDING_KEY
+      weddingKeyResolved
     )
     .run();
 
@@ -420,7 +484,8 @@ export async function updateRaffle(db, id, body) {
   });
 }
 
-export async function deleteRaffle(db, id) {
+export async function deleteRaffle(db, id, weddingKey = DEFAULT_WEDDING_KEY) {
+  const weddingKeyResolved = resolveWeddingKey(weddingKey);
   const raffleId = String(id || '').trim();
   if (!raffleId) throw new Error('INVALID_ID');
 
@@ -433,14 +498,14 @@ export async function deleteRaffle(db, id) {
 
   const existing = await db
     .prepare(`SELECT id FROM desafio_raffles WHERE id = ? AND wedding_key = ?`)
-    .bind(raffleId, WEDDING_KEY)
+    .bind(raffleId, weddingKeyResolved)
     .first();
   if (!existing) throw new Error('NOT_FOUND');
 
   await db.prepare(`DELETE FROM desafio_raffle_sales WHERE raffle_id = ?`).bind(raffleId).run();
   await db
     .prepare(`DELETE FROM desafio_raffles WHERE id = ? AND wedding_key = ?`)
-    .bind(raffleId, WEDDING_KEY)
+    .bind(raffleId, weddingKeyResolved)
     .run();
 }
 
@@ -470,7 +535,8 @@ async function listMySoldNumbers(db, raffleId, guestName) {
  * Números vendidos da rifa ativa (para sorteio no painel).
  * @returns {Promise<{raffle: object|null, entries: Array<{number:number, guestName:string}>}>}
  */
-export async function listActiveRaffleSoldEntries(db) {
+export async function listActiveRaffleSoldEntries(db, weddingKey = DEFAULT_WEDDING_KEY) {
+  const weddingKeyResolved = resolveWeddingKey(weddingKey);
   await purgeExpiredHolds(db);
 
   let raffle = null;
@@ -496,7 +562,7 @@ export async function listActiveRaffleSoldEntries(db) {
        ORDER BY updated_at DESC
        LIMIT 1`
     )
-    .bind(WEDDING_KEY)
+    .bind(weddingKeyResolved)
     .first();
   if (!row) return { raffle: null, entries: [] };
   raffle = rowToRaffle(row);
@@ -519,7 +585,8 @@ export async function listActiveRaffleSoldEntries(db) {
   return { raffle, entries };
 }
 
-export async function getActiveRafflePublic(db, { guestName = '' } = {}) {
+export async function getActiveRafflePublic(db, { guestName = '' } = {}, weddingKey = DEFAULT_WEDDING_KEY) {
+  const weddingKeyResolved = resolveWeddingKey(weddingKey);
   await purgeExpiredHolds(db);
   let raffle = null;
   if (!db) {
@@ -535,7 +602,7 @@ export async function getActiveRafflePublic(db, { guestName = '' } = {}) {
          ORDER BY updated_at DESC
          LIMIT 1`
       )
-      .bind(WEDDING_KEY)
+      .bind(weddingKeyResolved)
       .first();
     if (!row) return null;
     raffle = rowToRaffle(row);
@@ -590,7 +657,7 @@ async function bumpRaffleTotal(db, raffleId, newTotal) {
            updated_at = ?
        WHERE id = ? AND wedding_key = ?`
     )
-    .bind(newTotal, newTotal, now, raffleId, WEDDING_KEY)
+    .bind(newTotal, newTotal, now, raffleId, DEFAULT_WEDDING_KEY)
     .run();
 }
 
@@ -598,7 +665,8 @@ async function bumpRaffleTotal(db, raffleId, newTotal) {
  * Finaliza holds pendentes → vendidos.
  * Se o hold expirou, realoca números livres / sequenciais e expande o total se preciso.
  */
-export async function finalizeRaffleSalesByIntent(db, intentKey) {
+export async function finalizeRaffleSalesByIntent(db, intentKey, weddingKey = DEFAULT_WEDDING_KEY) {
+  const weddingKeyResolved = resolveWeddingKey(weddingKey);
   const key = String(intentKey || '').trim();
   if (!key) return { updated: 0, numbers: [] };
   const now = new Date().toISOString();
@@ -683,7 +751,7 @@ export async function finalizeRaffleSalesByIntent(db, intentKey) {
       `SELECT id, total_numbers AS totalNumbers FROM desafio_raffles
        WHERE id = ? AND wedding_key = ?`
     )
-    .bind(raffleId, WEDDING_KEY)
+    .bind(raffleId, weddingKeyResolved)
     .first();
   if (!raffleRow) return { updated: 0, numbers: [], reassigned: false };
 
@@ -724,7 +792,8 @@ export async function finalizeRaffleSalesByIntent(db, intentKey) {
 /**
  * Cria Pix + hold dos números selecionados.
  */
-export async function createRaffleCheckout(db, env, body, { origin = null } = {}) {
+export async function createRaffleCheckout(db, env, body, { origin = null } = {}, weddingKey = DEFAULT_WEDDING_KEY) {
+  const weddingKeyResolved = resolveWeddingKey(weddingKey);
   if (!db) {
     return {
       ok: false,
@@ -773,7 +842,7 @@ export async function createRaffleCheckout(db, env, body, { origin = null } = {}
       `SELECT id, name, total_numbers, price_cents, active
        FROM desafio_raffles WHERE id = ? AND wedding_key = ? AND active = 1`
     )
-    .bind(raffleId, WEDDING_KEY)
+    .bind(raffleId, weddingKeyResolved)
     .first();
   if (!raffleRow) {
     return { ok: false, status: 404, error: 'NO_ACTIVE_RAFFLE', message: 'Sorteio não encontrado ou inativo' };

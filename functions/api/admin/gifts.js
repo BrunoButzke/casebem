@@ -46,12 +46,12 @@ export async function onRequestOptions(context) {
 export async function onRequestGet(context) {
   const { request, env } = context;
   const headers = getCorsHeaders(request);
-  const auth = requireAdmin(request, env);
+  const auth = await requireAdmin(request, env);
   if (!auth.ok) return json(headers, { ok: false, error: auth.error, message: auth.message }, auth.status);
   if (!env.DB) return json(headers, { ok: false, error: 'DB_NOT_CONFIGURED' }, 503);
 
   try {
-    const gifts = await listCatalogAdmin(env.DB);
+    const gifts = await listCatalogAdmin(env.DB, auth.weddingKey);
     return json(headers, { ok: true, gifts });
   } catch (err) {
     return json(headers, { ok: false, error: 'LIST_FAILED', message: err.message }, 500);
@@ -67,7 +67,7 @@ export async function onRequestPost(context) {
     return json(headers, { ok: false, error: 'ORIGIN_DENIED', message: originCheck.error }, 403);
   }
 
-  const auth = requireAdmin(request, env);
+  const auth = await requireAdmin(request, env);
   if (!auth.ok) return json(headers, { ok: false, error: auth.error, message: auth.message }, auth.status);
   if (!env.DB) return json(headers, { ok: false, error: 'DB_NOT_CONFIGURED' }, 503);
 
@@ -79,8 +79,8 @@ export async function onRequestPost(context) {
   }
 
   try {
-    const gift = await createGift(env.DB, body || {});
-    const gifts = await listCatalogAdmin(env.DB);
+    const gift = await createGift(env.DB, body || {}, auth.weddingKey);
+    const gifts = await listCatalogAdmin(env.DB, auth.weddingKey);
     return json(headers, { ok: true, gift, gifts }, 201);
   } catch (err) {
     return mapWriteError(headers, err);
@@ -96,7 +96,7 @@ export async function onRequestPatch(context) {
     return json(headers, { ok: false, error: 'ORIGIN_DENIED', message: originCheck.error }, 403);
   }
 
-  const auth = requireAdmin(request, env);
+  const auth = await requireAdmin(request, env);
   if (!auth.ok) return json(headers, { ok: false, error: auth.error, message: auth.message }, auth.status);
   if (!env.DB) return json(headers, { ok: false, error: 'DB_NOT_CONFIGURED' }, 503);
 
@@ -112,7 +112,7 @@ export async function onRequestPatch(context) {
   }
 
   try {
-    const gift = await updateGift(env.DB, String(body.id), body);
+    const gift = await updateGift(env.DB, String(body.id), body, auth.weddingKey);
     return json(headers, { ok: true, gift });
   } catch (err) {
     return mapWriteError(headers, err);
@@ -128,7 +128,7 @@ export async function onRequestDelete(context) {
     return json(headers, { ok: false, error: 'ORIGIN_DENIED', message: originCheck.error }, 403);
   }
 
-  const auth = requireAdmin(request, env);
+  const auth = await requireAdmin(request, env);
   if (!auth.ok) return json(headers, { ok: false, error: auth.error, message: auth.message }, auth.status);
   if (!env.DB) return json(headers, { ok: false, error: 'DB_NOT_CONFIGURED' }, 503);
 
@@ -136,8 +136,8 @@ export async function onRequestDelete(context) {
   if (!id) return json(headers, { ok: false, error: 'MISSING_ID' }, 400);
 
   try {
-    await deleteGift(env.DB, id);
-    const gifts = await listCatalogAdmin(env.DB);
+    await deleteGift(env.DB, id, auth.weddingKey);
+    const gifts = await listCatalogAdmin(env.DB, auth.weddingKey);
     return json(headers, { ok: true, removed: id, gifts });
   } catch (err) {
     return mapWriteError(headers, err);

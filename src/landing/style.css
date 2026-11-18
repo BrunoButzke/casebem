@@ -279,6 +279,149 @@ h2 {
   }
 }
 
+.nav__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.nav__login {
+  appearance: none;
+  border: 1px solid color-mix(in srgb, currentColor 45%, transparent);
+  background: transparent;
+  color: inherit;
+  min-height: 40px;
+  padding: 0.45rem 0.95rem;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: background 0.25s var(--ease), border-color 0.25s var(--ease);
+}
+
+.nav__login:hover,
+.nav__login:focus-visible {
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  outline: none;
+}
+
+.admin-login {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+
+.admin-login[hidden] {
+  display: none;
+}
+
+.admin-login__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(28, 25, 23, 0.55);
+  backdrop-filter: blur(4px);
+}
+
+.admin-login__dialog {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 420px);
+  padding: 1.65rem 1.5rem 1.55rem;
+  border-radius: 22px;
+  background: linear-gradient(180deg, #fff 0%, color-mix(in srgb, var(--sand) 55%, #fff) 100%);
+  color: var(--ink);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.28);
+  border: 1px solid color-mix(in srgb, var(--ink) 10%, transparent);
+}
+
+.admin-login__close {
+  position: absolute;
+  top: 0.7rem;
+  right: 0.75rem;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--sand) 88%, #fff);
+  color: var(--ink);
+  font-size: 1.35rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.admin-login__close:hover,
+.admin-login__close:focus-visible {
+  background: color-mix(in srgb, var(--lagoon) 14%, var(--sand));
+  outline: none;
+}
+
+.admin-login__dialog .eyebrow {
+  margin: 0;
+  letter-spacing: 0.14em;
+}
+
+.admin-login__dialog h2 {
+  margin: 0.35rem 0 0.4rem;
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: clamp(1.55rem, 4vw, 1.85rem);
+  line-height: 1.15;
+}
+
+.admin-login__lead {
+  margin: 0 0 1.15rem;
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.admin-login__form {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.admin-login__form .form-field {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.admin-login__form .form-field label {
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.admin-login__form .form-field input {
+  width: 100%;
+  min-height: 3rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: 12px;
+  border: 1.5px solid color-mix(in srgb, var(--ink) 18%, transparent);
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+}
+
+.admin-login__form .btn {
+  width: 100%;
+  justify-content: center;
+  margin-top: 0.35rem;
+  min-height: 3rem;
+}
+
+.admin-login__error {
+  margin: 0;
+  color: #b4533a;
+  font-size: 0.9rem;
+}
+
 /* Hero */
 .hero {
   position: relative;
@@ -549,6 +692,18 @@ h2 {
 .app-highlight__status svg {
   flex-shrink: 0;
   color: var(--salmon);
+}
+
+.app-highlight__cta-wrap {
+  margin: 1.25rem 0 0;
+}
+
+.app-highlight__cta-wrap .btn {
+  display: inline-flex;
+}
+
+.features__cta-wrap {
+  margin: 1.25rem 0 0;
 }
 
 /* How */
@@ -1062,8 +1217,19 @@ h2 {
 }
 
 .waitlist__lead {
-  margin: 0 0 2rem;
+  margin: 0 0 1rem;
   color: var(--muted);
+}
+
+.waitlist__notice {
+  margin: 0 0 2rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--ink) 14%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--cream) 70%, white);
+  color: var(--ink);
+  font-size: 0.95rem;
+  line-height: 1.45;
 }
 
 .waitlist__form {
@@ -1116,6 +1282,40 @@ h2 {
   75% {
     transform: translateX(4px);
   }
+}
+
+.waitlist__role {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem 1rem;
+  margin: 0;
+  padding: 0.2rem 0 0;
+  border: 0;
+}
+
+.waitlist__role legend {
+  width: 100%;
+  padding: 0;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 0.1rem;
+}
+
+.waitlist__role label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.95rem;
+}
+
+.waitlist__hint {
+  margin: -0.15rem 0 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+  line-height: 1.4;
 }
 
 .waitlist__plans {

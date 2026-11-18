@@ -4,8 +4,6 @@ import Lenis from 'lenis';
 import { setupRsvp } from './rsvp.mjs';
 import { initMessages } from './messages.mjs';
 import { setupAdminLogin } from './admin-login.mjs';
-import { initMedia } from './media.mjs';
-
 gsap.registerPlugin(ScrollTrigger);
 
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -207,7 +205,6 @@ function formatBRL(value) {
 }
 
 function setupGifts() {
-  // Checkout de presentes pausado (“Em breve”) — reativar quando MP estiver ok.
   const toggle = document.querySelector('.gifts__toggle');
   const panel = document.querySelector('.gifts__collapse');
   const modal = document.querySelector('#gift-modal');
@@ -222,6 +219,7 @@ function setupGifts() {
   const totalEl = modal.querySelector('[data-gift-total]');
   const emailEl = modal.querySelector('#gift-email');
   const messageEl = modal.querySelector('#gift-message');
+  const signerEl = modal.querySelector('#gift-signer');
   const countEl = modal.querySelector('[data-gift-count]');
   const multBtns = [...modal.querySelectorAll('.gift-modal__mult')];
   const payBtn = modal.querySelector('#gift-pay');
@@ -322,6 +320,7 @@ function setupGifts() {
     dialogImg.alt = currentTitle;
     messageEl.value = '';
     emailEl.value = '';
+    if (signerEl) signerEl.value = '';
     updateCount();
     multiplier = 1;
     multBtns.forEach((b) => b.classList.toggle('is-active', b.dataset.mult === '1'));
@@ -432,6 +431,7 @@ function setupGifts() {
           email,
           message: messageEl.value.trim(),
           giftId: currentGiftId,
+          payerName: (signerEl?.value || '').trim(),
         }),
       });
       const data = await res.json();
@@ -654,7 +654,6 @@ function boot() {
   setupRsvp();
   initMessages();
   setupAdminLogin();
-  initMedia();
   setupReveals();
   ScrollTrigger.sort();
   window.addEventListener('load', () => ScrollTrigger.refresh());

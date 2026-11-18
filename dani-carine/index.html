@@ -55,7 +55,6 @@
         <a href="#manual-convidado">Manual</a>
         <a href="#presentes">Presentes</a>
         <a href="#mural-recados">Mural</a>
-        <a href="#playlist">Músicas</a>
       </nav>
       <div class="nav__actions">
         <button type="button" class="nav__login" id="admin-login-open" aria-haspopup="dialog">
@@ -553,19 +552,268 @@
         </div>
       </section>
 
-      <section class="gifts gifts--soon" id="presentes">
+      <section class="gifts" id="presentes">
         <div class="container">
           <p class="eyebrow">Presentes</p>
-          <div class="gifts__soon reveal">
-            <h2>Nossa lista</h2>
-            <p class="gifts__lead">
-              A lista de presentes com Pix está quase pronta. Em breve você poderá
-              presentear Dani &amp; Carine por aqui.
-            </p>
-            <p class="gifts__soon-badge" aria-label="Status">Em breve</p>
+          <div class="gifts__intro">
+            <div class="gifts__intro-copy">
+              <h2>Nossa lista</h2>
+              <p class="gifts__lead">
+                Presentes simbólicos para a nossa nova vida juntos.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              class="gifts__toggle reveal"
+              aria-expanded="true"
+              aria-controls="gifts-list"
+              id="gifts-toggle"
+            >
+              <span class="gifts__toggle-copy">
+                <strong>Abrir lista de presentes</strong>
+                <span>9 itens</span>
+              </span>
+              <span class="gifts__chevron" aria-hidden="true"></span>
+            </button>
+          </div>
+
+          <div class="gifts__collapse is-open" id="gifts-list" role="region" aria-labelledby="gifts-toggle">
+            <div class="gifts__collapse-inner">
+              <div class="gifts__grid">
+                <button
+                  type="button"
+                  class="gift-card"
+                  data-gift="mensagem"
+                  data-title="Uma mensagem de carinho"
+                  data-desc="Mande um carinho no valor que quiser"
+                  data-image="/images/gifts/mensagem.jpg"
+                  data-mode="custom"
+                >
+                  <figure>
+                    <img src="/images/gifts/mensagem.jpg" alt="" width="800" height="800" loading="lazy" />
+                  </figure>
+                  <h3>Uma mensagem de carinho</h3>
+                  <p>Valor livre · a partir de R$&nbsp;0,99</p>
+                </button>
+                <button
+                  type="button"
+                  class="gift-card"
+                  data-gift="danca"
+                  data-title="Aula de dança"
+                  data-desc="Uma noite só nossa"
+                  data-image="/images/gifts/danca.jpg"
+                  data-price="150"
+                >
+                  <figure>
+                    <img src="/images/gifts/danca.jpg" alt="" width="800" height="800" loading="lazy" />
+                  </figure>
+                  <h3>Aula de dança</h3>
+                  <p>R$&nbsp;150</p>
+                </button>
+                <button
+                  type="button"
+                  class="gift-card"
+                  data-gift="churrasco"
+                  data-title="Churrasco do casal"
+                  data-desc="Carne, vinho e boa conversa"
+                  data-image="/images/gifts/churrasco.jpg"
+                  data-price="180"
+                >
+                  <figure>
+                    <img src="/images/gifts/churrasco.jpg" alt="" width="800" height="800" loading="lazy" />
+                  </figure>
+                  <h3>Churrasco do casal</h3>
+                  <p>R$&nbsp;180</p>
+                </button>
+                <button
+                  type="button"
+                  class="gift-card"
+                  data-gift="brunch"
+                  data-title="Brunch na Lagoa"
+                  data-desc="Manhã preguiçosa com vista"
+                  data-image="/images/gifts/brunch.jpg"
+                  data-price="200"
+                >
+                  <figure>
+                    <img src="/images/gifts/brunch.jpg" alt="" width="800" height="800" loading="lazy" />
+                  </figure>
+                  <h3>Brunch na Lagoa</h3>
+                  <p>R$&nbsp;200</p>
+                </button>
+                <button
+                  type="button"
+                  class="gift-card"
+                  data-gift="adega"
+                  data-title="Adega para dois"
+                  data-desc="Garrafas para brindar"
+                  data-image="/images/gifts/adega.jpg"
+                  data-price="220"
+                >
+                  <figure>
+                    <img src="/images/gifts/adega.jpg" alt="" width="800" height="800" loading="lazy" />
+                  </figure>
+                  <h3>Adega para dois</h3>
+                  <p>R$&nbsp;220</p>
+                </button>
+                <button
+                  type="button"
+                  class="gift-card"
+                  data-gift="jantar"
+                  data-title="Jantar romântico"
+                  data-desc="Mesa reservada, só nós"
+                  data-image="/images/gifts/jantar.jpg"
+                  data-price="250"
+                >
+                  <figure>
+                    <img src="/images/gifts/jantar.jpg" alt="" width="800" height="800" loading="lazy" />
+                  </figure>
+                  <h3>Jantar romântico</h3>
+                  <p>R$&nbsp;250</p>
+                </button>
+                <button
+                  type="button"
+                  class="gift-card"
+                  data-gift="spa"
+                  data-title="Experiência spa"
+                  data-desc="Massagem a quatro mãos"
+                  data-image="/images/gifts/spa.jpg"
+                  data-price="300"
+                >
+                  <figure>
+                    <img src="/images/gifts/spa.jpg" alt="" width="800" height="800" loading="lazy" />
+                  </figure>
+                  <h3>Experiência spa</h3>
+                  <p>R$&nbsp;300</p>
+                </button>
+                <button
+                  type="button"
+                  class="gift-card"
+                  data-gift="hotel"
+                  data-title="Noite de hotel"
+                  data-desc="Check-in e café da manhã"
+                  data-image="/images/gifts/hotel.jpg"
+                  data-price="400"
+                >
+                  <figure>
+                    <img src="/images/gifts/hotel.jpg" alt="" width="800" height="800" loading="lazy" />
+                  </figure>
+                  <h3>Noite de hotel</h3>
+                  <p>R$&nbsp;400</p>
+                </button>
+                <button
+                  type="button"
+                  class="gift-card"
+                  data-gift="lua"
+                  data-title="Lua de mel"
+                  data-desc="Um pedacinho da viagem"
+                  data-image="/images/gifts/lua.jpg"
+                  data-price="500"
+                >
+                  <figure>
+                    <img src="/images/gifts/lua.jpg" alt="" width="800" height="800" loading="lazy" />
+                  </figure>
+                  <h3>Lua de mel</h3>
+                  <p>R$&nbsp;500</p>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </section>
+
+      <div class="gift-modal" id="gift-modal" hidden>
+        <div class="gift-modal__backdrop" data-close-gift></div>
+        <div
+          class="gift-modal__dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="gift-modal-title"
+        >
+          <button type="button" class="gift-modal__close" data-close-gift aria-label="Fechar">
+            ×
+          </button>
+          <figure class="gift-modal__photo">
+            <img src="" alt="" width="800" height="800" />
+          </figure>
+          <div class="gift-modal__body">
+            <h3 id="gift-modal-title"></h3>
+            <p class="gift-modal__desc"></p>
+
+            <div class="gift-modal__amount gift-modal__amount--custom" hidden>
+              <label for="gift-amount">Valor do Pix (R$)</label>
+              <input
+                id="gift-amount"
+                type="number"
+                inputmode="decimal"
+                min="0.99"
+                step="0.01"
+                value="0.99"
+              />
+            </div>
+
+            <div class="gift-modal__amount gift-modal__amount--fixed" hidden>
+              <p class="gift-modal__amount-label">Quantidade</p>
+              <div class="gift-modal__multiples" role="group" aria-label="Múltiplos do valor">
+                <button type="button" class="gift-modal__mult is-active" data-mult="1">1×</button>
+                <button type="button" class="gift-modal__mult" data-mult="2">2×</button>
+                <button type="button" class="gift-modal__mult" data-mult="3">3×</button>
+              </div>
+              <p class="gift-modal__total">Total: <strong data-gift-total>R$&nbsp;0</strong></p>
+            </div>
+
+            <div class="gift-modal__form" data-gift-form>
+              <label class="gift-modal__message-label" for="gift-email">E-mail</label>
+              <input
+                id="gift-email"
+                type="email"
+                autocomplete="email"
+                required
+                placeholder="voce@email.com"
+              />
+
+              <label class="gift-modal__message-label" for="gift-message">
+                Mensagem
+                <span><span data-gift-count>0</span>/300</span>
+              </label>
+              <textarea
+                id="gift-message"
+                maxlength="300"
+                rows="3"
+                placeholder="Escreva um carinho para os noivos…"
+              ></textarea>
+
+              <label class="gift-modal__message-label" for="gift-signer">Assinado:</label>
+              <input
+                id="gift-signer"
+                type="text"
+                autocomplete="name"
+                maxlength="80"
+                placeholder="Seu nome aqui"
+              />
+
+              <p class="gift-modal__error" data-gift-error hidden></p>
+
+              <button type="button" class="btn gift-modal__pay" id="gift-pay">
+                Pagar com Pix
+              </button>
+            </div>
+
+            <div class="gift-modal__pix" data-gift-pix hidden>
+              <p class="gift-modal__pix-status" data-pix-status>Escaneie o QR ou copie o código Pix</p>
+              <img class="gift-modal__qr" data-pix-qr alt="QR Code Pix" hidden />
+              <label class="gift-modal__message-label" for="gift-pix-code">Pix copia e cola</label>
+              <textarea id="gift-pix-code" data-pix-code rows="3" readonly></textarea>
+              <button type="button" class="btn btn--ghost gift-modal__copy" data-pix-copy>
+                Copiar código
+              </button>
+              <button type="button" class="btn gift-modal__pay" data-pix-back hidden>
+                Voltar
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <section class="messages" id="mural-recados">
         <div class="container">
@@ -660,17 +908,6 @@
         </div>
       </section>
 
-
-      <section class="playlist" id="playlist" hidden>
-        <div class="container">
-          <p class="eyebrow">Músicas</p>
-          <h2>A trilha do nosso dia</h2>
-          <p class="playlist__lead">
-            Vídeos e músicas escolhidos pelo casal — edite no painel (YouTube).
-          </p>
-          <div id="playlist-mount"></div>
-        </div>
-      </section>
 
       <section class="atmosphere">
         <div class="atmosphere__bg" data-parallax>

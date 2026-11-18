@@ -115,8 +115,9 @@ export function PlayProvider({ guestName, children }) {
           file,
           preview: file ? undefined : preview,
         });
-      } catch {
-        /* a foto continua no aparelho */
+      } catch (err) {
+        /* a foto continua no aparelho, mas a galeria compartilhada não recebeu */
+        setError(err.message || 'Foto salva neste aparelho, mas não entrou na galeria');
       }
       return true;
     },

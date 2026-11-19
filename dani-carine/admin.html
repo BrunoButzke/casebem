@@ -1085,8 +1085,15 @@
           showLogin(data.message || 'Não autorizado');
           return;
         }
+        const msg = data.message || data.error || 'Falha ao carregar';
+        const loginVisible = !$('login-box')?.hidden;
+        if (loginVisible) {
+          showLogin(msg);
+          return;
+        }
+        showPanel();
         $('panel-err').hidden = false;
-        $('panel-err').textContent = data.message || data.error || 'Falha ao carregar';
+        $('panel-err').textContent = msg;
         return;
       }
 

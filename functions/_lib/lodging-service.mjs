@@ -151,17 +151,30 @@ export async function listLodgingAdmin(db, weddingKey = DEFAULT_WEDDING_KEY) {
       (a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id)
     );
   }
-  await seedLodgingIfEmpty(db, key);
-  const rows = await db
-    .prepare(
-      `SELECT id, name, description, area, maps_url, website_url, active, sort_order, updated_at
-       FROM lodging_tips
-       WHERE wedding_key = ?
-       ORDER BY sort_order ASC, id ASC`
-    )
-    .bind(key)
-    .all();
-  return (rows?.results || []).map(rowToTip);
+  try {
+    await seedLodgingIfEmpty(db, key);
+    const rows = await db
+      .prepare(
+        `SELECT id, name, description, area, maps_url, website_url, active, sort_order, updated_at
+         FROM lodging_tips
+         WHERE wedding_key = ?
+         ORDER BY sort_order ASC, id ASC`
+      )
+      .bind(key)
+      .all();
+    return (rows?.results || []).map(rowToTip);
+  } catch (err) {
+    const { isMissingWeddingKeyColumn } = await import('./d1-compat.mjs');
+    if (!isMissingWeddingKeyColumn(err) || key !== DEFAULT_WEDDING_KEY) throw err;
+    const rows = await db
+      .prepare(
+        `SELECT id, name, description, area, maps_url, website_url, active, sort_order, updated_at
+         FROM lodging_tips
+         ORDER BY sort_order ASC, id ASC`
+      )
+      .all();
+    return (rows?.results || []).map(rowToTip);
+  }
 }
 
 function validateUrlField(value, field, errors, out, { allowEmpty = true } = {}) {

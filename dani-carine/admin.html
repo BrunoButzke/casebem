@@ -51,6 +51,7 @@
           </div>
         </div>
         <p class="err" id="super-err" hidden></p>
+        <p class="ok" id="super-ok" hidden></p>
         <article class="admin-card">
           <div class="admin-card__head">
             <div>
@@ -70,6 +71,31 @@
             </div>
           </div>
           <div id="super-waitlist-table"></div>
+        </article>
+        <article class="admin-card" style="margin-top: 1.25rem">
+          <div class="admin-card__head">
+            <div>
+              <h2>Conta</h2>
+              <p class="admin-card__lead">Trocar senha do super admin</p>
+              <p class="sub" id="super-account-email">—</p>
+            </div>
+          </div>
+          <form id="super-password-form" class="admin-stack" style="max-width: 28rem">
+            <div class="admin-field">
+              <label for="super-pass-current">Senha atual</label>
+              <input id="super-pass-current" type="password" autocomplete="current-password" required />
+            </div>
+            <div class="admin-field">
+              <label for="super-pass-new">Nova senha</label>
+              <input id="super-pass-new" type="password" autocomplete="new-password" required />
+            </div>
+            <div class="admin-field">
+              <label for="super-pass-confirm">Confirmar nova senha</label>
+              <input id="super-pass-confirm" type="password" autocomplete="new-password" required />
+            </div>
+            <p class="sub">Mín. 8 caracteres, com maiúscula, número e caractere especial.</p>
+            <button type="submit" class="btn" id="super-pass-btn">Salvar nova senha</button>
+          </form>
         </article>
       </section>
 
@@ -736,6 +762,7 @@
 
     const ROLE_KEY = `${STORAGE_KEY}:role`;
     const SUPER_TOKEN_KEY = `${STORAGE_KEY}:super`;
+    const SUPER_EMAIL_KEY = `${STORAGE_KEY}:super-email`;
     const WEDDING_KEY_STORAGE = `${STORAGE_KEY}:wedding`;
     const $ = (id) => document.getElementById(id);
 
@@ -794,17 +821,24 @@
       return sessionStorage.getItem(ROLE_KEY) || 'tenant';
     }
 
-    function setSession(token, role, weddingKey) {
+    function setSession(token, role, weddingKey, email) {
       sessionStorage.setItem(STORAGE_KEY, token);
       sessionStorage.setItem(ROLE_KEY, role || 'tenant');
       if (weddingKey) sessionStorage.setItem(WEDDING_KEY_STORAGE, weddingKey);
       else if (role === 'super') sessionStorage.removeItem(WEDDING_KEY_STORAGE);
+      if (role === 'super' && email) sessionStorage.setItem(SUPER_EMAIL_KEY, String(email).trim().toLowerCase());
+      else if (role !== 'super') sessionStorage.removeItem(SUPER_EMAIL_KEY);
+    }
+
+    function getSuperEmail() {
+      return sessionStorage.getItem(SUPER_EMAIL_KEY) || '';
     }
 
     function clearToken() {
       sessionStorage.removeItem(STORAGE_KEY);
       sessionStorage.removeItem(ROLE_KEY);
       sessionStorage.removeItem(SUPER_TOKEN_KEY);
+      sessionStorage.removeItem(SUPER_EMAIL_KEY);
       sessionStorage.removeItem(WEDDING_KEY_STORAGE);
     }
 
@@ -920,10 +954,17 @@
     async function loadSuper() {
       showSuperPanel();
       const err = $('super-err');
+      const ok = $('super-ok');
       if (err) {
         err.hidden = true;
         err.textContent = '';
       }
+      if (ok) {
+        ok.hidden = true;
+        ok.textContent = '';
+      }
+      const emailEl = $('super-account-email');
+      if (emailEl) emailEl.textContent = getSuperEmail() || 'E-mail da sessão não encontrado — faça login de novo.';
       const res = await fetch('/api/admin/super', { headers: authHeaders() });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) {
@@ -980,6 +1021,63 @@
       const btn = ev.target.closest('[data-enter-tenant]');
       if (!btn) return;
       void enterTenantAdmin(btn.getAttribute('data-enter-tenant'));
+    });
+
+    $('super-password-form')?.addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const err = $('super-err');
+      const ok = $('super-ok');
+      if (err) {
+        err.hidden = true;
+        err.textContent = '';
+      }
+      if (ok) {
+        ok.hidden = true;
+        ok.textContent = '';
+      }
+      const email = getSuperEmail();
+      if (!email) {
+        if (err) {
+          err.hidden = false;
+          err.textContent = 'Sessão sem e-mail. Saia e entre de novo.';
+        }
+        return;
+      }
+      const currentPassword = $('super-pass-current')?.value || '';
+      const newPassword = $('super-pass-new')?.value || '';
+      const newPasswordConfirm = $('super-pass-confirm')?.value || '';
+      const btn = $('super-pass-btn');
+      if (btn) btn.disabled = true;
+      try {
+        const res = await fetch('/api/admin/super/password', {
+          method: 'POST',
+          headers: {
+            ...authHeaders(),
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ email, currentPassword, newPassword, newPasswordConfirm }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.ok) {
+          if (err) {
+            err.hidden = false;
+            err.textContent = data.message || data.error || 'Não foi possível trocar a senha.';
+          }
+          return;
+        }
+        $('super-password-form')?.reset();
+        if (ok) {
+          ok.hidden = false;
+          ok.textContent = 'Senha atualizada.';
+        }
+      } catch {
+        if (err) {
+          err.hidden = false;
+          err.textContent = 'Falha de rede ao trocar a senha.';
+        }
+      } finally {
+        if (btn) btn.disabled = false;
+      }
     });
 
     $('return-super-btn')?.addEventListener('click', async () => {
@@ -2344,7 +2442,7 @@
           showLogin(data.message || 'Usuário ou senha inválidos.');
           return;
         }
-        setSession(data.token, data.role || 'tenant', data.weddingKey);
+        setSession(data.token, data.role || 'tenant', data.weddingKey, data.email);
         if (data.role === 'super') {
           await loadSuper();
           return;

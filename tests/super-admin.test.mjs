@@ -8,18 +8,25 @@ import { onRequestPost as loginPost } from '../functions/api/admin/login.js';
 import { onRequestGet as superGet } from '../functions/api/admin/super.js';
 import { onRequestPost as waitlistPost } from '../functions/api/waitlist.js';
 import { onRequestPost as enterTenantPost } from '../functions/api/admin/super/enter.js';
+import { onRequestPost as passwordPost } from '../functions/api/admin/super/password.js';
 import {
   SUPER_ADMIN_EMAIL,
   SUPER_ADMIN_PASS,
   resolveSuperAdminToken,
   enterTenantAsSuper,
+  resetSuperAdminsForTests,
+  changeSuperAdminPassword,
+  loginSuperAdmin,
 } from '../functions/_lib/super-admin.mjs';
 import { resetWaitlistForTests } from '../functions/_lib/waitlist-service.mjs';
 import { mintTenantToken } from '../functions/_lib/admin-auth.mjs';
 
 const SECRET = 'production-secret-16';
 
-beforeEach(() => resetWaitlistForTests());
+beforeEach(() => {
+  resetWaitlistForTests();
+  resetSuperAdminsForTests();
+});
 
 function loginCtx(body, env = { ADMIN_PANEL_SECRET: SECRET }) {
   return {
@@ -43,8 +50,87 @@ test('super login returns role super and distinct token', async () => {
   const body = await res.json();
   assert.equal(body.ok, true);
   assert.equal(body.role, 'super');
+  assert.equal(body.email, SUPER_ADMIN_EMAIL);
   assert.equal(body.token, `super.${SECRET}`);
   assert.notEqual(body.token, SECRET);
+});
+
+test('changeSuperAdminPassword exige senha atual e atualiza hash', async () => {
+  const env = { ADMIN_PANEL_SECRET: SECRET };
+  const weak = await changeSuperAdminPassword(null, {
+    email: SUPER_ADMIN_EMAIL,
+    currentPassword: SUPER_ADMIN_PASS,
+    newPassword: 'fraca',
+    newPasswordConfirm: 'fraca',
+  });
+  assert.equal(weak.ok, false);
+  assert.equal(weak.error, 'PASSWORD_WEAK');
+
+  const wrong = await changeSuperAdminPassword(null, {
+    email: SUPER_ADMIN_EMAIL,
+    currentPassword: 'errada',
+    newPassword: 'NovaSenha1!',
+    newPasswordConfirm: 'NovaSenha1!',
+  });
+  assert.equal(wrong.ok, false);
+  assert.equal(wrong.status, 401);
+
+  const ok = await changeSuperAdminPassword(null, {
+    email: SUPER_ADMIN_EMAIL,
+    currentPassword: SUPER_ADMIN_PASS,
+    newPassword: 'NovaSenha1!',
+    newPasswordConfirm: 'NovaSenha1!',
+  });
+  assert.equal(ok.ok, true);
+
+  const oldLogin = await loginSuperAdmin(env, SUPER_ADMIN_EMAIL, SUPER_ADMIN_PASS, null);
+  assert.equal(oldLogin.ok, false);
+
+  const newLogin = await loginSuperAdmin(env, SUPER_ADMIN_EMAIL, 'NovaSenha1!', null);
+  assert.equal(newLogin.ok, true);
+});
+
+test('POST /api/admin/super/password exige token super', async () => {
+  const denied = await passwordPost({
+    request: new Request('https://casebem.com/api/admin/super/password', {
+      method: 'POST',
+      headers: {
+        origin: 'https://casebem.com',
+        authorization: `Bearer ${SECRET}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        email: SUPER_ADMIN_EMAIL,
+        currentPassword: SUPER_ADMIN_PASS,
+        newPassword: 'OutraSenha1!',
+        newPasswordConfirm: 'OutraSenha1!',
+      }),
+    }),
+    env: { ADMIN_PANEL_SECRET: SECRET },
+  });
+  assert.equal(denied.status, 401);
+
+  const token = resolveSuperAdminToken({ ADMIN_PANEL_SECRET: SECRET });
+  const res = await passwordPost({
+    request: new Request('https://casebem.com/api/admin/super/password', {
+      method: 'POST',
+      headers: {
+        origin: 'https://casebem.com',
+        authorization: `Bearer ${token}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        email: SUPER_ADMIN_EMAIL,
+        currentPassword: SUPER_ADMIN_PASS,
+        newPassword: 'OutraSenha1!',
+        newPasswordConfirm: 'OutraSenha1!',
+      }),
+    }),
+    env: { ADMIN_PANEL_SECRET: SECRET },
+  });
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.ok, true);
 });
 
 test('login legado Dani/Carine não entra mais como tenant', async () => {

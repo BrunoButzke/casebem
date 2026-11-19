@@ -84,11 +84,11 @@ import {
 } from './functions/_lib/raffle-service.mjs';
 import { requireAdmin, mintTenantToken } from './functions/_lib/admin-auth.mjs';
 import {
-  isSuperAdminCredentials,
   loginSuperAdmin,
   requireSuperAdmin,
   getSuperAdminOverview,
   enterTenantAsSuper,
+  changeSuperAdminPassword,
 } from './functions/_lib/super-admin.mjs';
 import {
   addWaitlistSignup,
@@ -527,16 +527,14 @@ function adminApiPlugin(env) {
 
           if (path === '/api/admin/login' && req.method === 'POST') {
             const body = await readJsonBody(req);
-            if (isSuperAdminCredentials(body?.user, body?.pass)) {
-              const result = loginSuperAdmin(env, body?.user, body?.pass);
-              if (!result.ok) {
-                return sendJson(res, result.status, {
-                  ok: false,
-                  error: result.error,
-                  message: result.message,
-                });
-              }
-              return sendJson(res, 200, { ok: true, token: result.token, role: result.role });
+            const superResult = await loginSuperAdmin(env, body?.user, body?.pass, null);
+            if (superResult.ok) {
+              return sendJson(res, 200, {
+                ok: true,
+                token: superResult.token,
+                role: superResult.role,
+                email: superResult.email,
+              });
             }
             const memberAuth = await authenticateAdminMember(null, body?.user, body?.pass);
             if (memberAuth.ok) {
@@ -667,7 +665,11 @@ function adminApiPlugin(env) {
             }
           }
 
-          if (path === '/api/admin/super' || path === '/api/admin/super/enter') {
+          if (
+            path === '/api/admin/super' ||
+            path === '/api/admin/super/enter' ||
+            path === '/api/admin/super/password'
+          ) {
             const fakeReq = {
               headers: {
                 get(name) {
@@ -707,6 +709,23 @@ function adminApiPlugin(env) {
                 adminPath: result.adminPath,
                 coupleNames: result.coupleNames,
               });
+            }
+            if (path === '/api/admin/super/password' && req.method === 'POST') {
+              const body = await readJsonBody(req);
+              const result = await changeSuperAdminPassword(null, {
+                email: body?.email,
+                currentPassword: body?.currentPassword ?? body?.currentPass,
+                newPassword: body?.newPassword ?? body?.newPass,
+                newPasswordConfirm: body?.newPasswordConfirm ?? body?.newPassConfirm,
+              });
+              if (!result.ok) {
+                return sendJson(res, result.status, {
+                  ok: false,
+                  error: result.error,
+                  message: result.message,
+                });
+              }
+              return sendJson(res, 200, { ok: true, email: result.email });
             }
           }
 

@@ -1229,6 +1229,16 @@ tr.is-inactive {
   font-size: 0.9rem;
 }
 
+.ok {
+  margin: 0.65rem 0;
+  padding: 0.7rem 0.9rem;
+  border-radius: 12px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #166534;
+  font-size: 0.9rem;
+}
+
 .sub {
   margin: 0.35rem 0 0.75rem;
   color: var(--muted);

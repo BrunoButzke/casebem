@@ -47,13 +47,13 @@ export async function onRequestOptions(context) {
 export async function onRequestGet(context) {
   const { request, env } = context;
   const headers = getCorsHeaders(request);
-  const auth = requireAdmin(request, env);
+  const auth = await requireAdmin(request, env);
   if (!auth.ok) return json(headers, { ok: false, error: auth.error, message: auth.message }, auth.status);
   if (!env.DB) return json(headers, { ok: false, error: 'DB_NOT_CONFIGURED' }, 503);
 
   try {
     const origin = request.headers.get('Origin') || new URL(request.url).origin;
-    const raw = await listStationeryAdmin(env.DB);
+    const raw = await listStationeryAdmin(env.DB, auth.weddingKey);
     const templates = presentStationery(raw, origin);
     return json(headers, { ok: true, templates });
   } catch (err) {
@@ -70,7 +70,7 @@ export async function onRequestPost(context) {
     return json(headers, { ok: false, error: 'ORIGIN_DENIED', message: originCheck.error }, 403);
   }
 
-  const auth = requireAdmin(request, env);
+  const auth = await requireAdmin(request, env);
   if (!auth.ok) return json(headers, { ok: false, error: auth.error, message: auth.message }, auth.status);
   if (!env.DB) return json(headers, { ok: false, error: 'DB_NOT_CONFIGURED' }, 503);
 
@@ -83,9 +83,9 @@ export async function onRequestPost(context) {
 
   try {
     const origin = request.headers.get('Origin') || new URL(request.url).origin;
-    const template = await createStationeryTemplate(env.DB, body || {});
+    const template = await createStationeryTemplate(env.DB, body || {}, auth.weddingKey);
     const [presented] = presentStationery([template], origin);
-    const templates = presentStationery(await listStationeryAdmin(env.DB), origin);
+    const templates = presentStationery(await listStationeryAdmin(env.DB, auth.weddingKey), origin);
     return json(headers, { ok: true, template: presented, templates }, 201);
   } catch (err) {
     return mapWriteError(headers, err);
@@ -101,7 +101,7 @@ export async function onRequestPatch(context) {
     return json(headers, { ok: false, error: 'ORIGIN_DENIED', message: originCheck.error }, 403);
   }
 
-  const auth = requireAdmin(request, env);
+  const auth = await requireAdmin(request, env);
   if (!auth.ok) return json(headers, { ok: false, error: auth.error, message: auth.message }, auth.status);
   if (!env.DB) return json(headers, { ok: false, error: 'DB_NOT_CONFIGURED' }, 503);
 
@@ -117,7 +117,7 @@ export async function onRequestPatch(context) {
   }
 
   try {
-    const template = await updateStationeryTemplate(env.DB, String(body.id), body);
+    const template = await updateStationeryTemplate(env.DB, String(body.id), body, auth.weddingKey);
     const origin = request.headers.get('Origin') || new URL(request.url).origin;
     const [presented] = presentStationery([template], origin);
     return json(headers, { ok: true, template: presented });
@@ -135,7 +135,7 @@ export async function onRequestDelete(context) {
     return json(headers, { ok: false, error: 'ORIGIN_DENIED', message: originCheck.error }, 403);
   }
 
-  const auth = requireAdmin(request, env);
+  const auth = await requireAdmin(request, env);
   if (!auth.ok) return json(headers, { ok: false, error: auth.error, message: auth.message }, auth.status);
   if (!env.DB) return json(headers, { ok: false, error: 'DB_NOT_CONFIGURED' }, 503);
 
@@ -143,9 +143,9 @@ export async function onRequestDelete(context) {
   if (!id) return json(headers, { ok: false, error: 'MISSING_ID' }, 400);
 
   try {
-    await deleteStationeryTemplate(env.DB, id);
+    await deleteStationeryTemplate(env.DB, id, auth.weddingKey);
     const origin = request.headers.get('Origin') || new URL(request.url).origin;
-    const templates = presentStationery(await listStationeryAdmin(env.DB), origin);
+    const templates = presentStationery(await listStationeryAdmin(env.DB, auth.weddingKey), origin);
     return json(headers, { ok: true, removed: id, templates });
   } catch (err) {
     return mapWriteError(headers, err);

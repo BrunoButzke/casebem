@@ -1,4 +1,10 @@
-import { WEDDING_KEY } from './challenges-validators.mjs';
+import { WEDDING_KEY as DEFAULT_WEDDING_KEY } from './challenges-validators.mjs';
+
+function resolveWeddingKey(weddingKey) {
+  const k = String(weddingKey || DEFAULT_WEDDING_KEY).trim();
+  return k || DEFAULT_WEDDING_KEY;
+}
+
 
 const NAME_MIN = 2;
 const NAME_MAX = 80;
@@ -51,7 +57,8 @@ function sortRows(rows) {
   });
 }
 
-export async function listRanking(db) {
+export async function listRanking(db, weddingKey = DEFAULT_WEDDING_KEY) {
+  const weddingKeyResolved = resolveWeddingKey(weddingKey);
   if (!db) {
     return sortRows([...memoryRanking.values()].map(toPublic));
   }
@@ -62,12 +69,13 @@ export async function listRanking(db) {
        WHERE wedding_key = ?
        ORDER BY points DESC, stamps DESC, guest_name COLLATE NOCASE`
     )
-    .bind(WEDDING_KEY)
+    .bind(weddingKeyResolved)
     .all();
   return (result?.results || []).map(toPublic);
 }
 
-export async function upsertRanking(db, body) {
+export async function upsertRanking(db, body, weddingKey = DEFAULT_WEDDING_KEY) {
+  const weddingKeyResolved = resolveWeddingKey(weddingKey);
   const parsed = validatePayload(body);
   if (!parsed.valid) throwValidation(parsed.errors);
   const { guestName, points, stamps } = parsed.data;
@@ -90,7 +98,7 @@ export async function upsertRanking(db, body) {
          stamps = excluded.stamps,
          updated_at = excluded.updated_at`
     )
-    .bind(WEDDING_KEY, guestKey, guestName, points, stamps, now)
+    .bind(weddingKeyResolved, guestKey, guestName, points, stamps, now)
     .run();
   return listRanking(db);
 }

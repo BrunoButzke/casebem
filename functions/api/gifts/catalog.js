@@ -17,7 +17,9 @@ export async function onRequestGet(context) {
   headers.set('Cache-Control', 'public, max-age=30');
 
   try {
-    const catalog = await getActiveCatalog(env.DB || null);
+    const url = new URL(request.url);
+    const weddingKey = String(url.searchParams.get('w') || url.searchParams.get('wedding') || '').trim();
+    const catalog = await getActiveCatalog(env.DB || null, weddingKey || undefined);
     return Response.json(
       {
         ok: true,

@@ -45,8 +45,61 @@
         <a href="#app">App</a>
         <a href="#planos">Planos</a>
       </nav>
-      <a href="#lista" class="btn btn--sm magnetic">Lista de espera</a>
+      <div class="nav__actions">
+        <button type="button" class="nav__login" id="admin-login-open" aria-haspopup="dialog">
+          Entrar
+        </button>
+        <a href="#cadastro" class="btn btn--sm magnetic">Cadastro</a>
+      </div>
     </header>
+
+    <div class="admin-login" id="admin-login-modal" hidden>
+      <div class="admin-login__backdrop" data-admin-login-close></div>
+      <div
+        class="admin-login__dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="admin-login-title"
+      >
+        <button
+          type="button"
+          class="admin-login__close"
+          data-admin-login-close
+          aria-label="Fechar"
+        >
+          ×
+        </button>
+        <p class="eyebrow">CaseBem</p>
+        <h2 id="admin-login-title">Acesso ao painel</h2>
+        <p class="admin-login__lead">Entre com seu usuário ou e-mail para gerenciar o casamento.</p>
+        <form class="admin-login__form" id="admin-login-form" novalidate>
+          <div class="form-field">
+            <label for="admin-user">Usuário ou e-mail</label>
+            <input
+              id="admin-user"
+              name="user"
+              type="text"
+              autocomplete="username"
+              placeholder="login ou e-mail"
+              required
+            />
+          </div>
+          <div class="form-field">
+            <label for="admin-pass">Senha</label>
+            <input
+              id="admin-pass"
+              name="password"
+              type="password"
+              autocomplete="current-password"
+              placeholder="senha"
+              required
+            />
+          </div>
+          <p class="admin-login__error" id="admin-login-error" hidden role="alert"></p>
+          <button type="submit" class="btn magnetic">Entrar</button>
+        </form>
+      </div>
+    </div>
 
     <main id="topo">
       <section class="hero">
@@ -70,7 +123,7 @@
               para a festa — tudo em um só lugar.
             </p>
             <div class="hero__ctas">
-              <a href="#lista" class="btn magnetic">Entrar na lista</a>
+              <a href="#cadastro" class="btn magnetic">Criar cadastro</a>
               <a href="/dani-carine/" class="btn btn--ghost magnetic"
                 >Ver exemplo de casal parceiro</a
               >
@@ -117,7 +170,7 @@
         </div>
       </section>
 
-      <section class="app-highlight">
+      <section class="app-highlight" id="diferencial">
         <div class="container app-highlight__grid">
           <div class="app-highlight__media">
             <img 
@@ -135,12 +188,8 @@
               desafios com ranking, galeria ao vivo e jogos de festa que engajam 
               os convidados durante a celebração.
             </p>
-            <p class="app-highlight__status">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                <circle cx="12" cy="12" r="10"/>
-                <path d="M12 6v6l4 2"/>
-              </svg>
-              Em desenvolvimento — nos planos Pro e VIP
+            <p class="app-highlight__cta-wrap">
+              <a class="btn magnetic" href="/demo/game/">Experimentar a demo</a>
             </p>
           </div>
         </div>
@@ -272,6 +321,9 @@
             Desafios com ranking, galeria compartilhada, jogos e arrecadação —
             no Pro e no VIP.
           </p>
+          <p class="features__cta-wrap">
+            <a class="btn magnetic" href="/demo/game/">Abrir demo do app</a>
+          </p>
         </div>
         <div class="features__viewport">
           <div class="features__track">
@@ -322,7 +374,7 @@
                 <li>Convite virtual</li>
                 <li>Lista de presentes → Pix</li>
               </ul>
-              <a href="#lista" class="btn btn--ghost magnetic" data-plan="basic"
+              <a href="#cadastro" class="btn btn--ghost magnetic" data-plan="basic"
                 >Quero o Básico</a
               >
             </article>
@@ -337,7 +389,7 @@
                 <li>Sessões extras no informativo</li>
                 <li>Painel de mesas e convidados</li>
               </ul>
-              <a href="#lista" class="btn magnetic" data-plan="pro">Quero o Pro</a>
+              <a href="#cadastro" class="btn magnetic" data-plan="pro">Quero o Pro</a>
             </article>
 
             <article class="plan reveal">
@@ -350,7 +402,7 @@
                 <li>Link personalizado</li>
                 <li>Assessor para mesas e presentes</li>
               </ul>
-              <a href="#lista" class="btn btn--ghost magnetic" data-plan="vip">Quero o VIP</a>
+              <a href="#cadastro" class="btn btn--ghost magnetic" data-plan="vip">Quero o VIP</a>
             </article>
           </div>
         </div>
@@ -380,62 +432,62 @@
         </div>
       </section>
 
-      <section class="waitlist" id="lista">
+      <section class="waitlist" id="cadastro">
         <div class="container waitlist__inner">
-          <p class="eyebrow">Lista de espera</p>
-          <h2 class="waitlist__title">Garanta a vaga<br />do casamento de vocês.</h2>
+          <p class="eyebrow">Cadastro</p>
+          <h2 class="waitlist__title">Criem o site<br />do casamento de vocês.</h2>
           <p class="waitlist__lead">
-            Sem cobrança agora. Avisamos quando a próxima turma abrir.
+            Cadastro gratuito para começar. O processo de liberação leva menos de 1 dia.
           </p>
 
-          <form class="waitlist__form" novalidate>
+          <form class="waitlist__form" id="register-form" novalidate>
+            <div class="waitlist__row waitlist__row--name-role">
+              <label class="waitlist__field">
+                <span>Seu nome</span>
+                <input type="text" name="yourName" autocomplete="name" required placeholder="Como te chamamos" />
+              </label>
+              <fieldset class="waitlist__role">
+                <legend>Você é</legend>
+                <label><input type="radio" name="role" value="noiva" checked /> Noiva</label>
+                <label><input type="radio" name="role" value="noivo" /> Noivo</label>
+              </fieldset>
+            </div>
+            <label class="waitlist__field">
+              <span>Nome de quem vai casar com você</span>
+              <input type="text" name="partnerName" required placeholder="Nome do(a) parceiro(a)" />
+            </label>
+            <label class="waitlist__field">
+              <span>E-mail</span>
+              <input type="email" name="email" autocomplete="email" required placeholder="voce@email.com" />
+            </label>
             <div class="waitlist__row">
               <label class="waitlist__field">
-                <span>Nome</span>
-                <input type="text" name="name" autocomplete="name" required placeholder="Como te chamamos" />
+                <span>Senha</span>
+                <input type="password" name="password" autocomplete="new-password" required placeholder="8+ maiúscula, número e especial" minlength="8" />
               </label>
               <label class="waitlist__field">
-                <span>E-mail</span>
-                <input
-                  type="email"
-                  name="email"
-                  autocomplete="email"
-                  required
-                  placeholder="voce@email.com"
-                />
+                <span>Confirmar senha</span>
+                <input type="password" name="passwordConfirm" autocomplete="new-password" required placeholder="Repita a senha" minlength="8" />
               </label>
             </div>
-            <fieldset class="waitlist__plans">
-              <legend>Plano de interesse</legend>
-              <label
-                ><input type="radio" name="plan" value="basic" /> Básico</label
-              >
-              <label
-                ><input type="radio" name="plan" value="pro" checked /> Pro</label
-              >
-              <label><input type="radio" name="plan" value="vip" /> VIP</label>
-            </fieldset>
+            <p class="waitlist__hint">A senha precisa ter 8+ caracteres, uma maiúscula, um número e um caractere especial.</p>
             <label class="waitlist__consent">
               <input type="checkbox" name="consent" required />
-              <span>Quero receber o aviso por e-mail sobre o CaseBem.</span>
+              <span>Aceito criar minha conta CaseBem e receber avisos por e-mail.</span>
             </label>
             <p class="waitlist__msg" role="status" aria-live="polite"></p>
-            <button type="submit" class="btn magnetic">Entrar na lista</button>
+            <button type="submit" class="btn magnetic">Criar cadastro</button>
           </form>
 
           <div class="waitlist__success" hidden>
             <p class="waitlist__success-mark">Case<em>Bem</em></p>
-            <h3>Pronto, você está na lista!</h3>
+            <h3>Cadastro criado!</h3>
             <p>
-              Registramos <strong data-success-email></strong>. Em breve falamos
-              com você.
+              Conta de <strong data-success-email></strong> pronta.
+              Tenant: <strong data-success-tenant></strong>.
             </p>
-            <button type="button" class="btn magnetic waitlist__pay" data-pay-plan disabled>
-              Pagamento em breve
-            </button>
-            <p class="waitlist__pay-msg" data-pay-msg role="status" aria-live="polite">
-              Checkout temporariamente pausado — em breve liberamos.
-            </p>
+            <a class="btn magnetic" href="/dani-carine/admin" data-success-admin>Ir para o painel</a>
+            <p class="waitlist__pay-msg">Use o e-mail e a senha cadastrados para entrar.</p>
           </div>
         </div>
       </section>

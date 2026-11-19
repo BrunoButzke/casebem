@@ -27,13 +27,13 @@ function json(headers, body, status = 200) {
   return Response.json(body, { status, headers });
 }
 
-async function snapshot(db) {
+async function snapshot(db, weddingKey) {
   const [rsvpMode, guests, groups] = await Promise.all([
-    getRsvpMode(db),
-    listGuestList(db),
-    listGroups(db),
+    getRsvpMode(db, weddingKey),
+    listGuestList(db, weddingKey),
+    listGroups(db, weddingKey),
   ]);
-  return { rsvpMode, guests, groups, count: guests.length };
+  return { rsvpMode, guests, groups, count: guests.length, weddingKey };
 }
 
 export async function onRequestOptions(context) {
@@ -43,11 +43,11 @@ export async function onRequestOptions(context) {
 export async function onRequestGet(context) {
   const { request, env } = context;
   const headers = getCorsHeaders(request);
-  const auth = requireAdmin(request, env);
+  const auth = await requireAdmin(request, env);
   if (!auth.ok) return json(headers, { ok: false, error: auth.error, message: auth.message }, auth.status);
   if (!env.DB) return json(headers, { ok: false, error: 'DB_NOT_CONFIGURED' }, 503);
 
-  return json(headers, { ok: true, ...(await snapshot(env.DB)) });
+  return json(headers, { ok: true, ...(await snapshot(env.DB, auth.weddingKey)) });
 }
 
 export async function onRequestPost(context) {
@@ -59,7 +59,7 @@ export async function onRequestPost(context) {
     return json(headers, { ok: false, error: 'ORIGIN_DENIED', message: originCheck.error }, 403);
   }
 
-  const auth = requireAdmin(request, env);
+  const auth = await requireAdmin(request, env);
   if (!auth.ok) return json(headers, { ok: false, error: auth.error, message: auth.message }, auth.status);
   if (!env.DB) return json(headers, { ok: false, error: 'DB_NOT_CONFIGURED' }, 503);
 
@@ -71,10 +71,13 @@ export async function onRequestPost(context) {
   }
 
   try {
-    const result = await addGuests(env.DB, body?.names || [], {
-      groupId: body?.groupId || null,
-    });
-    return json(headers, { ok: true, ...result, ...(await snapshot(env.DB)) });
+    const result = await addGuests(
+      env.DB,
+      body?.names || [],
+      { groupId: body?.groupId || null },
+      auth.weddingKey
+    );
+    return json(headers, { ok: true, ...result, ...(await snapshot(env.DB, auth.weddingKey)) });
   } catch (err) {
     if (err.message === 'EMPTY_GUEST_LIST') {
       return json(headers, { ok: false, error: 'EMPTY_GUEST_LIST', message: 'Informe names: string[]' }, 400);
@@ -98,7 +101,7 @@ export async function onRequestPatch(context) {
     return json(headers, { ok: false, error: 'ORIGIN_DENIED', message: originCheck.error }, 403);
   }
 
-  const auth = requireAdmin(request, env);
+  const auth = await requireAdmin(request, env);
   if (!auth.ok) return json(headers, { ok: false, error: auth.error, message: auth.message }, auth.status);
   if (!env.DB) return json(headers, { ok: false, error: 'DB_NOT_CONFIGURED' }, 503);
 
@@ -112,28 +115,29 @@ export async function onRequestPatch(context) {
   try {
     let modeResult = null;
 
+    const wk = auth.weddingKey;
     if (body?.createGroup?.name) {
-      await createGroup(env.DB, body.createGroup.name);
+      await createGroup(env.DB, body.createGroup.name, wk);
     }
     if (body?.deleteGroupId) {
-      await deleteGroup(env.DB, String(body.deleteGroupId));
+      await deleteGroup(env.DB, String(body.deleteGroupId), wk);
     }
     if (body?.removeId) {
-      await removeGuest(env.DB, String(body.removeId));
+      await removeGuest(env.DB, String(body.removeId), wk);
     }
     if (body?.guestId && Object.prototype.hasOwnProperty.call(body, 'attending')) {
-      await setGuestAttending(env.DB, String(body.guestId), body.attending);
+      await setGuestAttending(env.DB, String(body.guestId), body.attending, wk);
     }
     if (body?.guestId && Object.prototype.hasOwnProperty.call(body, 'groupId')) {
-      await setGuestGroup(env.DB, String(body.guestId), body.groupId);
+      await setGuestGroup(env.DB, String(body.guestId), body.groupId, wk);
     }
     if (body?.rsvpMode) {
-      modeResult = await setRsvpMode(env.DB, body.rsvpMode);
+      modeResult = await setRsvpMode(env.DB, body.rsvpMode, wk);
     }
 
     return json(headers, {
       ok: true,
-      ...(await snapshot(env.DB)),
+      ...(await snapshot(env.DB, wk)),
       ...(modeResult ? { updatedAt: modeResult.updatedAt } : {}),
     });
   } catch (err) {

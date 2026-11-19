@@ -5,3 +5,7 @@
 # SPA Games (React) — desafio.casebem.com → /games via middleware (path interno /games/)
 /games    /games/index.html   200
 /games/*  /games/index.html   200
+
+# Demo ilustrativa do app (mock isolado do /games)
+/demo/game    /demo/game/index.html   200
+/demo/game/*  /demo/game/index.html   200

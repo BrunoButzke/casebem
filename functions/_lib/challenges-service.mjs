@@ -3,7 +3,7 @@
  */
 
 import {
-  WEDDING_KEY,
+  WEDDING_KEY as DEFAULT_WEDDING_KEY,
   validateQuestionCreate,
   validateQuestionPatch,
   validatePhotoMissionCreate,
@@ -21,21 +21,34 @@ import {
   DESAFIO_STAMP_CARDS,
 } from '../../data/desafio-challenges-seed.mjs';
 
-let memoryStore = null;
-/** Seed attempt flags — once true, that collection won't auto-refill after intentional empty. */
-let memorySeedAttempts = { questions: false, photoMissions: false, stampCards: false };
+function resolveWeddingKey(weddingKey) {
+  const k = String(weddingKey || DEFAULT_WEDDING_KEY).trim();
+  return k || DEFAULT_WEDDING_KEY;
+}
 
-function ensureMemory() {
-  if (!memoryStore) {
-    memoryStore = { questions: [], photoMissions: [], stampCards: [] };
-    memorySeedAttempts = { questions: false, photoMissions: false, stampCards: false };
+/** @type {Map<string, {questions:any[], photoMissions:any[], stampCards:any[]}>} */
+let memoryByWedding = new Map();
+/** @type {Map<string, object>} */
+let memorySeedAttemptsByWedding = new Map();
+
+function ensureMemory(weddingKey) {
+  const key = resolveWeddingKey(weddingKey);
+  if (!memoryByWedding.has(key)) {
+    memoryByWedding.set(key, { questions: [], photoMissions: [], stampCards: [] });
+    memorySeedAttemptsByWedding.set(key, { questions: false, photoMissions: false, stampCards: false });
   }
-  return memoryStore;
+  return memoryByWedding.get(key);
+}
+
+function seedAttemptsFor(weddingKey) {
+  const key = resolveWeddingKey(weddingKey);
+  ensureMemory(key);
+  return memorySeedAttemptsByWedding.get(key);
 }
 
 export function resetMemoryChallengesForTests() {
-  memoryStore = null;
-  memorySeedAttempts = { questions: false, photoMissions: false, stampCards: false };
+  memoryByWedding = new Map();
+  memorySeedAttemptsByWedding = new Map();
 }
 
 /**
@@ -43,12 +56,27 @@ export function resetMemoryChallengesForTests() {
  * @param {unknown} db
  * @param {Record<string, string>} [gabarito] map question id → 'a'|'b'|'c'|'d'
  */
-export async function seedChallengesIfEmpty(db, gabarito = {}) {
+export async function seedChallengesIfEmpty(db, gabarito = {}, weddingKey = DEFAULT_WEDDING_KEY) {
+  const key = resolveWeddingKey(weddingKey);
   const now = new Date().toISOString();
   const quiz = applyQuizGabarito(DESAFIO_QUESTIONS, gabarito).filter((q) => q.correctIndex != null);
 
+  if (key !== DEFAULT_WEDDING_KEY) {
+    if (!db) {
+      const mem = ensureMemory(key);
+      return {
+        seeded: false,
+        questions: mem.questions.length,
+        photos: mem.photoMissions.length,
+        stampCards: mem.stampCards.length,
+      };
+    }
+    return { seeded: false };
+  }
+
   if (!db) {
-    const mem = ensureMemory();
+    const mem = ensureMemory(key);
+    const memorySeedAttempts = seedAttemptsFor(key);
     let seeded = false;
 
     if (!memorySeedAttempts.photoMissions) {
@@ -56,7 +84,7 @@ export async function seedChallengesIfEmpty(db, gabarito = {}) {
         mem.photoMissions.push(
           ...DESAFIO_PHOTO_MISSIONS.map((m, i) => ({
             id: m.id,
-            weddingKey: WEDDING_KEY,
+            weddingKey: key,
             title: m.title,
             points: m.points,
             awardsStamp: Boolean(m.awardsStamp),
@@ -75,7 +103,7 @@ export async function seedChallengesIfEmpty(db, gabarito = {}) {
         mem.stampCards.push(
           ...DESAFIO_STAMP_CARDS.map((c, i) => ({
             id: c.id,
-            weddingKey: WEDDING_KEY,
+            weddingKey: key,
             name: c.name,
             stampsRequired: c.stampsRequired,
             rewardText: c.rewardText,
@@ -103,7 +131,7 @@ export async function seedChallengesIfEmpty(db, gabarito = {}) {
         mem.questions.push(
           ...quiz.map((q, i) => ({
             id: q.id,
-            weddingKey: WEDDING_KEY,
+            weddingKey: key,
             prompt: q.prompt,
             options: q.options,
             correctIndex: q.correctIndex,
@@ -127,8 +155,7 @@ export async function seedChallengesIfEmpty(db, gabarito = {}) {
   }
 
   const photoCount = Number(
-    (await db.prepare(`SELECT COUNT(*) AS c FROM challenge_photo_missions WHERE wedding_key = ?`).bind(WEDDING_KEY).first())
-      ?.c || 0
+    (await db.prepare(`SELECT COUNT(*) AS c FROM challenge_photo_missions WHERE wedding_key = ?`).bind(key).first())?.c || 0
   );
   if (photoCount === 0) {
     let i = 0;
@@ -139,14 +166,13 @@ export async function seedChallengesIfEmpty(db, gabarito = {}) {
             id, wedding_key, title, points, awards_stamp, active, sort_order, updated_at
           ) VALUES (?, ?, ?, ?, ?, 1, ?, ?)`
         )
-        .bind(m.id, WEDDING_KEY, m.title, m.points, m.awardsStamp ? 1 : 0, i++, now)
+        .bind(m.id, key, m.title, m.points, m.awardsStamp ? 1 : 0, i++, now)
         .run();
     }
   }
 
   const cardCount = Number(
-    (await db.prepare(`SELECT COUNT(*) AS c FROM challenge_stamp_cards WHERE wedding_key = ?`).bind(WEDDING_KEY).first())?.c ||
-      0
+    (await db.prepare(`SELECT COUNT(*) AS c FROM challenge_stamp_cards WHERE wedding_key = ?`).bind(key).first())?.c || 0
   );
   if (cardCount === 0) {
     let i = 0;
@@ -161,7 +187,7 @@ export async function seedChallengesIfEmpty(db, gabarito = {}) {
         )
         .bind(
           c.id,
-          WEDDING_KEY,
+          key,
           c.name,
           c.stampsRequired,
           c.rewardText,
@@ -182,7 +208,7 @@ export async function seedChallengesIfEmpty(db, gabarito = {}) {
   }
 
   const qCount = Number(
-    (await db.prepare(`SELECT COUNT(*) AS c FROM challenge_questions WHERE wedding_key = ?`).bind(WEDDING_KEY).first())?.c || 0
+    (await db.prepare(`SELECT COUNT(*) AS c FROM challenge_questions WHERE wedding_key = ?`).bind(key).first())?.c || 0
   );
   if (qCount === 0 && quiz.length) {
     let i = 0;
@@ -193,7 +219,7 @@ export async function seedChallengesIfEmpty(db, gabarito = {}) {
             id, wedding_key, prompt, options_json, correct_index, points, active, sort_order, updated_at
           ) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)`
         )
-        .bind(q.id, WEDDING_KEY, q.prompt, JSON.stringify(q.options), q.correctIndex, q.points, i++, now)
+        .bind(q.id, key, q.prompt, JSON.stringify(q.options), q.correctIndex, q.points, i++, now)
         .run();
     }
   }
@@ -219,7 +245,7 @@ function parseOptionsJson(raw) {
 function rowToQuestion(row) {
   return {
     id: row.id,
-    weddingKey: row.wedding_key ?? row.weddingKey ?? WEDDING_KEY,
+    weddingKey: row.wedding_key ?? row.weddingKey ?? DEFAULT_WEDDING_KEY,
     prompt: row.prompt,
     options: Array.isArray(row.options) ? row.options : parseOptionsJson(row.options_json),
     correctIndex: Number(row.correct_index ?? row.correctIndex),
@@ -233,7 +259,7 @@ function rowToQuestion(row) {
 function rowToPhotoMission(row) {
   return {
     id: row.id,
-    weddingKey: row.wedding_key ?? row.weddingKey ?? WEDDING_KEY,
+    weddingKey: row.wedding_key ?? row.weddingKey ?? DEFAULT_WEDDING_KEY,
     title: row.title,
     points: Number(row.points),
     awardsStamp: Boolean(Number(row.awards_stamp ?? row.awardsStamp ?? 0)),
@@ -246,7 +272,7 @@ function rowToPhotoMission(row) {
 function rowToStampCard(row) {
   return {
     id: row.id,
-    weddingKey: row.wedding_key ?? row.weddingKey ?? WEDDING_KEY,
+    weddingKey: row.wedding_key ?? row.weddingKey ?? DEFAULT_WEDDING_KEY,
     name: row.name,
     stampsRequired: Number(row.stamps_required ?? row.stampsRequired),
     rewardText: row.reward_text ?? row.rewardText,
@@ -276,9 +302,10 @@ function isUniqueViolation(err) {
 
 // ——— Questions ———
 
-export async function listQuestionsAdmin(db) {
-  await seedChallengesIfEmpty(db);
-  if (!db) return [...ensureMemory().questions].sort(sortByOrder);
+export async function listQuestionsAdmin(db, weddingKey = DEFAULT_WEDDING_KEY) {
+  const key = resolveWeddingKey(weddingKey);
+  await seedChallengesIfEmpty(db, {}, key);
+  if (!db) return [...ensureMemory(key).questions].sort(sortByOrder);
 
   const rows = await db
     .prepare(
@@ -287,25 +314,25 @@ export async function listQuestionsAdmin(db) {
        WHERE wedding_key = ?
        ORDER BY sort_order ASC, id ASC`
     )
-    .bind(WEDDING_KEY)
+    .bind(key)
     .all();
   return (rows?.results || []).map(rowToQuestion);
 }
 
-export async function createQuestion(db, body) {
+export async function createQuestion(db, body, weddingKey = DEFAULT_WEDDING_KEY) {
+  const key = resolveWeddingKey(weddingKey);
   const validation = validateQuestionCreate(body);
   if (!validation.valid) throwValidation(validation.errors);
   const d = validation.data;
   const now = new Date().toISOString();
 
   if (!db) {
-    ensureMemory();
-    memorySeedAttempts.questions = true;
-    const mem = memoryStore.questions;
+    seedAttemptsFor(key).questions = true;
+    const mem = ensureMemory(key).questions;
     if (mem.some((q) => q.id === d.id)) throw new Error('EXISTS');
     const row = {
       id: d.id,
-      weddingKey: WEDDING_KEY,
+      weddingKey: key,
       prompt: d.prompt,
       options: d.options,
       correctIndex: d.correctIndex,
@@ -327,7 +354,7 @@ export async function createQuestion(db, body) {
       )
       .bind(
         d.id,
-        WEDDING_KEY,
+        key,
         d.prompt,
         JSON.stringify(d.options),
         d.correctIndex,
@@ -344,7 +371,7 @@ export async function createQuestion(db, body) {
 
   return rowToQuestion({
     id: d.id,
-    wedding_key: WEDDING_KEY,
+    wedding_key: key,
     prompt: d.prompt,
     options_json: JSON.stringify(d.options),
     correct_index: d.correctIndex,
@@ -355,8 +382,9 @@ export async function createQuestion(db, body) {
   });
 }
 
-export async function updateQuestion(db, id, patch) {
+export async function updateQuestion(db, id, patch, weddingKey = DEFAULT_WEDDING_KEY) {
   if (!id || typeof id !== 'string') throw new Error('INVALID_ID');
+  const key = resolveWeddingKey(weddingKey);
 
   const validation = validateQuestionPatch(patch);
   if (!validation.valid) throwValidation(validation.errors);
@@ -383,7 +411,7 @@ export async function updateQuestion(db, id, patch) {
   };
 
   if (!db) {
-    const mem = ensureMemory().questions;
+    const mem = ensureMemory(key).questions;
     const idx = mem.findIndex((q) => q.id === id);
     if (idx < 0) throw new Error('NOT_FOUND');
     mem[idx] = applyQuestionPatch(mem[idx]);
@@ -395,7 +423,7 @@ export async function updateQuestion(db, id, patch) {
       `SELECT id, wedding_key, prompt, options_json, correct_index, points, active, sort_order, updated_at
        FROM challenge_questions WHERE id = ? AND wedding_key = ?`
     )
-    .bind(id, WEDDING_KEY)
+    .bind(id, key)
     .first();
   if (!row) throw new Error('NOT_FOUND');
 
@@ -415,17 +443,18 @@ export async function updateQuestion(db, id, patch) {
       next.sortOrder,
       now,
       id,
-      WEDDING_KEY
+      key
     )
     .run();
   return next;
 }
 
-export async function deleteQuestion(db, id) {
+export async function deleteQuestion(db, id, weddingKey = DEFAULT_WEDDING_KEY) {
   if (!id || typeof id !== 'string') throw new Error('INVALID_ID');
+  const key = resolveWeddingKey(weddingKey);
 
   if (!db) {
-    const mem = ensureMemory().questions;
+    const mem = ensureMemory(key).questions;
     const idx = mem.findIndex((q) => q.id === id);
     if (idx < 0) throw new Error('NOT_FOUND');
     mem.splice(idx, 1);
@@ -434,7 +463,7 @@ export async function deleteQuestion(db, id) {
 
   const result = await db
     .prepare(`DELETE FROM challenge_questions WHERE id = ? AND wedding_key = ?`)
-    .bind(id, WEDDING_KEY)
+    .bind(id, key)
     .run();
   const changes = Number(result?.meta?.changes ?? result?.changes ?? 0);
   if (changes === 0) throw new Error('NOT_FOUND');
@@ -443,9 +472,10 @@ export async function deleteQuestion(db, id) {
 
 // ——— Photo missions ———
 
-export async function listPhotoMissionsAdmin(db) {
-  await seedChallengesIfEmpty(db);
-  if (!db) return [...ensureMemory().photoMissions].sort(sortByOrder);
+export async function listPhotoMissionsAdmin(db, weddingKey = DEFAULT_WEDDING_KEY) {
+  const key = resolveWeddingKey(weddingKey);
+  await seedChallengesIfEmpty(db, {}, key);
+  if (!db) return [...ensureMemory(key).photoMissions].sort(sortByOrder);
 
   const rows = await db
     .prepare(
@@ -454,25 +484,25 @@ export async function listPhotoMissionsAdmin(db) {
        WHERE wedding_key = ?
        ORDER BY sort_order ASC, id ASC`
     )
-    .bind(WEDDING_KEY)
+    .bind(key)
     .all();
   return (rows?.results || []).map(rowToPhotoMission);
 }
 
-export async function createPhotoMission(db, body) {
+export async function createPhotoMission(db, body, weddingKey = DEFAULT_WEDDING_KEY) {
+  const key = resolveWeddingKey(weddingKey);
   const validation = validatePhotoMissionCreate(body);
   if (!validation.valid) throwValidation(validation.errors);
   const d = validation.data;
   const now = new Date().toISOString();
 
   if (!db) {
-    ensureMemory();
-    memorySeedAttempts.photoMissions = true;
-    const mem = memoryStore.photoMissions;
+    seedAttemptsFor(key).photoMissions = true;
+    const mem = ensureMemory(key).photoMissions;
     if (mem.some((m) => m.id === d.id)) throw new Error('EXISTS');
     const row = {
       id: d.id,
-      weddingKey: WEDDING_KEY,
+      weddingKey: key,
       title: d.title,
       points: d.points,
       awardsStamp: d.awardsStamp,
@@ -493,7 +523,7 @@ export async function createPhotoMission(db, body) {
       )
       .bind(
         d.id,
-        WEDDING_KEY,
+        key,
         d.title,
         d.points,
         d.awardsStamp ? 1 : 0,
@@ -509,7 +539,7 @@ export async function createPhotoMission(db, body) {
 
   return rowToPhotoMission({
     id: d.id,
-    wedding_key: WEDDING_KEY,
+    wedding_key: key,
     title: d.title,
     points: d.points,
     awards_stamp: d.awardsStamp ? 1 : 0,
@@ -519,8 +549,9 @@ export async function createPhotoMission(db, body) {
   });
 }
 
-export async function updatePhotoMission(db, id, patch) {
+export async function updatePhotoMission(db, id, patch, weddingKey = DEFAULT_WEDDING_KEY) {
   if (!id || typeof id !== 'string') throw new Error('INVALID_ID');
+  const key = resolveWeddingKey(weddingKey);
 
   const validation = validatePhotoMissionPatch(patch);
   if (!validation.valid) throwValidation(validation.errors);
@@ -529,7 +560,7 @@ export async function updatePhotoMission(db, id, patch) {
   const now = new Date().toISOString();
 
   if (!db) {
-    const mem = ensureMemory().photoMissions;
+    const mem = ensureMemory(key).photoMissions;
     const idx = mem.findIndex((m) => m.id === id);
     if (idx < 0) throw new Error('NOT_FOUND');
     const m = mem[idx];
@@ -547,7 +578,7 @@ export async function updatePhotoMission(db, id, patch) {
       `SELECT id, wedding_key, title, points, awards_stamp, active, sort_order, updated_at
        FROM challenge_photo_missions WHERE id = ? AND wedding_key = ?`
     )
-    .bind(id, WEDDING_KEY)
+    .bind(id, key)
     .first();
   if (!row) throw new Error('NOT_FOUND');
 
@@ -574,18 +605,19 @@ export async function updatePhotoMission(db, id, patch) {
       next.sortOrder,
       now,
       id,
-      WEDDING_KEY
+      key
     )
     .run();
 
   return { ...existing, ...next, updatedAt: now };
 }
 
-export async function deletePhotoMission(db, id) {
+export async function deletePhotoMission(db, id, weddingKey = DEFAULT_WEDDING_KEY) {
   if (!id || typeof id !== 'string') throw new Error('INVALID_ID');
+  const key = resolveWeddingKey(weddingKey);
 
   if (!db) {
-    const mem = ensureMemory().photoMissions;
+    const mem = ensureMemory(key).photoMissions;
     const idx = mem.findIndex((m) => m.id === id);
     if (idx < 0) throw new Error('NOT_FOUND');
     mem.splice(idx, 1);
@@ -594,7 +626,7 @@ export async function deletePhotoMission(db, id) {
 
   const result = await db
     .prepare(`DELETE FROM challenge_photo_missions WHERE id = ? AND wedding_key = ?`)
-    .bind(id, WEDDING_KEY)
+    .bind(id, key)
     .run();
   const changes = Number(result?.meta?.changes ?? result?.changes ?? 0);
   if (changes === 0) throw new Error('NOT_FOUND');
@@ -603,9 +635,10 @@ export async function deletePhotoMission(db, id) {
 
 // ——— Stamp cards ———
 
-export async function listStampCardsAdmin(db) {
-  await seedChallengesIfEmpty(db);
-  if (!db) return [...ensureMemory().stampCards].sort(sortByOrder);
+export async function listStampCardsAdmin(db, weddingKey = DEFAULT_WEDDING_KEY) {
+  const key = resolveWeddingKey(weddingKey);
+  await seedChallengesIfEmpty(db, {}, key);
+  if (!db) return [...ensureMemory(key).stampCards].sort(sortByOrder);
 
   const rows = await db
     .prepare(
@@ -616,25 +649,25 @@ export async function listStampCardsAdmin(db) {
        WHERE wedding_key = ?
        ORDER BY sort_order ASC, id ASC`
     )
-    .bind(WEDDING_KEY)
+    .bind(key)
     .all();
   return (rows?.results || []).map(rowToStampCard);
 }
 
-export async function createStampCard(db, body) {
+export async function createStampCard(db, body, weddingKey = DEFAULT_WEDDING_KEY) {
+  const key = resolveWeddingKey(weddingKey);
   const validation = validateStampCardCreate(body);
   if (!validation.valid) throwValidation(validation.errors);
   const d = validation.data;
   const now = new Date().toISOString();
 
   if (!db) {
-    ensureMemory();
-    memorySeedAttempts.stampCards = true;
-    const mem = memoryStore.stampCards;
+    seedAttemptsFor(key).stampCards = true;
+    const mem = ensureMemory(key).stampCards;
     if (mem.some((c) => c.id === d.id)) throw new Error('EXISTS');
     const row = {
       id: d.id,
-      weddingKey: WEDDING_KEY,
+      weddingKey: key,
       name: d.name,
       stampsRequired: d.stampsRequired,
       rewardText: d.rewardText,
@@ -666,7 +699,7 @@ export async function createStampCard(db, body) {
       )
       .bind(
         d.id,
-        WEDDING_KEY,
+        key,
         d.name,
         d.stampsRequired,
         d.rewardText,
@@ -691,7 +724,7 @@ export async function createStampCard(db, body) {
 
   return rowToStampCard({
     id: d.id,
-    wedding_key: WEDDING_KEY,
+    wedding_key: key,
     name: d.name,
     stamps_required: d.stampsRequired,
     reward_text: d.rewardText,
@@ -710,8 +743,9 @@ export async function createStampCard(db, body) {
   });
 }
 
-export async function updateStampCard(db, id, patch) {
+export async function updateStampCard(db, id, patch, weddingKey = DEFAULT_WEDDING_KEY) {
   if (!id || typeof id !== 'string') throw new Error('INVALID_ID');
+  const key = resolveWeddingKey(weddingKey);
 
   const validation = validateStampCardPatch(patch);
   if (!validation.valid) throwValidation(validation.errors);
@@ -720,7 +754,7 @@ export async function updateStampCard(db, id, patch) {
   const now = new Date().toISOString();
 
   if (!db) {
-    const mem = ensureMemory().stampCards;
+    const mem = ensureMemory(key).stampCards;
     const idx = mem.findIndex((c) => c.id === id);
     if (idx < 0) throw new Error('NOT_FOUND');
     const c = mem[idx];
@@ -749,7 +783,7 @@ export async function updateStampCard(db, id, patch) {
               fill_mode, points_per_slot
        FROM challenge_stamp_cards WHERE id = ? AND wedding_key = ?`
     )
-    .bind(id, WEDDING_KEY)
+    .bind(id, key)
     .first();
   if (!row) throw new Error('NOT_FOUND');
 
@@ -796,18 +830,19 @@ export async function updateStampCard(db, id, patch) {
       next.fillMode,
       next.pointsPerSlot,
       id,
-      WEDDING_KEY
+      key
     )
     .run();
 
   return { ...existing, ...next, updatedAt: now };
 }
 
-export async function deleteStampCard(db, id) {
+export async function deleteStampCard(db, id, weddingKey = DEFAULT_WEDDING_KEY) {
   if (!id || typeof id !== 'string') throw new Error('INVALID_ID');
+  const key = resolveWeddingKey(weddingKey);
 
   if (!db) {
-    const mem = ensureMemory().stampCards;
+    const mem = ensureMemory(key).stampCards;
     const idx = mem.findIndex((c) => c.id === id);
     if (idx < 0) throw new Error('NOT_FOUND');
     mem.splice(idx, 1);
@@ -816,7 +851,7 @@ export async function deleteStampCard(db, id) {
 
   const result = await db
     .prepare(`DELETE FROM challenge_stamp_cards WHERE id = ? AND wedding_key = ?`)
-    .bind(id, WEDDING_KEY)
+    .bind(id, key)
     .run();
   const changes = Number(result?.meta?.changes ?? result?.changes ?? 0);
   if (changes === 0) throw new Error('NOT_FOUND');
@@ -861,11 +896,11 @@ function toPublicStampCard(c) {
   };
 }
 
-export async function listChallengesPublic(db) {
+export async function listChallengesPublic(db, weddingKey = DEFAULT_WEDDING_KEY) {
   const [questions, photoMissions, stampCards] = await Promise.all([
-    listQuestionsAdmin(db),
-    listPhotoMissionsAdmin(db),
-    listStampCardsAdmin(db),
+    listQuestionsAdmin(db, weddingKey),
+    listPhotoMissionsAdmin(db, weddingKey),
+    listStampCardsAdmin(db, weddingKey),
   ]);
   return {
     questions: questions.filter((q) => q.active).map(toPublicQuestion),
@@ -874,9 +909,9 @@ export async function listChallengesPublic(db) {
   };
 }
 
-export async function gradeQuestion(db, questionId, selectedIndex) {
+export async function gradeQuestion(db, questionId, selectedIndex, weddingKey = DEFAULT_WEDDING_KEY) {
   if (!questionId || typeof questionId !== 'string') throw new Error('INVALID_ID');
-  const questions = await listQuestionsAdmin(db);
+  const questions = await listQuestionsAdmin(db, weddingKey);
   const q = questions.find((item) => item.id === questionId && item.active);
   if (!q) throw new Error('NOT_FOUND');
   const idx = Number(selectedIndex);

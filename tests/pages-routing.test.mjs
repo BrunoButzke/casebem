@@ -49,6 +49,19 @@ test('nested /games routes on casebem.com rewrite to the games directory, not in
   });
 });
 
+test('nested /demo/game routes rewrite to the demo SPA directory', () => {
+  assert.deepEqual(resolvePagesRoute('casebem.com', '/demo/game/quiz'), {
+    action: 'rewrite',
+    assetPath: '/demo/game/',
+  });
+  assert.deepEqual(resolvePagesRoute('casebem.com', '/demo/game/sorteio'), {
+    action: 'rewrite',
+    assetPath: '/demo/game/',
+  });
+  assert.deepEqual(resolvePagesRoute('casebem.com', '/demo/game'), { action: 'next' });
+  assert.deepEqual(resolvePagesRoute('casebem.com', '/demo/game/'), { action: 'next' });
+});
+
 test('existing /games on casebem.com is served as a static file', () => {
   assert.deepEqual(resolvePagesRoute('casebem.com', '/games'), { action: 'next' });
   assert.deepEqual(resolvePagesRoute('casebem.com', '/games/'), { action: 'next' });
@@ -56,6 +69,26 @@ test('existing /games on casebem.com is served as a static file', () => {
   assert.deepEqual(resolvePagesRoute('casebem.com', '/assets/casebemGames.js'), { action: 'next' });
   assert.deepEqual(resolvePagesRoute('casebem.com', '/api/desafio/gallery'), { action: 'next' });
   assert.deepEqual(resolvePagesRoute('casebem.com', '/dani-carine/'), { action: 'next' });
+});
+
+test('tenant slug routes rewrite to shared dani-carine assets', () => {
+  assert.deepEqual(resolvePagesRoute('casebem.com', '/zoe-max/'), {
+    action: 'rewrite',
+    assetPath: '/dani-carine/',
+  });
+  assert.deepEqual(resolvePagesRoute('casebem.com', '/zoe-max/admin'), {
+    action: 'rewrite',
+    assetPath: '/dani-carine/admin.html',
+  });
+  assert.deepEqual(resolvePagesRoute('casebem.com', '/zoe-max/admin.html'), {
+    action: 'rewrite',
+    assetPath: '/dani-carine/admin.html',
+  });
+  assert.deepEqual(resolvePagesRoute('casebem.com', '/dani-carine/admin'), {
+    action: 'rewrite',
+    assetPath: '/dani-carine/admin.html',
+  });
+  assert.deepEqual(resolvePagesRoute('casebem.com', '/landing-page-animada/'), { action: 'next' });
 });
 
 test('desafio.casebem.com serves the games SPA at the host root via /games/', () => {

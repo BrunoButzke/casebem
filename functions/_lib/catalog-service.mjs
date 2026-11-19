@@ -4,8 +4,15 @@
  */
 
 import { GIFTS_CATALOG } from '../../data/gifts-catalog.mjs';
+import { WEDDING_KEY as DEFAULT_WEDDING_KEY } from './messages-validators.mjs';
 
-let memoryCatalog = null;
+function resolveWeddingKey(weddingKey) {
+  const k = String(weddingKey || DEFAULT_WEDDING_KEY).trim();
+  return k || DEFAULT_WEDDING_KEY;
+}
+
+/** @type {Map<string, object[]>} */
+let memoryCatalogByWedding = new Map();
 
 const MAX_IMAGE_DATA = 180_000;
 
@@ -60,30 +67,53 @@ export function slugifyId(text) {
   return base || `item-${Date.now().toString(36)}`;
 }
 
-function ensureMemoryCatalog() {
-  if (!memoryCatalog) {
-    memoryCatalog = GIFTS_CATALOG.map((g, i) => ({
-      id: g.id,
-      name: g.name,
-      description: g.description,
-      priceInCents: g.priceInCents,
-      imageUrl: g.imageUrl,
-      mode: g.mode,
-      active: true,
-      sortOrder: i,
-      updatedAt: null,
-    }));
+function ensureMemoryCatalog(weddingKey = DEFAULT_WEDDING_KEY) {
+  const key = resolveWeddingKey(weddingKey);
+  if (!memoryCatalogByWedding.has(key)) {
+    const list =
+      key === DEFAULT_WEDDING_KEY
+        ? GIFTS_CATALOG.map((g, i) => ({
+            id: g.id,
+            name: g.name,
+            description: g.description,
+            priceInCents: g.priceInCents,
+            imageUrl: g.imageUrl,
+            mode: g.mode,
+            active: true,
+            sortOrder: i,
+            updatedAt: null,
+          }))
+        : [];
+    memoryCatalogByWedding.set(key, list);
   }
-  return memoryCatalog;
+  return memoryCatalogByWedding.get(key);
 }
 
 export function resetMemoryCatalogForTests() {
-  memoryCatalog = null;
+  memoryCatalogByWedding = new Map();
 }
 
-export async function seedCatalogIfEmpty(db) {
-  if (!db) return { seeded: false, count: ensureMemoryCatalog().length };
-  const countRow = await db.prepare(`SELECT COUNT(*) AS c FROM gifts_catalog`).first();
+function staticActiveCatalogFallback() {
+  return GIFTS_CATALOG.map((g) => ({ ...g, active: true }));
+}
+
+export async function seedCatalogIfEmpty(db, weddingKey = DEFAULT_WEDDING_KEY) {
+  const key = resolveWeddingKey(weddingKey);
+  if (!db) {
+    return { seeded: false, count: ensureMemoryCatalog(key).length };
+  }
+  if (key !== DEFAULT_WEDDING_KEY) {
+    const countRow = await db
+      .prepare(`SELECT COUNT(*) AS c FROM gifts_catalog WHERE wedding_key = ?`)
+      .bind(key)
+      .first();
+    const count = Number(countRow?.c || 0);
+    return { seeded: false, count };
+  }
+  const countRow = await db
+    .prepare(`SELECT COUNT(*) AS c FROM gifts_catalog WHERE wedding_key = ?`)
+    .bind(key)
+    .first();
   const count = Number(countRow?.c || 0);
   if (count > 0) return { seeded: false, count };
 
@@ -93,11 +123,12 @@ export async function seedCatalogIfEmpty(db) {
     await db
       .prepare(
         `INSERT INTO gifts_catalog (
-          id, name, description, price_in_cents, image_url, mode, active, sort_order, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)`
+          id, wedding_key, name, description, price_in_cents, image_url, mode, active, sort_order, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`
       )
       .bind(
         gift.id,
+        key,
         gift.name,
         gift.description,
         gift.priceInCents,
@@ -114,44 +145,50 @@ export async function seedCatalogIfEmpty(db) {
 /**
  * Active gifts for checkout / public site. Falls back to static if D1 empty/unavailable.
  */
-export async function getActiveCatalog(db) {
+export async function getActiveCatalog(db, weddingKey = DEFAULT_WEDDING_KEY) {
+  const key = resolveWeddingKey(weddingKey);
   if (!db) {
-    return ensureMemoryCatalog()
+    return ensureMemoryCatalog(key)
       .filter((g) => g.active)
       .map((g) => ({ ...g }));
   }
 
   try {
-    await seedCatalogIfEmpty(db);
+    await seedCatalogIfEmpty(db, key);
     const rows = await db
       .prepare(
         `SELECT id, name, description, price_in_cents, image_url, image_data, mode, active, sort_order, updated_at
          FROM gifts_catalog
-         WHERE active = 1
+         WHERE wedding_key = ? AND active = 1
          ORDER BY sort_order ASC, id ASC`
       )
+      .bind(key)
       .all();
     const list = (rows?.results || []).map(rowToGift);
-    if (list.length === 0) return GIFTS_CATALOG.map((g) => ({ ...g, active: true }));
+    if (list.length === 0 && key === DEFAULT_WEDDING_KEY) return staticActiveCatalogFallback();
     return list;
   } catch {
-    return GIFTS_CATALOG.map((g) => ({ ...g, active: true }));
+    if (key === DEFAULT_WEDDING_KEY) return staticActiveCatalogFallback();
+    return [];
   }
 }
 
-export async function listCatalogAdmin(db) {
+export async function listCatalogAdmin(db, weddingKey = DEFAULT_WEDDING_KEY) {
+  const key = resolveWeddingKey(weddingKey);
   if (!db) {
-    return [...ensureMemoryCatalog()].sort(
+    return [...ensureMemoryCatalog(key)].sort(
       (a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id)
     );
   }
-  await seedCatalogIfEmpty(db);
+  await seedCatalogIfEmpty(db, key);
   const rows = await db
     .prepare(
       `SELECT id, name, description, price_in_cents, image_url, image_data, mode, active, sort_order, updated_at
        FROM gifts_catalog
+       WHERE wedding_key = ?
        ORDER BY sort_order ASC, id ASC`
     )
+    .bind(key)
     .all();
   return (rows?.results || []).map(rowToGift);
 }
@@ -255,7 +292,8 @@ export function validateGiftCreate(body) {
   };
 }
 
-export async function createGift(db, body) {
+export async function createGift(db, body, weddingKey = DEFAULT_WEDDING_KEY) {
+  const key = resolveWeddingKey(weddingKey);
   const validation = validateGiftCreate(body);
   if (!validation.valid) {
     const err = new Error('VALIDATION');
@@ -266,7 +304,7 @@ export async function createGift(db, body) {
   const now = new Date().toISOString();
 
   if (!db) {
-    const mem = ensureMemoryCatalog();
+    const mem = ensureMemoryCatalog(key);
     if (mem.some((g) => g.id === d.id)) throw new Error('GIFT_EXISTS');
     const gift = {
       id: d.id,
@@ -288,11 +326,12 @@ export async function createGift(db, body) {
     await db
       .prepare(
         `INSERT INTO gifts_catalog (
-          id, name, description, price_in_cents, image_url, image_data, mode, active, sort_order, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          id, wedding_key, name, description, price_in_cents, image_url, image_data, mode, active, sort_order, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .bind(
         d.id,
+        key,
         d.name,
         d.description,
         d.priceInCents,
@@ -325,8 +364,9 @@ export async function createGift(db, body) {
   });
 }
 
-export async function updateGift(db, giftId, patch) {
+export async function updateGift(db, giftId, patch, weddingKey = DEFAULT_WEDDING_KEY) {
   if (!giftId || typeof giftId !== 'string') throw new Error('INVALID_GIFT_ID');
+  const key = resolveWeddingKey(weddingKey);
 
   const validation = validateGiftPatch(patch);
   if (!validation.valid) {
@@ -339,7 +379,7 @@ export async function updateGift(db, giftId, patch) {
   const now = new Date().toISOString();
 
   if (!db) {
-    const mem = ensureMemoryCatalog();
+    const mem = ensureMemoryCatalog(key);
     const g = mem.find((x) => x.id === giftId);
     if (!g) throw new Error('GIFT_NOT_FOUND');
     if (d.name !== undefined) g.name = d.name;
@@ -361,17 +401,17 @@ export async function updateGift(db, giftId, patch) {
   }
 
   const existing = await db
-    .prepare(`SELECT id FROM gifts_catalog WHERE id = ?`)
-    .bind(giftId)
+    .prepare(`SELECT id FROM gifts_catalog WHERE id = ? AND wedding_key = ?`)
+    .bind(giftId, key)
     .first();
   if (!existing) throw new Error('GIFT_NOT_FOUND');
 
   const row = await db
     .prepare(
       `SELECT id, name, description, price_in_cents, image_url, image_data, mode, active, sort_order
-       FROM gifts_catalog WHERE id = ?`
+       FROM gifts_catalog WHERE id = ? AND wedding_key = ?`
     )
-    .bind(giftId)
+    .bind(giftId, key)
     .first();
 
   const next = {
@@ -395,7 +435,7 @@ export async function updateGift(db, giftId, patch) {
       `UPDATE gifts_catalog
        SET name = ?, description = ?, price_in_cents = ?, image_url = ?, image_data = ?,
            mode = ?, active = ?, sort_order = ?, updated_at = ?
-       WHERE id = ?`
+       WHERE id = ? AND wedding_key = ?`
     )
     .bind(
       next.name,
@@ -407,25 +447,30 @@ export async function updateGift(db, giftId, patch) {
       next.active,
       next.sort_order,
       now,
-      giftId
+      giftId,
+      key
     )
     .run();
 
   return rowToGift({ ...next, id: giftId, updated_at: now });
 }
 
-export async function deleteGift(db, giftId) {
+export async function deleteGift(db, giftId, weddingKey = DEFAULT_WEDDING_KEY) {
   if (!giftId || typeof giftId !== 'string') throw new Error('INVALID_GIFT_ID');
+  const key = resolveWeddingKey(weddingKey);
 
   if (!db) {
-    const mem = ensureMemoryCatalog();
+    const mem = ensureMemoryCatalog(key);
     const idx = mem.findIndex((g) => g.id === giftId);
     if (idx < 0) throw new Error('GIFT_NOT_FOUND');
     mem.splice(idx, 1);
     return { id: giftId, removed: true };
   }
 
-  const result = await db.prepare(`DELETE FROM gifts_catalog WHERE id = ?`).bind(giftId).run();
+  const result = await db
+    .prepare(`DELETE FROM gifts_catalog WHERE id = ? AND wedding_key = ?`)
+    .bind(giftId, key)
+    .run();
   const changes = Number(result?.meta?.changes ?? result?.changes ?? 0);
   if (changes === 0) throw new Error('GIFT_NOT_FOUND');
   return { id: giftId, removed: true };

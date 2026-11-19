@@ -165,7 +165,10 @@ async function handlePost(request, env) {
   try {
     // Rate limit (5 per hour for messages)
     const ip = getClientIp(request);
-    const rateLimit = await checkRateLimit(env.DB, ip, env.RSVP_SECRET, 5);
+    const url = new URL(request.url);
+    const weddingKey = String(url.searchParams.get('w') || url.searchParams.get('wedding') || '').trim();
+
+    const rateLimit = await checkRateLimit(env.DB, ip, env.RSVP_SECRET, 5, weddingKey || undefined);
     
     if (!rateLimit.allowed) {
       return errorResponse(
@@ -180,7 +183,8 @@ async function handlePost(request, env) {
       env.DB,
       validation.data,
       idempotencyKey,
-      env.RSVP_SECRET
+      env.RSVP_SECRET,
+      weddingKey || undefined
     );
 
     // Best-effort e-mail (Resend free). Sem key = no-op, zero custo Cloudflare.
@@ -227,7 +231,8 @@ async function handleGet(request, env) {
   }
 
   try {
-    const result = await getMessages(env.DB, limit, cursorParam);
+    const weddingKey = String(url.searchParams.get('w') || url.searchParams.get('wedding') || '').trim();
+    const result = await getMessages(env.DB, limit, cursorParam, weddingKey || undefined);
     return jsonResponse(request, result, 200);
   } catch (error) {
     console.error('Failed to get messages:', error);

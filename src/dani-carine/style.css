@@ -1509,7 +1509,11 @@ h2 {
 .gift-modal__form[hidden],
 .gift-modal__pix[hidden],
 .gift-modal__qr[hidden],
-.gift-modal__error[hidden] {
+.gift-modal__success[hidden],
+.gift-modal__error[hidden],
+.gift-modal__photo[hidden],
+.gift-modal__desc[hidden],
+#gift-modal-title[hidden] {
   display: none !important;
 }
 
@@ -1661,16 +1665,46 @@ h2 {
 .gift-modal__qr-wrap {
   display: grid;
   place-items: center;
+  width: 100%;
   min-height: 0;
 }
 
 .gift-modal__qr {
+  display: block;
   width: min(100%, 168px);
+  margin: 0 auto;
   aspect-ratio: 1;
   border-radius: 12px;
   background: #fff;
   border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
   padding: 0.4rem;
+}
+
+.gift-modal__success {
+  display: grid;
+  justify-items: center;
+  gap: 0.65rem;
+  padding: 1.4rem 0.5rem 0.35rem;
+  text-align: center;
+}
+
+.gift-modal__check {
+  color: var(--lagoon);
+  line-height: 0;
+}
+
+.gift-modal__success-title {
+  margin: 0.35rem 0 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.35rem, 4vw, 1.6rem);
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.gift-modal__success-lead {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.95rem;
 }
 
 .gift-modal__pix-actions {
@@ -2783,4 +2817,112 @@ h2 {
   flex-wrap: wrap;
   gap: 0.6rem;
   align-items: center;
+}
+
+/* —— Site em breve (novos tenants) —— */
+.coming-soon {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: grid;
+  place-items: center;
+  padding: 2rem;
+  background:
+    radial-gradient(ellipse 70% 50% at 15% 10%, rgba(61, 90, 76, 0.14), transparent 55%),
+    radial-gradient(ellipse 55% 40% at 90% 20%, rgba(212, 132, 106, 0.14), transparent 50%),
+    linear-gradient(165deg, #f7f1e8 0%, #efe4d6 48%, #e8ddd0 100%);
+}
+
+.coming-soon[hidden] {
+  display: none !important;
+}
+
+.coming-soon__inner {
+  width: min(28rem, 100%);
+  text-align: center;
+}
+
+.coming-soon__brand {
+  margin: 0 0 1.5rem;
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 5vw, 2.75rem);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.coming-soon__brand em {
+  font-style: italic;
+  color: var(--lagoon);
+}
+
+.coming-soon__mark {
+  margin: 0 0 1.25rem;
+  font-family: var(--font-display);
+  font-size: clamp(2.4rem, 8vw, 3.6rem);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+}
+
+.coming-soon__mark em {
+  font-family: var(--font-script);
+  font-style: normal;
+  color: var(--salmon);
+  margin: 0 0.15em;
+}
+
+.coming-soon__couple {
+  justify-content: center;
+}
+
+.coming-soon__title {
+  margin: 0 0 0.85rem;
+  font-family: var(--font-display);
+  font-size: clamp(2.6rem, 8vw, 4.2rem);
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+}
+
+.coming-soon__lead {
+  margin: 0 auto 1.75rem;
+  max-width: 22rem;
+  color: var(--muted);
+  font-size: 1.05rem;
+  line-height: 1.55;
+}
+
+body.is-coming-soon {
+  overflow: hidden;
+  cursor: auto;
+}
+
+body.is-coming-soon.has-cursor,
+body.is-coming-soon.has-cursor a,
+body.is-coming-soon.has-cursor button {
+  cursor: auto;
+}
+
+body.is-coming-soon .preloader,
+body.is-coming-soon .scroll-progress,
+body.is-coming-soon .cursor,
+body.is-coming-soon .nav,
+body.is-coming-soon main,
+body.is-coming-soon footer,
+body.is-coming-soon .admin-login {
+  display: none !important;
+}
+
+.dress__card--madrinha.is-vip-locked .dress__picker {
+  display: none !important;
+}
+
+.dress__card--madrinha.is-vip-locked::after {
+  content: 'Seleção de cores · VIP';
+  display: block;
+  margin-top: 0.65rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
 }

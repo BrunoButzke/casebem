@@ -2,12 +2,17 @@
  * Messages Service - Public guestbook implementation
  */
 
-import { WEDDING_KEY } from './messages-validators.mjs';
-import { 
-  deriveRsvpKeys, 
-  hmacHash, 
-  sha256Hash
+import { WEDDING_KEY as DEFAULT_WEDDING_KEY } from './messages-validators.mjs';
+import {
+  deriveRsvpKeys,
+  hmacHash,
+  sha256Hash,
 } from './crypto-utils.mjs';
+
+function resolveWeddingKey(weddingKey) {
+  const k = String(weddingKey || DEFAULT_WEDDING_KEY).trim();
+  return k || DEFAULT_WEDDING_KEY;
+}
 
 export function generateUuid() {
   return crypto.randomUUID();
@@ -22,13 +27,14 @@ export function now() {
  * @param {object} data - Normalized message data
  * @returns {Promise<string>} SHA-256 hash of canonical representation
  */
-async function createPayloadFingerprint(data) {
+async function createPayloadFingerprint(data, weddingKey = DEFAULT_WEDDING_KEY) {
+  const wk = resolveWeddingKey(weddingKey);
   // Canonical representation: sorted keys, normalized values
   const canonical = JSON.stringify({
     consentGiven: data.consentGiven,
     guestName: data.guestName,
     message: data.message,
-    weddingKey: WEDDING_KEY,
+    weddingKey: wk,
   });
   
   return sha256Hash(canonical);
@@ -42,12 +48,13 @@ async function createPayloadFingerprint(data) {
  * @param {string} secret - Base64 secret for HMAC
  * @returns {Promise<object>} Created message
  */
-export async function createMessage(db, data, idempotencyKey, secret) {
+export async function createMessage(db, data, idempotencyKey, secret, weddingKey = DEFAULT_WEDDING_KEY) {
   if (!secret) {
     throw new Error('Secret not configured');
   }
+  const wk = resolveWeddingKey(weddingKey);
   
-  const fingerprint = await createPayloadFingerprint(data);
+  const fingerprint = await createPayloadFingerprint(data, wk);
 
   // Check idempotency: same key + same fingerprint
   if (idempotencyKey) {
@@ -57,7 +64,7 @@ export async function createMessage(db, data, idempotencyKey, secret) {
          FROM wedding_messages
          WHERE wedding_key = ? AND idempotency_key = ?`
       )
-      .bind(WEDDING_KEY, idempotencyKey)
+      .bind(wk, idempotencyKey)
       .first();
 
     if (existing) {
@@ -76,7 +83,7 @@ export async function createMessage(db, data, idempotencyKey, secret) {
       // Valid replay: return same message
       return {
         id: existing.id,
-        weddingKey: WEDDING_KEY,
+        weddingKey: wk,
         guestName: existing.guest_name,
         message: existing.message,
         createdAt: existing.created_at,
@@ -98,7 +105,7 @@ export async function createMessage(db, data, idempotencyKey, secret) {
           idempotency_key, idempotency_fingerprint
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
       ).bind(
-        id, WEDDING_KEY, data.guestName, data.message,
+        id, wk, data.guestName, data.message,
         1, timestamp,
         idempotencyKey || null, fingerprint
       ),
@@ -118,7 +125,7 @@ export async function createMessage(db, data, idempotencyKey, secret) {
            FROM wedding_messages
            WHERE wedding_key = ? AND idempotency_key = ?`
         )
-        .bind(WEDDING_KEY, idempotencyKey)
+        .bind(wk, idempotencyKey)
         .first();
       
       if (existing) {
@@ -135,7 +142,7 @@ export async function createMessage(db, data, idempotencyKey, secret) {
         // Valid replay
         return {
           id: existing.id,
-          weddingKey: WEDDING_KEY,
+          weddingKey: wk,
           guestName: existing.guest_name,
           message: existing.message,
           createdAt: existing.created_at,
@@ -146,7 +153,7 @@ export async function createMessage(db, data, idempotencyKey, secret) {
   }
 
   return {
-    id, weddingKey: WEDDING_KEY,
+    id, weddingKey: wk,
     guestName: data.guestName,
     message: data.message,
     createdAt: timestamp,
@@ -226,7 +233,8 @@ function decodeCursor(cursor) {
  * @param {string|null} cursor - Pagination cursor (base64 encoded)
  * @returns {Promise<{messages: Array, nextCursor: string|null}>}
  */
-export async function getMessages(db, limit, cursor) {
+export async function getMessages(db, limit, cursor, weddingKey = DEFAULT_WEDDING_KEY) {
+  const wk = resolveWeddingKey(weddingKey);
   let query;
   let params;
   
@@ -245,7 +253,7 @@ export async function getMessages(db, limit, cursor) {
                AND (created_at < ? OR (created_at = ? AND id < ?))
              ORDER BY created_at DESC, id DESC
              LIMIT ?`;
-    params = [WEDDING_KEY, decoded.createdAt, decoded.createdAt, decoded.id, limit + 1];
+    params = [wk, decoded.createdAt, decoded.createdAt, decoded.id, limit + 1];
   } else {
     // First page (exclude moderated/hidden)
     query = `SELECT id, guest_name, message, created_at
@@ -254,7 +262,7 @@ export async function getMessages(db, limit, cursor) {
                AND COALESCE(hidden, 0) = 0
              ORDER BY created_at DESC, id DESC
              LIMIT ?`;
-    params = [WEDDING_KEY, limit + 1];
+    params = [wk, limit + 1];
   }
   
   const result = await db.prepare(query).bind(...params).all();
@@ -285,12 +293,13 @@ export async function getMessages(db, limit, cursor) {
  * @param {number} limit - Maximum requests per window (default 5 for messages)
  * @returns {Promise<{allowed: boolean, remaining: number}>}
  */
-export async function checkRateLimit(db, ipAddress, secret, limit = 5) {
+export async function checkRateLimit(db, ipAddress, secret, limit = 5, weddingKey = DEFAULT_WEDDING_KEY) {
+  const wk = resolveWeddingKey(weddingKey);
   const keys = await deriveRsvpKeys(secret);
   const ipHash = await hmacHash(ipAddress, keys.hmacKey);
   const windowStart = getHourWindow();
   // Use 'messages:' namespace to separate from RSVP rate limits
-  const rateLimitId = `messages:${WEDDING_KEY}:${ipHash}:${windowStart}`;
+  const rateLimitId = `messages:${wk}:${ipHash}:${windowStart}`;
   const timestamp = now();
 
   // Atomic UPSERT with RETURNING
@@ -303,7 +312,7 @@ export async function checkRateLimit(db, ipAddress, secret, limit = 5) {
        WHERE request_count < ?
        RETURNING request_count`
     )
-    .bind(rateLimitId, WEDDING_KEY, ipHash, windowStart, timestamp, timestamp, timestamp, limit)
+    .bind(rateLimitId, wk, ipHash, windowStart, timestamp, timestamp, timestamp, limit)
     .first();
 
   // Cleanup old windows

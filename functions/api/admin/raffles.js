@@ -6,6 +6,7 @@ import { requireAdmin } from '../../_lib/admin-auth.mjs';
 import { getCorsHeaders, validateOrigin } from '../../_lib/http-helpers.mjs';
 import {
   listRafflesAdmin,
+  listRaffleSalesAdmin,
   createRaffle,
   updateRaffle,
   deleteRaffle,
@@ -42,13 +43,17 @@ export async function onRequestOptions(context) {
 export async function onRequestGet(context) {
   const { request, env } = context;
   const headers = getCorsHeaders(request);
-  const auth = requireAdmin(request, env);
+  const auth = await requireAdmin(request, env);
   if (!auth.ok) return json(headers, { ok: false, error: auth.error, message: auth.message }, auth.status);
   if (!env.DB) return json(headers, { ok: false, error: 'DB_NOT_CONFIGURED' }, 503);
 
   try {
-    const raffles = await listRafflesAdmin(env.DB);
-    return json(headers, { ok: true, raffles });
+    const wk = auth.weddingKey;
+    const [raffles, sales] = await Promise.all([
+      listRafflesAdmin(env.DB, wk),
+      listRaffleSalesAdmin(env.DB, {}, wk),
+    ]);
+    return json(headers, { ok: true, raffles, sales, weddingKey: wk });
   } catch (err) {
     return json(headers, { ok: false, error: 'LIST_FAILED', message: err.message }, 500);
   }
@@ -63,7 +68,7 @@ export async function onRequestPost(context) {
     return json(headers, { ok: false, error: 'ORIGIN_DENIED', message: originCheck.error }, 403);
   }
 
-  const auth = requireAdmin(request, env);
+  const auth = await requireAdmin(request, env);
   if (!auth.ok) return json(headers, { ok: false, error: auth.error, message: auth.message }, auth.status);
   if (!env.DB) return json(headers, { ok: false, error: 'DB_NOT_CONFIGURED' }, 503);
 
@@ -75,8 +80,9 @@ export async function onRequestPost(context) {
   }
 
   try {
-    const raffle = await createRaffle(env.DB, body || {});
-    const raffles = await listRafflesAdmin(env.DB);
+    const wk = auth.weddingKey;
+    const raffle = await createRaffle(env.DB, body || {}, wk);
+    const raffles = await listRafflesAdmin(env.DB, wk);
     return json(headers, { ok: true, raffle, raffles }, 201);
   } catch (err) {
     return mapWriteError(headers, err);
@@ -92,7 +98,7 @@ export async function onRequestPatch(context) {
     return json(headers, { ok: false, error: 'ORIGIN_DENIED', message: originCheck.error }, 403);
   }
 
-  const auth = requireAdmin(request, env);
+  const auth = await requireAdmin(request, env);
   if (!auth.ok) return json(headers, { ok: false, error: auth.error, message: auth.message }, auth.status);
   if (!env.DB) return json(headers, { ok: false, error: 'DB_NOT_CONFIGURED' }, 503);
 
@@ -106,7 +112,7 @@ export async function onRequestPatch(context) {
   if (!body?.id) return json(headers, { ok: false, error: 'MISSING_ID' }, 400);
 
   try {
-    const raffle = await updateRaffle(env.DB, String(body.id), body);
+    const raffle = await updateRaffle(env.DB, String(body.id), body, auth.weddingKey);
     return json(headers, { ok: true, raffle });
   } catch (err) {
     return mapWriteError(headers, err);
@@ -122,7 +128,7 @@ export async function onRequestDelete(context) {
     return json(headers, { ok: false, error: 'ORIGIN_DENIED', message: originCheck.error }, 403);
   }
 
-  const auth = requireAdmin(request, env);
+  const auth = await requireAdmin(request, env);
   if (!auth.ok) return json(headers, { ok: false, error: auth.error, message: auth.message }, auth.status);
   if (!env.DB) return json(headers, { ok: false, error: 'DB_NOT_CONFIGURED' }, 503);
 
@@ -130,8 +136,9 @@ export async function onRequestDelete(context) {
   if (!id) return json(headers, { ok: false, error: 'MISSING_ID' }, 400);
 
   try {
-    await deleteRaffle(env.DB, id);
-    const raffles = await listRafflesAdmin(env.DB);
+    const wk = auth.weddingKey;
+    await deleteRaffle(env.DB, id, wk);
+    const raffles = await listRafflesAdmin(env.DB, wk);
     return json(headers, { ok: true, removed: id, raffles });
   } catch (err) {
     return mapWriteError(headers, err);

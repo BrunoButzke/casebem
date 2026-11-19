@@ -26,10 +26,10 @@
       <section class="admin-login-card" id="login-box">
         <p class="eyebrow">Painel dos noivos</p>
         <h1>Bem-vindos</h1>
-        <p class="admin-sub">Dani &amp; Carine · acesso à gestão do casamento</p>
+        <p class="admin-sub" id="login-couple-sub">Acesso à gestão do casamento</p>
         <div class="admin-field">
-          <label for="admin-user">Usuário</label>
-          <input id="admin-user" type="text" autocomplete="username" placeholder="login" />
+          <label for="admin-user">Usuário ou e-mail</label>
+          <input id="admin-user" type="text" autocomplete="username" placeholder="login ou e-mail" />
         </div>
         <div class="admin-field">
           <label for="admin-pass">Senha</label>
@@ -39,15 +39,49 @@
         <p class="err" id="login-err" hidden></p>
       </section>
 
+      <section id="super-panel" hidden>
+        <div class="admin-hero">
+          <div>
+            <p class="eyebrow">CaseBem</p>
+            <h1>Super admin</h1>
+            <p class="admin-sub">Tenants e lista de espera</p>
+          </div>
+          <div class="admin-hero__actions">
+            <button type="button" class="btn btn--ghost" id="super-logout-btn">Sair</button>
+          </div>
+        </div>
+        <p class="err" id="super-err" hidden></p>
+        <article class="admin-card">
+          <div class="admin-card__head">
+            <div>
+              <h2>Tenants</h2>
+              <p class="admin-card__lead">Casamentos ativos na plataforma</p>
+              <p class="sub" id="super-tenants-summary">Carregando…</p>
+            </div>
+          </div>
+          <div id="super-tenants-table"></div>
+        </article>
+        <article class="admin-card" style="margin-top: 1.25rem">
+          <div class="admin-card__head">
+            <div>
+              <h2>Lista de espera</h2>
+              <p class="admin-card__lead">Cadastros de “Garanta a vaga”</p>
+              <p class="sub" id="super-waitlist-summary">Carregando…</p>
+            </div>
+          </div>
+          <div id="super-waitlist-table"></div>
+        </article>
+      </section>
+
       <section id="panel" hidden>
         <div class="admin-hero">
           <div>
-            <p class="eyebrow">Dani &amp; Carine</p>
+            <p class="eyebrow" id="panel-couple-names">Dani &amp; Carine</p>
             <h1>Painel dos noivos</h1>
             <p class="admin-sub">Lista, grupos, mural e conteúdos do site</p>
           </div>
           <div class="admin-hero__actions">
-            <button type="button" class="btn btn--ghost" id="refresh-btn">Atualizar</button>
+            <button type="button" class="btn btn--ghost" id="return-super-btn" hidden>← Super admin</button>
             <button type="button" class="btn btn--ghost" id="csv-btn">Exportar lista</button>
             <button type="button" class="btn btn--ghost" id="logout-btn">Sair</button>
           </div>
@@ -57,13 +91,21 @@
         <p class="err" id="panel-err" hidden></p>
 
         <div id="admin-hub" class="admin-hub">
+          <button type="button" class="hub-tile" data-goto="site-page">
+            <span class="hub-tile__title">Nossa página</span>
+            <span class="hub-tile__lead" id="hub-site-page-summary">Construtor de seções</span>
+          </button>
           <button type="button" class="hub-tile" data-goto="guests">
             <span class="hub-tile__title">Lista de convidados</span>
             <span class="hub-tile__lead">Nomes, grupos e confirmações</span>
           </button>
           <button type="button" class="hub-tile" data-goto="catalog">
             <span class="hub-tile__title">Presentes</span>
-            <span class="hub-tile__lead" id="hub-catalog-summary">Catálogo e recebidos</span>
+            <span class="hub-tile__lead" id="hub-catalog-summary">Catálogo do site</span>
+          </button>
+          <button type="button" class="hub-tile" data-goto="finance">
+            <span class="hub-tile__title">Financeiro</span>
+            <span class="hub-tile__lead" id="hub-finance-summary">Presentes e sorteios</span>
           </button>
           <button type="button" class="hub-tile" data-goto="stationery">
             <span class="hub-tile__title">Papelaria</span>
@@ -85,12 +127,41 @@
             <span class="hub-tile__title">Álbum compartilhado</span>
             <span class="hub-tile__lead">Fotos dos convidados</span>
           </button>
+          <button type="button" class="hub-tile" data-goto="access">
+            <span class="hub-tile__title">Acessos</span>
+            <span class="hub-tile__lead" id="hub-access-summary">Noiva e Noivo</span>
+          </button>
         </div>
 
         <div id="admin-section-view" class="admin-section-view" hidden>
           <button type="button" class="btn btn--ghost hub-back" id="hub-back">← Voltar ao painel</button>
 
           <div class="admin-sections">
+            <article class="admin-card admin-section" data-section="site-page" hidden>
+              <div class="admin-card__head">
+                <div>
+                  <h2>Nossa página</h2>
+                  <p class="admin-card__lead">Monte as seções do site · fotos, textos e datas</p>
+                  <p class="sub" id="site-page-summary">Carregando…</p>
+                </div>
+                <div class="card-actions">
+                  <a class="btn btn--ghost" href="/dani-carine/" target="_blank" rel="noopener">Ver site</a>
+                </div>
+              </div>
+              <div id="site-page-list" class="site-page-list"></div>
+              <div id="site-page-editor" class="site-page-editor" hidden>
+                <button type="button" class="btn btn--ghost btn--sm" id="site-page-back">← Voltar às seções</button>
+                <h3 id="site-page-editor-title">Editar seção</h3>
+                <label class="site-page-active">
+                  <input type="checkbox" id="site-page-active" />
+                  <span>Seção ativa no site</span>
+                </label>
+                <div id="site-page-fields" class="site-page-fields"></div>
+                <button type="button" class="btn" id="site-page-save">Salvar seção</button>
+                <p class="err" id="site-page-err" hidden></p>
+              </div>
+            </article>
+
             <article class="admin-card admin-section" data-section="guests" hidden>
               <div class="admin-card__head">
                 <div>
@@ -139,9 +210,22 @@
                 </div>
               </div>
               <div id="catalog-grid" class="admin-gifts-grid"></div>
-              <h3 class="admin-subhead">Recebidos</h3>
-              <p class="admin-card__lead">Checkouts Pix / pagamentos</p>
-              <div id="gifts-table"></div>
+            </article>
+
+            <article class="admin-card admin-section" data-section="finance" hidden>
+              <div class="admin-card__head">
+                <div>
+                  <h2>Financeiro</h2>
+                  <p class="admin-card__lead">Presentes e números de sorteio em um só lugar</p>
+                  <p class="sub" id="finance-summary">Carregando…</p>
+                </div>
+              </div>
+              <div class="finance-filters" role="group" aria-label="Filtrar por origem">
+                <button type="button" class="btn btn--ghost btn--sm is-active" data-finance-filter="all">Todos</button>
+                <button type="button" class="btn btn--ghost btn--sm" data-finance-filter="gift">Presentes</button>
+                <button type="button" class="btn btn--ghost btn--sm" data-finance-filter="raffle">Sorteios</button>
+              </div>
+              <div id="finance-table"></div>
             </article>
 
             <article class="admin-card admin-section" data-section="stationery" hidden>
@@ -357,6 +441,40 @@
               <div class="admin-album-grid" id="album-grid">
                 <p class="sub admin-album-empty">Quando os convidados enviarem fotos, elas aparecem aqui.</p>
               </div>
+            </article>
+
+            <article class="admin-card admin-section" data-section="access" hidden>
+              <div class="admin-card__head">
+                <div>
+                  <h2>Acessos</h2>
+                  <p class="admin-card__lead">Quem pode entrar neste painel</p>
+                  <p class="sub" id="access-summary">Carregando…</p>
+                </div>
+              </div>
+              <div id="access-table"></div>
+              <p class="sub" id="access-pending-hint" hidden>
+                O(a) parceiro(a) já está reservado(a). Não precisa cadastrar e-mail/senha agora —
+                quando for a vez dele(a), use o formulário abaixo para completar o acesso.
+              </p>
+              <form id="access-form" class="access-form" novalidate>
+                <div class="admin-field">
+                  <label for="access-email">E-mail</label>
+                  <input id="access-email" type="email" autocomplete="off" placeholder="voce@email.com" required />
+                </div>
+                <div class="admin-field">
+                  <label for="access-role">Papel</label>
+                  <select id="access-role">
+                    <option value="noiva">Noiva</option>
+                    <option value="noivo">Noivo</option>
+                  </select>
+                </div>
+                <div class="admin-field">
+                  <label for="access-password">Senha temporária</label>
+                  <input id="access-password" type="password" autocomplete="new-password" placeholder="8+ chars, maiúscula, número e especial" required minlength="8" />
+                </div>
+                <button type="submit" class="btn" id="access-save-btn">Completar acesso</button>
+                <p class="err" id="access-err" hidden></p>
+              </form>
             </article>
           </div>
         </div>
@@ -616,7 +734,48 @@
     import QRCode from 'qrcode';
     import { ADMIN_STORAGE_KEY as STORAGE_KEY } from '/src/dani-carine/admin-credentials.mjs';
 
+    const ROLE_KEY = `${STORAGE_KEY}:role`;
+    const SUPER_TOKEN_KEY = `${STORAGE_KEY}:super`;
+    const WEDDING_KEY_STORAGE = `${STORAGE_KEY}:wedding`;
     const $ = (id) => document.getElementById(id);
+
+    function tenantBaseFromPath(pathname = location.pathname) {
+      const m = String(pathname || '').match(/^\/([^/]+)/);
+      return m ? `/${m[1]}` : '/dani-carine';
+    }
+
+    function syncTenantSiteLinks(sitePath) {
+      const base = String(sitePath || `${tenantBaseFromPath()}/`).replace(/\/?$/, '/');
+      document.querySelectorAll('a.admin-top__brand, a.admin-top__link, a[href="/dani-carine/"]').forEach((a) => {
+        if (a.classList.contains('admin-top__brand') || a.classList.contains('admin-top__link') || a.textContent.includes('Ver site')) {
+          a.setAttribute('href', base);
+        }
+      });
+    }
+
+    syncTenantSiteLinks();
+
+    (async function hydrateLoginCouple() {
+      const sub = $('login-couple-sub');
+      if (!sub) return;
+      const m = String(location.pathname || '').match(/^\/([^/]+)/);
+      const slug = m?.[1];
+      if (!slug || slug === 'dani-carine') {
+        sub.textContent = 'Acesso à gestão do casamento';
+        return;
+      }
+      try {
+        const res = await fetch(`/api/wedding?w=${encodeURIComponent(slug)}`);
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.ok && data.coupleNames) {
+          sub.textContent = `${data.coupleNames} · acesso à gestão do casamento`;
+          return;
+        }
+      } catch {
+        /* ignore */
+      }
+      sub.textContent = 'Acesso à gestão do casamento';
+    })();
 
     function parseGuestNamesInput(text) {
       return String(text || '')
@@ -631,12 +790,32 @@
       return sessionStorage.getItem(STORAGE_KEY) || '';
     }
 
-    function setToken(t) {
-      sessionStorage.setItem(STORAGE_KEY, t);
+    function getRole() {
+      return sessionStorage.getItem(ROLE_KEY) || 'tenant';
+    }
+
+    function setSession(token, role, weddingKey) {
+      sessionStorage.setItem(STORAGE_KEY, token);
+      sessionStorage.setItem(ROLE_KEY, role || 'tenant');
+      if (weddingKey) sessionStorage.setItem(WEDDING_KEY_STORAGE, weddingKey);
+      else if (role === 'super') sessionStorage.removeItem(WEDDING_KEY_STORAGE);
     }
 
     function clearToken() {
       sessionStorage.removeItem(STORAGE_KEY);
+      sessionStorage.removeItem(ROLE_KEY);
+      sessionStorage.removeItem(SUPER_TOKEN_KEY);
+      sessionStorage.removeItem(WEDDING_KEY_STORAGE);
+    }
+
+    function hasSuperReturn() {
+      return Boolean(sessionStorage.getItem(SUPER_TOKEN_KEY));
+    }
+
+    function syncSuperReturnBtn() {
+      const btn = $('return-super-btn');
+      if (!btn) return;
+      btn.hidden = !hasSuperReturn();
     }
 
     function authHeaders() {
@@ -647,8 +826,14 @@
       return (Number(cents || 0) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     }
 
+    function planLabel(plan) {
+      const map = { basic: 'Básico', pro: 'Pro', vip: 'VIP' };
+      return map[String(plan || '').toLowerCase()] || String(plan || '—');
+    }
+
     function showLogin(err) {
       $('panel').hidden = true;
+      if ($('super-panel')) $('super-panel').hidden = true;
       $('login-box').hidden = false;
       if (err) {
         $('login-err').hidden = false;
@@ -658,10 +843,152 @@
 
     function showPanel() {
       $('login-box').hidden = true;
+      if ($('super-panel')) $('super-panel').hidden = true;
       $('panel').hidden = false;
       $('login-err').hidden = true;
+      syncSuperReturnBtn();
       showHub();
     }
+
+    function showSuperPanel() {
+      $('login-box').hidden = true;
+      $('panel').hidden = true;
+      $('login-err').hidden = true;
+      if ($('super-panel')) $('super-panel').hidden = false;
+    }
+
+    function renderSuperTenants(rows) {
+      const el = $('super-tenants-table');
+      const summary = $('super-tenants-summary');
+      if (!el) return;
+      if (summary) {
+        summary.textContent = rows.length
+          ? `${rows.length} tenant(s) ativo(s)`
+          : 'Nenhum tenant cadastrado.';
+      }
+      if (!rows.length) {
+        el.innerHTML = '<p class="sub">Nenhum tenant ainda.</p>';
+        return;
+      }
+      el.innerHTML = `<div class="admin-table-wrap"><table><thead><tr>
+        <th>Noivos</th><th>E-mail</th><th>Plano</th><th></th>
+      </tr></thead><tbody>
+      ${rows
+        .map(
+          (t) => `<tr>
+        <td>${escapeHtml(t.coupleNames || t.id)}</td>
+        <td>${escapeHtml(t.email || '—')}</td>
+        <td>${escapeHtml(planLabel(t.plan))}</td>
+        <td class="row-actions">
+          <button type="button" class="btn btn--ghost btn--sm" data-enter-tenant="${escapeHtml(t.id)}">Abrir admin</button>
+        </td>
+      </tr>`
+        )
+        .join('')}
+      </tbody></table></div>`;
+    }
+
+    function renderSuperWaitlist(rows) {
+      const el = $('super-waitlist-table');
+      const summary = $('super-waitlist-summary');
+      if (!el) return;
+      if (summary) {
+        summary.textContent = rows.length
+          ? `${rows.length} cadastro(s)`
+          : 'Ninguém na lista ainda.';
+      }
+      if (!rows.length) {
+        el.innerHTML = '<p class="sub">Lista de espera vazia.</p>';
+        return;
+      }
+      el.innerHTML = `<div class="admin-table-wrap"><table><thead><tr>
+        <th>Nome</th><th>E-mail</th><th>Plano</th><th>Quando</th>
+      </tr></thead><tbody>
+      ${rows
+        .map(
+          (w) => `<tr>
+        <td>${escapeHtml(w.name)}</td>
+        <td>${escapeHtml(w.email)}</td>
+        <td>${escapeHtml(planLabel(w.plan))}</td>
+        <td>${escapeHtml(String(w.createdAt || '').slice(0, 16).replace('T', ' '))}</td>
+      </tr>`
+        )
+        .join('')}
+      </tbody></table></div>`;
+    }
+
+    async function loadSuper() {
+      showSuperPanel();
+      const err = $('super-err');
+      if (err) {
+        err.hidden = true;
+        err.textContent = '';
+      }
+      const res = await fetch('/api/admin/super', { headers: authHeaders() });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        if (res.status === 401) {
+          clearToken();
+          showLogin(data.message || 'Não autorizado');
+          return;
+        }
+        if (err) {
+          err.hidden = false;
+          err.textContent = data.message || data.error || 'Falha ao carregar super admin';
+        }
+        return;
+      }
+      renderSuperTenants(data.tenants || []);
+      renderSuperWaitlist(data.waitlist || []);
+    }
+
+    async function enterTenantAdmin(tenantId) {
+      const err = $('super-err');
+      if (err) {
+        err.hidden = true;
+        err.textContent = '';
+      }
+      const superToken = getToken();
+      const res = await fetch('/api/admin/super/enter', {
+        method: 'POST',
+        headers: {
+          ...authHeaders(),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ tenantId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok || !data.token) {
+        if (err) {
+          err.hidden = false;
+          err.textContent = data.message || data.error || 'Não foi possível abrir o admin.';
+        }
+        return;
+      }
+      sessionStorage.setItem(SUPER_TOKEN_KEY, superToken);
+      setSession(data.token, 'tenant', data.weddingKey || tenantId);
+      const dest = data.adminPath || (data.weddingKey ? `/${data.weddingKey}/admin` : '');
+      if (dest && !location.pathname.startsWith(dest.replace(/\/admin$/, ''))) {
+        location.href = dest;
+        return;
+      }
+      syncTenantSiteLinks(data.sitePath || (data.weddingKey ? `/${data.weddingKey}/` : null));
+      await load();
+    }
+
+    $('super-tenants-table')?.addEventListener('click', (ev) => {
+      const btn = ev.target.closest('[data-enter-tenant]');
+      if (!btn) return;
+      void enterTenantAdmin(btn.getAttribute('data-enter-tenant'));
+    });
+
+    $('return-super-btn')?.addEventListener('click', async () => {
+      const superToken = sessionStorage.getItem(SUPER_TOKEN_KEY);
+      if (!superToken) return;
+      sessionStorage.removeItem(SUPER_TOKEN_KEY);
+      setSession(superToken, 'super');
+      await loadSuper();
+    });
 
     function showHub() {
       $('admin-hub').hidden = false;
@@ -689,6 +1016,9 @@
       if (id === 'catalog') void loadCatalogEditor();
       if (id === 'stationery') void loadStationeryEditor();
       if (id === 'raffles') void loadRafflesEditor();
+      if (id === 'finance') renderFinance();
+      if (id === 'access') void loadAccessEditor();
+      if (id === 'site-page') void loadSitePageEditor();
     }
 
     $('admin-hub')?.addEventListener('click', (ev) => {
@@ -765,22 +1095,37 @@
       cachedGroups = data.groups || [];
       fillDefaultGroupSelect();
 
+      const coupleEl = $('panel-couple-names');
+      if (coupleEl && data.tenant?.coupleNames) {
+        coupleEl.textContent = data.tenant.coupleNames;
+      }
+      if (data.tenant?.sitePath) syncTenantSiteLinks(data.tenant.sitePath);
+
       $('stats').innerHTML = `
         <div class="stat"><b>${s.attendingCount ?? 0}</b><span>confirmados</span></div>
         <div class="stat"><b>${s.declinedCount ?? 0}</b><span>ausentes</span></div>
         <div class="stat"><b>${s.pendingCount ?? 0}</b><span>pendentes</span></div>
         <div class="stat"><b>${s.guestListCount ?? (data.guestList || []).length}</b><span>na lista</span></div>
         <div class="stat"><b>${s.messagesVisible ?? 0}</b><span>recados visíveis</span></div>
-        <div class="stat"><b>${s.giftsPaid ?? 0}</b><span>presentes pagos</span></div>
-        <div class="stat"><b>${money(s.giftsPaidCents)}</b><span>arrecadado (pago)</span></div>
+        <div class="stat"><b>${s.financePaid ?? s.giftsPaid ?? 0}</b><span>pagamentos ok</span></div>
+        <div class="stat"><b>${money(s.financePaidCents ?? s.giftsPaidCents)}</b><span>arrecadado (pago)</span></div>
         <div class="stat"><b>${(data.rsvpMode || s.rsvpMode) === 'open' ? 'Lista aberta' : 'Só da lista'}</b><span>quem pode confirmar</span></div>
       `;
 
       syncModeSelect(data.rsvpMode || s.rsvpMode || 'closed');
+      cachedFinance = Array.isArray(data.finance) ? data.finance : [];
+      const hubFinance = $('hub-finance-summary');
+      if (hubFinance) {
+        const paidCents = Number(s.financePaidCents ?? 0);
+        hubFinance.textContent =
+          cachedFinance.length === 0
+            ? 'Presentes e sorteios'
+            : `${cachedFinance.length} lançamento(s) · ${money(paidCents)} pago`;
+      }
       $('groups-table').innerHTML = renderGroups(cachedGroups);
       $('guest-table').innerHTML = renderGuests(data.guestList || []);
-      $('gifts-table').innerHTML = renderGifts(data.gifts || []);
       $('messages-table').innerHTML = renderMessages(data.messages || []);
+      renderFinance();
       await loadCatalogEditor();
       await loadStationeryEditor();
       await loadLodgingEditor();
@@ -792,6 +1137,83 @@
     let cachedPhotoMissions = [];
     let cachedStampCards = [];
     let cachedRaffles = [];
+    let cachedFinance = [];
+    let financeFilter = 'all';
+    let cachedAccessMembers = [];
+    let cachedSiteSections = [];
+    let editingSiteSectionKey = null;
+    const sitePageImageDrafts = {};
+
+    let sitePagePlan = 'basic';
+    const SITE_FIELD_LABELS = {
+      eyebrow: 'Eyebrow / chapéu',
+      title: 'Título',
+      titleLeft: 'Nome (esquerda)',
+      titleRight: 'Nome (direita)',
+      dateText: 'Data / horário (texto)',
+      eventDate: 'Data do evento (contagem)',
+      ctaLabel: 'Texto do botão',
+      body: 'Texto',
+      lead: 'Texto de apoio',
+      ruleText: 'Regra',
+      placeText: 'Endereço curto',
+      hintText: 'Dica / bairro',
+      mapsUrl: 'Link do Google Maps',
+      deadlineText: 'Prazo RSVP',
+      nameLeft: 'Nome esquerda',
+      nameRight: 'Nome direita',
+      image: 'Foto',
+      imageLeft: 'Foto esquerda',
+      imageRight: 'Foto direita',
+      marqueeText: 'Faixa rolante (separe com ·)',
+      step1Title: 'Momento 1 — título',
+      step1Text: 'Momento 1 — texto',
+      step1Image: 'Momento 1 — foto',
+      step2Title: 'Momento 2 — título',
+      step2Text: 'Momento 2 — texto',
+      step2Image: 'Momento 2 — foto',
+      step3Title: 'Momento 3 — título',
+      step3Text: 'Momento 3 — texto',
+      step3Image: 'Momento 3 — foto',
+      padrinhosTitle: 'Padrinhos — título',
+      padrinhosText: 'Padrinhos — descrição',
+      padrinhosImage: 'Padrinhos — foto',
+      paisTitle: 'Pais — título',
+      paisText: 'Pais — descrição',
+      paisImage: 'Pais — foto',
+      madrinhasTitle: 'Madrinhas — título',
+      madrinhasText: 'Madrinhas — descrição',
+      madrinhasImage: 'Madrinhas — foto padrão',
+      madrinhaRosaImage: 'VIP · vestido rosa',
+      madrinhaSalmaoImage: 'VIP · vestido salmão',
+      madrinhaCoralImage: 'VIP · vestido coral',
+      madrinhaTerracotaImage: 'VIP · vestido terracota',
+      initialLeft: 'Inicial esquerda',
+      initialRight: 'Inicial direita',
+      footerDate: 'Data no rodapé',
+      footerNote: 'Nota do rodapé',
+      atmosphereText: 'Texto da foto final',
+      atmosphereImage: 'Foto final de rodapé',
+    };
+
+    function toDatetimeLocalValue(iso) {
+      if (!iso) return '';
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return String(iso).slice(0, 16);
+      const pad = (n) => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+
+    function fromDatetimeLocalValue(local) {
+      if (!local) return '';
+      const d = new Date(local);
+      if (Number.isNaN(d.getTime())) return local;
+      return d.toISOString();
+    }
+
+    function isSiteImageField(key) {
+      return /image/i.test(key);
+    }
 
     let pendingGiftImageData = null;
     let pendingRaffleImageData = null;
@@ -871,6 +1293,192 @@
       openModal('modal-create-raffle');
     }
 
+    function accessRoleLabel(role) {
+      if (role === 'noivo') return 'Noivo';
+      if (role === 'noiva') return 'Noiva';
+      return role || '—';
+    }
+
+    function renderAccessMembers(rows) {
+      const el = $('access-table');
+      if (!el) return;
+      if (!rows.length) {
+        el.innerHTML = '<p class="sub">Nenhuma conta cadastrada ainda.</p>';
+        return;
+      }
+      el.innerHTML = `<div class="admin-table-wrap"><table><thead><tr>
+        <th>E-mail</th><th>Papel</th><th></th>
+      </tr></thead><tbody>
+      ${rows
+        .map(
+          (m) => {
+            const email = m.email || '';
+            const removeKey = m.memberKey || email;
+            const label = m.displayName
+              ? `${m.displayName}${email ? ` · ${email}` : m.pending ? ' · aguardando e-mail' : ''}`
+              : email || '—';
+            return `<tr>
+        <td>${escapeHtml(label)}</td>
+        <td>${escapeHtml(accessRoleLabel(m.role))}</td>
+        <td class="row-actions">
+          <button type="button" class="btn btn--ghost btn--sm" data-access-remove="${escapeHtml(removeKey)}">Remover</button>
+        </td>
+      </tr>`;
+          }
+        )
+        .join('')}
+      </tbody></table></div>`;
+    }
+
+    function syncAccessFormState() {
+      const form = $('access-form');
+      const btn = $('access-save-btn');
+      const hint = $('access-pending-hint');
+      if (!form || !btn) return;
+      const hasPending = cachedAccessMembers.some((m) => m.pending);
+      const activeCount = cachedAccessMembers.filter((m) => !m.pending).length;
+      const full = cachedAccessMembers.length >= 2 && activeCount >= 2;
+      if (hint) hint.hidden = !(hasPending && !full);
+      form.hidden = full;
+      form.querySelectorAll('input, select').forEach((el) => {
+        el.disabled = full;
+      });
+      btn.disabled = full;
+      btn.textContent = full
+        ? 'Limite de 2 contas atingido'
+        : hasPending
+          ? 'Completar acesso do parceiro'
+          : 'Salvar acesso';
+    }
+
+    async function loadAccessEditor() {
+      const summary = $('access-summary');
+      const err = $('access-err');
+      if (err) {
+        err.hidden = true;
+        err.textContent = '';
+      }
+      const res = await fetch('/api/admin/access', { headers: authHeaders() });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        if (summary) summary.textContent = data.message || data.error || 'Acessos indisponíveis';
+        renderAccessMembers([]);
+        return;
+      }
+      cachedAccessMembers = data.members || [];
+      if (summary) {
+        summary.textContent = `${cachedAccessMembers.length}/2 contas`;
+      }
+      const hub = $('hub-access-summary');
+      if (hub) {
+        hub.textContent =
+          cachedAccessMembers.length === 0
+            ? 'Noiva e Noivo'
+            : cachedAccessMembers.map((m) => accessRoleLabel(m.role)).join(' · ');
+      }
+      renderAccessMembers(cachedAccessMembers);
+      syncAccessFormState();
+    }
+
+    function renderSitePageList(sections) {
+      const list = $('site-page-list');
+      const editor = $('site-page-editor');
+      if (!list) return;
+      if (editor) editor.hidden = true;
+      list.hidden = false;
+      const activeCount = sections.filter((s) => s.active).length;
+      const summary = $('site-page-summary');
+      if (summary) summary.textContent = `${activeCount}/${sections.length} seções ativas`;
+      const hub = $('hub-site-page-summary');
+      if (hub) hub.textContent = `${activeCount} seções no ar`;
+      if (!sections.length) {
+        list.innerHTML = '<p class="sub">Nenhuma seção disponível.</p>';
+        return;
+      }
+      list.innerHTML = sections
+        .map(
+          (s) => `<article class="site-page-row">
+          <div>
+            <p class="site-page-row__title">${escapeHtml(s.label)}</p>
+            <p class="site-page-row__meta">${s.active ? 'Ativa' : 'Oculta'} · ${escapeHtml(s.sectionKey)}</p>
+          </div>
+          <span class="pill ${s.active ? '' : 'warn'}">${s.active ? 'ativa' : 'off'}</span>
+          <button type="button" class="btn btn--ghost btn--sm" data-edit-section="${escapeHtml(s.sectionKey)}">Editar</button>
+        </article>`
+        )
+        .join('');
+    }
+
+    function openSiteSectionEditor(sectionKey) {
+      const section = cachedSiteSections.find((s) => s.sectionKey === sectionKey);
+      if (!section) return;
+      editingSiteSectionKey = sectionKey;
+      Object.keys(sitePageImageDrafts).forEach((k) => delete sitePageImageDrafts[k]);
+      $('site-page-list').hidden = true;
+      const editor = $('site-page-editor');
+      editor.hidden = false;
+      $('site-page-editor-title').textContent = section.label;
+      $('site-page-active').checked = Boolean(section.active);
+      const fieldsEl = $('site-page-fields');
+      const content = section.content || {};
+      const vipFields = new Set(section.vipFields || []);
+      const isVip = sitePagePlan === 'vip';
+      fieldsEl.innerHTML = (section.fields || [])
+        .map((field) => {
+          const label = SITE_FIELD_LABELS[field] || field;
+          const value = content[field] ?? '';
+          const locked = vipFields.has(field) && !isVip;
+          if (locked) {
+            return `<div class="admin-field site-page-locked">
+              <label>🔒 ${escapeHtml(label)}</label>
+              <p class="sub">Recurso VIP — disponível no plano VIP (como Dani &amp; Carine).</p>
+            </div>`;
+          }
+          if (isSiteImageField(field)) {
+            const src = value || '';
+            return `<div class="admin-field site-page-photo" data-image-field="${escapeHtml(field)}">
+              <label>${escapeHtml(label)}</label>
+              ${src ? `<img src="${escapeHtml(src)}" alt="" data-preview="${escapeHtml(field)}" />` : `<img alt="" data-preview="${escapeHtml(field)}" hidden />`}
+              <input type="file" accept="image/*" data-image-input="${escapeHtml(field)}" />
+              <input type="hidden" data-image-value="${escapeHtml(field)}" value="${escapeHtml(src)}" />
+            </div>`;
+          }
+          if (field === 'body' || field === 'marqueeText') {
+            return `<div class="admin-field">
+              <label for="site-field-${escapeHtml(field)}">${escapeHtml(label)}</label>
+              <textarea id="site-field-${escapeHtml(field)}" data-site-field="${escapeHtml(field)}">${escapeHtml(value)}</textarea>
+            </div>`;
+          }
+          if (field === 'eventDate') {
+            return `<div class="admin-field">
+              <label for="site-field-${escapeHtml(field)}">${escapeHtml(label)}</label>
+              <input id="site-field-${escapeHtml(field)}" type="datetime-local" data-site-field="${escapeHtml(field)}" data-datetime-local="1" value="${escapeHtml(toDatetimeLocalValue(value))}" />
+            </div>`;
+          }
+          const type = field.toLowerCase().includes('url') ? 'url' : 'text';
+          return `<div class="admin-field">
+            <label for="site-field-${escapeHtml(field)}">${escapeHtml(label)}</label>
+            <input id="site-field-${escapeHtml(field)}" type="${type}" data-site-field="${escapeHtml(field)}" value="${escapeHtml(value)}" />
+          </div>`;
+        })
+        .join('');
+      $('site-page-err').hidden = true;
+    }
+
+    async function loadSitePageEditor() {
+      const summary = $('site-page-summary');
+      const res = await fetch('/api/admin/site-page', { headers: authHeaders() });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        if (summary) summary.textContent = data.message || data.error || 'Construtor indisponível';
+        renderSitePageList([]);
+        return;
+      }
+      cachedSiteSections = data.sections || [];
+      sitePagePlan = String(data.plan || 'basic').toLowerCase();
+      renderSitePageList(cachedSiteSections);
+    }
+
     async function loadRafflesEditor() {
       const grid = $('raffles-grid');
       const summary = $('raffles-summary');
@@ -883,11 +1491,14 @@
         return;
       }
       cachedRaffles = data.raffles || [];
+      const sales = data.sales || [];
       const active = cachedRaffles.filter((r) => r.active).length;
+      const soldCents = sales.reduce((s, row) => s + (Number(row.priceCents) || 0), 0);
       summary.textContent =
         cachedRaffles.length === 0
           ? 'Nenhuma rifa cadastrada.'
-          : `${cachedRaffles.length} rifa(s) · ${active} ativa(s)`;
+          : `${cachedRaffles.length} rifa(s) · ${active} ativa(s)` +
+            (sales.length ? ` · ${sales.length} vendido(s) · ${money(soldCents)}` : '');
       grid.innerHTML = renderRaffles(cachedRaffles);
     }
 
@@ -1443,24 +2054,221 @@
       </tbody></table></div>`;
     }
 
-    function renderGifts(rows) {
-      if (!rows.length) return '<p class="sub">Nenhum checkout ainda.</p>';
-      return `<div class="admin-table-wrap"><table><thead><tr>
-        <th>Presenteador</th><th>Valor</th><th>Status</th><th>Pago</th><th>Quando</th>
+    function financeKindLabel(kind) {
+      return kind === 'raffle' ? 'Sorteio' : 'Presente';
+    }
+
+    function filteredFinanceRows() {
+      if (financeFilter === 'gift') return cachedFinance.filter((r) => r.kind === 'gift');
+      if (financeFilter === 'raffle') return cachedFinance.filter((r) => r.kind === 'raffle');
+      return cachedFinance;
+    }
+
+    function renderFinance() {
+      const summary = $('finance-summary');
+      const table = $('finance-table');
+      if (!table) return;
+
+      document.querySelectorAll('[data-finance-filter]').forEach((btn) => {
+        btn.classList.toggle('is-active', btn.getAttribute('data-finance-filter') === financeFilter);
+      });
+
+      const rows = filteredFinanceRows();
+      const paidRows = rows.filter((r) => r.paid);
+      const pendingRows = rows.filter((r) => !r.paid);
+      const paidCents = paidRows.reduce((s, r) => s + (Number(r.amountCents) || 0), 0);
+      const pendingCents = pendingRows.reduce((s, r) => s + (Number(r.amountCents) || 0), 0);
+
+      if (summary) {
+        if (!rows.length) {
+          summary.textContent =
+            financeFilter === 'gift'
+              ? 'Nenhum presente neste filtro.'
+              : financeFilter === 'raffle'
+                ? 'Nenhum sorteio vendido neste filtro.'
+                : 'Nenhum lançamento ainda.';
+        } else {
+          summary.textContent = `${rows.length} lançamento(s) · ${money(paidCents)} pago` +
+            (pendingRows.length ? ` · ${money(pendingCents)} pendente` : '');
+        }
+      }
+
+      if (!rows.length) {
+        table.innerHTML = '<p class="sub">Nada para mostrar neste filtro.</p>';
+        return;
+      }
+
+      table.innerHTML = `<div class="admin-table-wrap"><table><thead><tr>
+        <th>Quem</th><th>Origem</th><th>Detalhe</th><th>Valor</th><th>Status</th><th>Quando</th>
       </tr></thead><tbody>
       ${rows
         .map(
-          (g) => `<tr>
-        <td>${escapeHtml(g.gifterName)}</td>
-        <td>${money(g.amountCents)}</td>
-        <td>${escapeHtml(g.status)}</td>
-        <td>${g.paid ? '<span class="pill">pago</span>' : '<span class="pill warn">pendente</span>'}</td>
-        <td>${escapeHtml((g.createdAt || '').slice(0, 16).replace('T', ' '))}</td>
+          (r) => `<tr>
+        <td>${escapeHtml(r.who)}</td>
+        <td><span class="pill ${r.kind === 'raffle' ? 'muted' : ''}">${escapeHtml(financeKindLabel(r.kind))}</span></td>
+        <td>${escapeHtml(r.detail || '—')}</td>
+        <td>${money(r.amountCents)}</td>
+        <td>${r.paid ? '<span class="pill">pago</span>' : '<span class="pill warn">pendente</span>'}</td>
+        <td>${escapeHtml(String(r.at || '').slice(0, 16).replace('T', ' '))}</td>
       </tr>`
         )
         .join('')}
       </tbody></table></div>`;
     }
+
+    document.querySelector('.finance-filters')?.addEventListener('click', (ev) => {
+      const btn = ev.target.closest('[data-finance-filter]');
+      if (!btn) return;
+      financeFilter = btn.getAttribute('data-finance-filter') || 'all';
+      renderFinance();
+    });
+
+    $('access-form')?.addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const err = $('access-err');
+      if (err) {
+        err.hidden = true;
+        err.textContent = '';
+      }
+      const email = $('access-email')?.value.trim() || '';
+      const role = $('access-role')?.value || 'noiva';
+      const password = $('access-password')?.value || '';
+      const res = await fetch('/api/admin/access', {
+        method: 'POST',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, role, password }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        if (err) {
+          err.hidden = false;
+          err.textContent = data.message || data.error || 'Não foi possível salvar.';
+        }
+        return;
+      }
+      cachedAccessMembers = data.members || [];
+      if ($('access-email')) $('access-email').value = '';
+      if ($('access-password')) $('access-password').value = '';
+      renderAccessMembers(cachedAccessMembers);
+      syncAccessFormState();
+      const summary = $('access-summary');
+      if (summary) summary.textContent = `${cachedAccessMembers.length}/2 contas`;
+      const hub = $('hub-access-summary');
+      if (hub) {
+        hub.textContent =
+          cachedAccessMembers.length === 0
+            ? 'Noiva e Noivo'
+            : cachedAccessMembers.map((m) => accessRoleLabel(m.role)).join(' · ');
+      }
+    });
+
+    $('site-page-list')?.addEventListener('click', (ev) => {
+      const btn = ev.target.closest('[data-edit-section]');
+      if (!btn) return;
+      openSiteSectionEditor(btn.getAttribute('data-edit-section'));
+    });
+
+    $('site-page-back')?.addEventListener('click', () => {
+      editingSiteSectionKey = null;
+      renderSitePageList(cachedSiteSections);
+    });
+
+    $('site-page-fields')?.addEventListener('change', async (ev) => {
+      const input = ev.target.closest('[data-image-input]');
+      if (!input || !input.files?.[0]) return;
+      const field = input.getAttribute('data-image-input');
+      try {
+        const dataUrl = await compressImageFile(input.files[0]);
+        sitePageImageDrafts[field] = dataUrl;
+        const hidden = document.querySelector(`[data-image-value="${CSS.escape(field)}"]`);
+        if (hidden) hidden.value = dataUrl;
+        const preview = document.querySelector(`[data-preview="${CSS.escape(field)}"]`);
+        if (preview) {
+          preview.src = dataUrl;
+          preview.hidden = false;
+        }
+      } catch (err) {
+        const box = $('site-page-err');
+        if (box) {
+          box.hidden = false;
+          box.textContent = err?.message || 'Falha ao processar a imagem.';
+        }
+      }
+    });
+
+    $('site-page-save')?.addEventListener('click', async () => {
+      if (!editingSiteSectionKey) return;
+      const err = $('site-page-err');
+      if (err) {
+        err.hidden = true;
+        err.textContent = '';
+      }
+      const section = cachedSiteSections.find((s) => s.sectionKey === editingSiteSectionKey);
+      if (!section) return;
+      const content = { ...(section.content || {}) };
+      document.querySelectorAll('#site-page-fields [data-site-field]').forEach((el) => {
+        const key = el.getAttribute('data-site-field');
+        content[key] = el.hasAttribute('data-datetime-local')
+          ? fromDatetimeLocalValue(el.value)
+          : el.value;
+      });
+      document.querySelectorAll('#site-page-fields [data-image-value]').forEach((el) => {
+        const field = el.getAttribute('data-image-value');
+        content[field] = sitePageImageDrafts[field] || el.value || '';
+      });
+      const res = await fetch('/api/admin/site-page', {
+        method: 'PATCH',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sectionKey: editingSiteSectionKey,
+          active: Boolean($('site-page-active')?.checked),
+          content,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        if (err) {
+          err.hidden = false;
+          err.textContent = data.message || data.error || 'Não foi possível salvar.';
+        }
+        return;
+      }
+      cachedSiteSections = data.sections || [];
+      editingSiteSectionKey = null;
+      renderSitePageList(cachedSiteSections);
+    });
+
+    $('access-table')?.addEventListener('click', async (ev) => {
+      const btn = ev.target.closest('[data-access-remove]');
+      if (!btn) return;
+      const email = btn.getAttribute('data-access-remove');
+      if (!email || !confirm(`Remover acesso de ${email}?`)) return;
+      const res = await fetch(`/api/admin/access?email=${encodeURIComponent(email)}`, {
+        method: 'DELETE',
+        headers: authHeaders(),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        const err = $('access-err');
+        if (err) {
+          err.hidden = false;
+          err.textContent = data.message || data.error || 'Falha ao remover.';
+        }
+        return;
+      }
+      cachedAccessMembers = data.members || [];
+      renderAccessMembers(cachedAccessMembers);
+      syncAccessFormState();
+      const summary = $('access-summary');
+      if (summary) summary.textContent = `${cachedAccessMembers.length}/2 contas`;
+      const hub = $('hub-access-summary');
+      if (hub) {
+        hub.textContent =
+          cachedAccessMembers.length === 0
+            ? 'Noiva e Noivo'
+            : cachedAccessMembers.map((m) => accessRoleLabel(m.role)).join(' · ');
+      }
+    });
 
     function renderMessages(rows) {
       if (!rows.length) return '<p class="sub">Nenhum recado.</p>';
@@ -1529,7 +2337,17 @@
           showLogin(data.message || 'Usuário ou senha inválidos.');
           return;
         }
-        setToken(data.token);
+        setSession(data.token, data.role || 'tenant', data.weddingKey);
+        if (data.role === 'super') {
+          await loadSuper();
+          return;
+        }
+        const dest = data.adminPath || (data.weddingKey ? `/${data.weddingKey}/admin` : '');
+        if (dest && location.pathname.replace(/\/+$/, '') !== dest.replace(/\/+$/, '')) {
+          location.href = dest;
+          return;
+        }
+        syncTenantSiteLinks(data.sitePath || (data.weddingKey ? `/${data.weddingKey}/` : null));
         await load();
       } catch {
         showLogin('Não deu para entrar. Tente de novo.');
@@ -1540,16 +2358,19 @@
       if (e.key === 'Enter') $('login-btn').click();
     });
 
-    $('refresh-btn').addEventListener('click', () => load());
-    $('logout-btn').addEventListener('click', () => {
+    function doLogout() {
       clearToken();
       $('admin-user').value = '';
       $('admin-pass').value = '';
       showLogin();
-    });
+    }
+
+    $('logout-btn')?.addEventListener('click', doLogout);
+    $('super-logout-btn')?.addEventListener('click', doLogout);
 
     if (getToken()) {
-      load();
+      if (getRole() === 'super') loadSuper();
+      else load();
     }
 
     $('csv-btn').addEventListener('click', async () => {

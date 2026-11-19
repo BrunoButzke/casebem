@@ -2,8 +2,17 @@
  * Messages UI (Mural de Recados) — trilha rolante infinita + formulário
  */
 
+import { weddingKeyFromPathname } from '../../functions/_lib/wedding-path.mjs';
+
 const API_URL = '/api/messages';
 let currentCursor = null;
+
+function messagesApiUrl(extra = '') {
+  const w = weddingKeyFromPathname(location.pathname);
+  const params = new URLSearchParams(extra);
+  params.set('w', w);
+  return `${API_URL}?${params.toString()}`;
+}
 
 /**
  * @param {Window} windowContext
@@ -62,7 +71,7 @@ export function initMessages(windowContext = window) {
     submitBtn.textContent = 'Enviando...';
 
     try {
-      const response = await windowContext.fetch(API_URL, {
+      const response = await windowContext.fetch(messagesApiUrl(), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -116,8 +125,8 @@ async function loadMessages(windowContext, messagesListEl, statusEl, loadMoreBtn
   try {
     const url =
       currentCursor && isLoadMore
-        ? `${API_URL}?limit=50&cursor=${encodeURIComponent(currentCursor)}`
-        : `${API_URL}?limit=50`;
+        ? messagesApiUrl(`limit=50&cursor=${encodeURIComponent(currentCursor)}`)
+        : messagesApiUrl('limit=50');
 
     const response = await windowContext.fetch(url);
     const data = await response.json();

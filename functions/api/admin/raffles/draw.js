@@ -19,12 +19,12 @@ export async function onRequestOptions(context) {
 export async function onRequestGet(context) {
   const { request, env } = context;
   const headers = getCorsHeaders(request);
-  const auth = requireAdmin(request, env);
+  const auth = await requireAdmin(request, env);
   if (!auth.ok) return json(headers, { ok: false, error: auth.error, message: auth.message }, auth.status);
   if (!env.DB) return json(headers, { ok: false, error: 'DB_NOT_CONFIGURED' }, 503);
 
   try {
-    const { raffle, entries } = await listActiveRaffleSoldEntries(env.DB);
+    const { raffle, entries } = await listActiveRaffleSoldEntries(env.DB, auth.weddingKey);
     if (!raffle) {
       return json(headers, { ok: false, error: 'NO_ACTIVE_RAFFLE', message: 'Nenhuma rifa ativa' }, 404);
     }

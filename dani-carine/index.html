@@ -26,9 +26,24 @@
     <link rel="stylesheet" href="/src/dani-carine/style.css" />
   </head>
   <body>
+    <div class="coming-soon" id="coming-soon" hidden>
+      <div class="coming-soon__inner">
+        <p class="coming-soon__brand">Case<em>Bem</em></p>
+        <p class="coming-soon__mark" aria-hidden="true">
+          <span data-initial-left>B</span> <em>&amp;</em> <span data-initial-right>C</span>
+        </p>
+        <p class="eyebrow coming-soon__couple" data-coming-soon-couple>Os noivos</p>
+        <h1 class="coming-soon__title">Em breve</h1>
+        <p class="coming-soon__lead">
+          O site do casamento está sendo preparado com carinho. Volte em breve.
+        </p>
+        <a class="btn magnetic" href="/landing-page-animada/">Conhecer o CaseBem</a>
+      </div>
+    </div>
+
     <div class="preloader" aria-hidden="true">
       <div class="preloader__inner">
-        <span class="preloader__mark">D <em>&amp;</em> C</span>
+        <span class="preloader__mark"><span data-initial-left>D</span> <em>&amp;</em> <span data-initial-right>C</span></span>
       </div>
       <div class="preloader__bar"><span></span></div>
     </div>
@@ -39,7 +54,7 @@
     <header class="nav">
       <div class="nav__brand">
         <a href="#topo" class="logo" aria-label="Início">
-          <span class="logo__mark">D<em>&amp;</em>C</span>
+          <span class="logo__mark"><span data-initial-left>D</span><em>&amp;</em><span data-initial-right>C</span></span>
         </a>
         <a href="/landing-page-animada/" class="nav__casebem" aria-label="Voltar para CaseBem"
           >Case<em>Bem</em></a
@@ -62,6 +77,7 @@
         </button>
         <a
           class="btn btn--sm magnetic"
+          data-maps-cta
           href="https://www.google.com/maps/search/?api=1&query=Indai%C3%A1+Eventos+Canto+da+Lagoa+Florian%C3%B3polis"
           target="_blank"
           rel="noopener noreferrer"
@@ -333,6 +349,7 @@
             <p class="local__hint">Lagoa da Conceição</p>
             <a
               class="btn magnetic"
+              data-maps-cta
               href="https://www.google.com/maps/search/?api=1&query=Indai%C3%A1+Eventos+Canto+da+Lagoa+Florian%C3%B3polis"
               target="_blank"
               rel="noopener noreferrer"
@@ -733,12 +750,12 @@
           <button type="button" class="gift-modal__close" data-close-gift aria-label="Fechar">
             ×
           </button>
-          <figure class="gift-modal__photo">
+          <figure class="gift-modal__photo" data-gift-chrome>
             <img src="" alt="" width="800" height="800" />
           </figure>
           <div class="gift-modal__body">
-            <h3 id="gift-modal-title"></h3>
-            <p class="gift-modal__desc"></p>
+            <h3 id="gift-modal-title" data-gift-chrome></h3>
+            <p class="gift-modal__desc" data-gift-chrome></p>
 
             <div class="gift-modal__amount gift-modal__amount--custom" hidden>
               <label for="gift-amount">Valor do Pix (R$)</label>
@@ -801,7 +818,9 @@
 
             <div class="gift-modal__pix" data-gift-pix hidden>
               <p class="gift-modal__pix-status" data-pix-status>Escaneie o QR ou copie o código Pix</p>
-              <img class="gift-modal__qr" data-pix-qr alt="QR Code Pix" hidden />
+              <div class="gift-modal__qr-wrap">
+                <img class="gift-modal__qr" data-pix-qr alt="QR Code Pix" hidden />
+              </div>
               <label class="gift-modal__message-label" for="gift-pix-code">Pix copia e cola</label>
               <textarea id="gift-pix-code" data-pix-code rows="3" readonly></textarea>
               <button type="button" class="btn btn--ghost gift-modal__copy" data-pix-copy>
@@ -810,6 +829,24 @@
               <button type="button" class="btn gift-modal__pay" data-pix-back hidden>
                 Voltar
               </button>
+            </div>
+
+            <div class="gift-modal__success" data-gift-success hidden>
+              <div class="gift-modal__check" aria-hidden="true">
+                <svg viewBox="0 0 48 48" width="56" height="56" focusable="false">
+                  <circle cx="24" cy="24" r="22" fill="none" stroke="currentColor" stroke-width="2.5" />
+                  <path
+                    d="M14 24.5 20.5 31 34 17"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.8"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </div>
+              <p class="gift-modal__success-title">Pagamento confirmado</p>
+              <p class="gift-modal__success-lead">Obrigado pelo carinho!</p>
             </div>
           </div>
         </div>
@@ -927,7 +964,7 @@
     </main>
 
     <footer class="footer">
-      <p class="footer__mark">D <em>&amp;</em> C</p>
+      <p class="footer__mark"><span data-initial-left>D</span> <em>&amp;</em> <span data-initial-right>C</span></p>
       <p class="footer__date">21 · 11 · 2026</p>
       <p class="footer__note">Imagens geradas com base nas fotos do casal</p>
     </footer>

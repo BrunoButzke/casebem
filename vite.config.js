@@ -73,6 +73,7 @@ import {
 import { listRanking, upsertRanking } from './functions/_lib/ranking-service.mjs';
 import {
   listRafflesAdmin,
+  listRaffleSalesAdmin,
   createRaffle,
   updateRaffle,
   deleteRaffle,
@@ -81,7 +82,34 @@ import {
   finalizeRaffleSalesByIntent,
   listActiveRaffleSoldEntries,
 } from './functions/_lib/raffle-service.mjs';
-import { loginGamesAdmin } from './functions/_lib/admin-auth.mjs';
+import { loginGamesAdmin, requireAdmin, mintTenantToken } from './functions/_lib/admin-auth.mjs';
+import {
+  isSuperAdminCredentials,
+  loginSuperAdmin,
+  requireSuperAdmin,
+  getSuperAdminOverview,
+  enterTenantAsSuper,
+} from './functions/_lib/super-admin.mjs';
+import {
+  addWaitlistSignup,
+  validateWaitlistPayload,
+} from './functions/_lib/waitlist-service.mjs';
+import {
+  listAdminMembers,
+  upsertAdminMember,
+  removeAdminMember,
+  authenticateAdminMember,
+} from './functions/_lib/admin-members-service.mjs';
+import {
+  listSiteSectionsAdmin,
+  listSiteSectionsPublic,
+  updateSiteSection,
+} from './functions/_lib/site-page-service.mjs';
+import { getTenantById, registerWedding } from './functions/_lib/tenant-service.mjs';
+import {
+  PUBLISHED_WEDDING_KEY,
+  coupleNamesFallbackFromSlug,
+} from './functions/_lib/wedding-path.mjs';
 
 const rootDir = dirname(fileURLToPath(import.meta.url));
 
@@ -475,6 +503,18 @@ function guestListApiPlugin() {
   };
 }
 
+function fakeRequestFromNodeReq(req) {
+  return {
+    headers: {
+      get(name) {
+        const key = String(name || '').toLowerCase();
+        if (key === 'authorization') return req.headers.authorization || '';
+        return req.headers[key] ?? null;
+      },
+    },
+  };
+}
+
 function adminApiPlugin(env) {
   return {
     name: 'admin-api-local',
@@ -487,7 +527,40 @@ function adminApiPlugin(env) {
 
           if (path === '/api/admin/login' && req.method === 'POST') {
             const body = await readJsonBody(req);
-            const result = loginGamesAdmin(env, body?.user, body?.pass);
+            if (isSuperAdminCredentials(body?.user, body?.pass)) {
+              const result = loginSuperAdmin(env, body?.user, body?.pass);
+              if (!result.ok) {
+                return sendJson(res, result.status, {
+                  ok: false,
+                  error: result.error,
+                  message: result.message,
+                });
+              }
+              return sendJson(res, 200, { ok: true, token: result.token, role: result.role });
+            }
+            const memberAuth = await authenticateAdminMember(null, body?.user, body?.pass);
+            if (memberAuth.ok) {
+              const secret = env.ADMIN_PANEL_SECRET || '';
+              if (!secret || secret.length < 16) {
+                return sendJson(res, 503, {
+                  ok: false,
+                  error: 'ADMIN_NOT_CONFIGURED',
+                  message: 'Defina ADMIN_PANEL_SECRET (≥16) no .env',
+                });
+              }
+              const token = await mintTenantToken(secret, memberAuth.weddingKey);
+              const adminPath = `/${memberAuth.weddingKey}/admin`;
+              return sendJson(res, 200, {
+                ok: true,
+                token,
+                role: 'tenant',
+                memberRole: memberAuth.member.role,
+                weddingKey: memberAuth.weddingKey,
+                adminPath,
+                sitePath: `/${memberAuth.weddingKey}/`,
+              });
+            }
+            const result = await loginGamesAdmin(env, body?.user, body?.pass);
             if (!result.ok) {
               return sendJson(res, result.status, {
                 ok: false,
@@ -495,41 +568,195 @@ function adminApiPlugin(env) {
                 message: result.message,
               });
             }
-            return sendJson(res, 200, { ok: true, token: result.token });
+            return sendJson(res, 200, {
+              ok: true,
+              token: result.token,
+              role: result.role || 'tenant',
+              weddingKey: 'dani-carine',
+              adminPath: '/dani-carine/admin',
+              sitePath: '/dani-carine/',
+            });
           }
 
-          const secret = env.ADMIN_PANEL_SECRET || '';
-          const auth = req.headers.authorization || '';
-          const token = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
-          if (!secret || secret.length < 16) {
-            return sendJson(res, 503, {
+          if (path === '/api/admin/site-page') {
+            const auth = await requireAdmin(fakeRequestFromNodeReq(req), env);
+            if (!auth.ok) {
+              return sendJson(res, auth.status, {
+                ok: false,
+                error: auth.error,
+                message: auth.message,
+              });
+            }
+            const wk = auth.weddingKey;
+            try {
+              if (req.method === 'GET') {
+                return sendJson(res, 200, {
+                  ok: true,
+                  sections: await listSiteSectionsAdmin(null, wk),
+                  weddingKey: wk,
+                });
+              }
+              if (req.method === 'PATCH') {
+                const body = await readJsonBody(req);
+                const section = await updateSiteSection(null, body?.sectionKey, body, wk);
+                return sendJson(res, 200, {
+                  ok: true,
+                  section,
+                  sections: await listSiteSectionsAdmin(null, wk),
+                  weddingKey: wk,
+                });
+              }
+            } catch (err) {
+              const map = {
+                SECTION_NOT_FOUND: 404,
+                IMAGE_TOO_LARGE: 400,
+                IMAGE_INVALID: 400,
+                URL_INVALID: 400,
+              };
+              return sendJson(res, map[err.message] || 500, {
+                ok: false,
+                error: err.message,
+                message: err.details || err.message,
+              });
+            }
+          }
+
+          if (path === '/api/admin/access') {
+            const auth = await requireAdmin(fakeRequestFromNodeReq(req), env);
+            if (!auth.ok) {
+              return sendJson(res, auth.status, {
+                ok: false,
+                error: auth.error,
+                message: auth.message,
+              });
+            }
+            const wk = auth.weddingKey;
+            try {
+              if (req.method === 'GET') {
+                const members = await listAdminMembers(null, wk);
+                return sendJson(res, 200, {
+                  ok: true,
+                  members,
+                  limits: { maxMembers: 2 },
+                  weddingKey: wk,
+                });
+              }
+              if (req.method === 'POST') {
+                const body = await readJsonBody(req);
+                const member = await upsertAdminMember(null, body, wk);
+                return sendJson(res, 200, {
+                  ok: true,
+                  member,
+                  members: await listAdminMembers(null, wk),
+                  weddingKey: wk,
+                });
+              }
+              if (req.method === 'DELETE') {
+                const email = parsed.searchParams.get('email');
+                await removeAdminMember(null, email, wk);
+                return sendJson(res, 200, {
+                  ok: true,
+                  removed: email,
+                  members: await listAdminMembers(null, wk),
+                  weddingKey: wk,
+                });
+              }
+            } catch (err) {
+              const map = {
+                EMAIL_INVALID: 400,
+                ROLE_INVALID: 400,
+                PASSWORD_WEAK: 400,
+                MEMBER_LIMIT: 409,
+                ROLE_TAKEN: 409,
+                NOT_FOUND: 404,
+              };
+              return sendJson(res, map[err.message] || 500, {
+                ok: false,
+                error: err.message,
+                message: err.details || err.message,
+              });
+            }
+          }
+
+          if (path === '/api/admin/super' || path === '/api/admin/super/enter') {
+            const fakeReq = {
+              headers: {
+                get(name) {
+                  const key = String(name || '').toLowerCase();
+                  if (key === 'authorization') return req.headers.authorization || '';
+                  return req.headers[key] || null;
+                },
+              },
+            };
+            const auth = requireSuperAdmin(fakeReq, env);
+            if (!auth.ok) {
+              return sendJson(res, auth.status, {
+                ok: false,
+                error: auth.error,
+                message: auth.message,
+              });
+            }
+            if (path === '/api/admin/super' && req.method === 'GET') {
+              const overview = await getSuperAdminOverview(null);
+              return sendJson(res, 200, { ok: true, ...overview });
+            }
+            if (path === '/api/admin/super/enter' && req.method === 'POST') {
+              const body = await readJsonBody(req);
+              const result = await enterTenantAsSuper({ ...env, DB: null }, body?.tenantId);
+              if (!result.ok) {
+                return sendJson(res, result.status, {
+                  ok: false,
+                  error: result.error,
+                  message: result.message,
+                });
+              }
+              return sendJson(res, 200, {
+                ok: true,
+                token: result.token,
+                role: result.role,
+                weddingKey: result.weddingKey,
+                adminPath: result.adminPath,
+                coupleNames: result.coupleNames,
+              });
+            }
+          }
+
+          const tenantAuth = await requireAdmin(fakeRequestFromNodeReq(req), env);
+          if (!tenantAuth.ok) {
+            return sendJson(res, tenantAuth.status, {
               ok: false,
-              error: 'ADMIN_NOT_CONFIGURED',
-              message: 'Defina ADMIN_PANEL_SECRET (≥16) no .env',
+              error: tenantAuth.error,
+              message: tenantAuth.message,
             });
           }
-          if (token !== secret) {
-            return sendJson(res, 401, {
-              ok: false,
-              error: 'UNAUTHORIZED',
-              message: 'Token admin inválido.',
-            });
-          }
+          const wk = tenantAuth.weddingKey;
 
           if (path === '/api/admin/summary' && req.method === 'GET') {
-            const guests = await listGuestList(null);
-            const groups = await listGroups(null);
+            const guests = await listGuestList(null, wk);
+            const groups = await listGroups(null, wk);
             const guestStats = summarizeGuestList(guests);
-            const rsvpMode = await getRsvpMode(null);
-            const messages = localMessages.map((m) => ({
+            const rsvpMode = await getRsvpMode(null, wk);
+            const messages = localMessages
+              .filter((m) => (m.weddingKey || 'dani-carine') === wk)
+              .map((m) => ({
               id: m.id,
               guestName: m.guestName,
               message: m.message,
               createdAt: m.createdAt,
               hidden: false,
             }));
+            const tenantRow = await getTenantById(null, wk);
+            const coupleNames =
+              tenantRow?.coupleNames ||
+              (wk === PUBLISHED_WEDDING_KEY ? 'Dani & Carine' : coupleNamesFallbackFromSlug(wk));
             return sendJson(res, 200, {
               ok: true,
+              tenant: {
+                id: wk,
+                coupleNames,
+                sitePath: tenantRow?.sitePath || `/${wk}/`,
+                adminPath: tenantRow?.adminPath || `/${wk}/admin`,
+              },
               summary: {
                 attendingCount: guestStats.attendingCount,
                 declinedCount: guestStats.declinedCount,
@@ -539,6 +766,8 @@ function adminApiPlugin(env) {
                 giftsPending: 0,
                 giftsPaid: 0,
                 giftsPaidCents: 0,
+                financePaid: 0,
+                financePaidCents: 0,
                 rsvpMode,
                 guestListCount: guestStats.guestListCount,
                 groupsCount: groups.length,
@@ -548,15 +777,16 @@ function adminApiPlugin(env) {
               groups,
               messages,
               gifts: [],
+              finance: [],
             });
           }
 
           if (path === '/api/admin/guest-list') {
             const snap = async () => {
               const [rsvpMode, guests, groups] = await Promise.all([
-                getRsvpMode(null),
-                listGuestList(null),
-                listGroups(null),
+                getRsvpMode(null, wk),
+                listGuestList(null, wk),
+                listGroups(null, wk),
               ]);
               return { rsvpMode, guests, groups, count: guests.length };
             };
@@ -571,7 +801,7 @@ function adminApiPlugin(env) {
                 const names = Array.isArray(body?.names)
                   ? body.names
                   : parseGuestNamesInput(body?.namesText || '');
-                const result = await addGuests(null, names, { groupId: body?.groupId || null });
+                const result = await addGuests(null, names, { groupId: body?.groupId || null }, wk);
                 return sendJson(res, 200, { ok: true, ...result, ...(await snap()) });
               } catch (err) {
                 const status =
@@ -587,17 +817,17 @@ function adminApiPlugin(env) {
             if (req.method === 'PATCH') {
               const body = await readJsonBody(req);
               try {
-                if (body?.createGroup?.name) await createGroup(null, body.createGroup.name);
-                if (body?.deleteGroupId) await deleteGroup(null, String(body.deleteGroupId));
-                if (body?.removeId) await removeGuest(null, String(body.removeId));
+                if (body?.createGroup?.name) await createGroup(null, body.createGroup.name, wk);
+                if (body?.deleteGroupId) await deleteGroup(null, String(body.deleteGroupId), wk);
+                if (body?.removeId) await removeGuest(null, String(body.removeId), wk);
                 if (body?.guestId && Object.prototype.hasOwnProperty.call(body, 'attending')) {
-                  await setGuestAttending(null, String(body.guestId), body.attending);
+                  await setGuestAttending(null, String(body.guestId), body.attending, wk);
                 }
                 if (body?.guestId && Object.prototype.hasOwnProperty.call(body, 'groupId')) {
-                  await setGuestGroup(null, String(body.guestId), body.groupId);
+                  await setGuestGroup(null, String(body.guestId), body.groupId, wk);
                 }
                 let modeResult = null;
-                if (body?.rsvpMode) modeResult = await setRsvpMode(null, body.rsvpMode);
+                if (body?.rsvpMode) modeResult = await setRsvpMode(null, body.rsvpMode, wk);
                 return sendJson(res, 200, {
                   ok: true,
                   ...(await snap()),
@@ -641,28 +871,28 @@ function adminApiPlugin(env) {
             };
             try {
               if (req.method === 'GET') {
-                const gifts = await listCatalogAdmin(null);
+                const gifts = await listCatalogAdmin(null, wk);
                 return sendJson(res, 200, { ok: true, gifts });
               }
               if (req.method === 'POST') {
                 const body = await readJsonBody(req);
-                const gift = await createGift(null, body || {});
-                return sendJson(res, 201, { ok: true, gift, gifts: await listCatalogAdmin(null) });
+                const gift = await createGift(null, body || {}, wk);
+                return sendJson(res, 201, { ok: true, gift, gifts: await listCatalogAdmin(null, wk) });
               }
               if (req.method === 'PATCH') {
                 const body = await readJsonBody(req);
                 if (!body?.id) return sendJson(res, 400, { ok: false, error: 'MISSING_ID' });
-                const gift = await updateGift(null, String(body.id), body);
+                const gift = await updateGift(null, String(body.id), body, wk);
                 return sendJson(res, 200, { ok: true, gift });
               }
               if (req.method === 'DELETE') {
                 const id = parsed.searchParams.get('id');
                 if (!id) return sendJson(res, 400, { ok: false, error: 'MISSING_ID' });
-                await deleteGift(null, id);
+                await deleteGift(null, id, wk);
                 return sendJson(res, 200, {
                   ok: true,
                   removed: id,
-                  gifts: await listCatalogAdmin(null),
+                  gifts: await listCatalogAdmin(null, wk),
                 });
               }
             } catch (err) {
@@ -689,34 +919,34 @@ function adminApiPlugin(env) {
             };
             try {
               if (req.method === 'GET') {
-                const templates = presentStationery(await listStationeryAdmin(null), origin);
+                const templates = presentStationery(await listStationeryAdmin(null, wk), origin);
                 return sendJson(res, 200, { ok: true, templates });
               }
               if (req.method === 'POST') {
                 const body = await readJsonBody(req);
-                const template = await createStationeryTemplate(null, body || {});
+                const template = await createStationeryTemplate(null, body || {}, wk);
                 const [presented] = presentStationery([template], origin);
                 return sendJson(res, 201, {
                   ok: true,
                   template: presented,
-                  templates: presentStationery(await listStationeryAdmin(null), origin),
+                  templates: presentStationery(await listStationeryAdmin(null, wk), origin),
                 });
               }
               if (req.method === 'PATCH') {
                 const body = await readJsonBody(req);
                 if (!body?.id) return sendJson(res, 400, { ok: false, error: 'MISSING_ID' });
-                const template = await updateStationeryTemplate(null, String(body.id), body);
+                const template = await updateStationeryTemplate(null, String(body.id), body, wk);
                 const [presented] = presentStationery([template], origin);
                 return sendJson(res, 200, { ok: true, template: presented });
               }
               if (req.method === 'DELETE') {
                 const id = parsed.searchParams.get('id');
                 if (!id) return sendJson(res, 400, { ok: false, error: 'MISSING_ID' });
-                await deleteStationeryTemplate(null, id);
+                await deleteStationeryTemplate(null, id, wk);
                 return sendJson(res, 200, {
                   ok: true,
                   removed: id,
-                  templates: presentStationery(await listStationeryAdmin(null), origin),
+                  templates: presentStationery(await listStationeryAdmin(null, wk), origin),
                 });
               }
             } catch (err) {
@@ -743,31 +973,31 @@ function adminApiPlugin(env) {
           if (path === '/api/admin/challenges/questions') {
             try {
               if (req.method === 'GET') {
-                return sendJson(res, 200, { ok: true, questions: await listQuestionsAdmin(null) });
+                return sendJson(res, 200, { ok: true, questions: await listQuestionsAdmin(null, wk) });
               }
               if (req.method === 'POST') {
                 const body = await readJsonBody(req);
-                const question = await createQuestion(null, body || {});
+                const question = await createQuestion(null, body || {}, wk);
                 return sendJson(res, 201, {
                   ok: true,
                   question,
-                  questions: await listQuestionsAdmin(null),
+                  questions: await listQuestionsAdmin(null, wk),
                 });
               }
               if (req.method === 'PATCH') {
                 const body = await readJsonBody(req);
                 if (!body?.id) return sendJson(res, 400, { ok: false, error: 'MISSING_ID' });
-                const question = await updateQuestion(null, String(body.id), body);
+                const question = await updateQuestion(null, String(body.id), body, wk);
                 return sendJson(res, 200, { ok: true, question });
               }
               if (req.method === 'DELETE') {
                 const id = parsed.searchParams.get('id');
                 if (!id) return sendJson(res, 400, { ok: false, error: 'MISSING_ID' });
-                await deleteQuestion(null, id);
+                await deleteQuestion(null, id, wk);
                 return sendJson(res, 200, {
                   ok: true,
                   removed: id,
-                  questions: await listQuestionsAdmin(null),
+                  questions: await listQuestionsAdmin(null, wk),
                 });
               }
             } catch (err) {
@@ -780,32 +1010,32 @@ function adminApiPlugin(env) {
               if (req.method === 'GET') {
                 return sendJson(res, 200, {
                   ok: true,
-                  photoMissions: await listPhotoMissionsAdmin(null),
+                  photoMissions: await listPhotoMissionsAdmin(null, wk),
                 });
               }
               if (req.method === 'POST') {
                 const body = await readJsonBody(req);
-                const photoMission = await createPhotoMission(null, body || {});
+                const photoMission = await createPhotoMission(null, body || {}, wk);
                 return sendJson(res, 201, {
                   ok: true,
                   photoMission,
-                  photoMissions: await listPhotoMissionsAdmin(null),
+                  photoMissions: await listPhotoMissionsAdmin(null, wk),
                 });
               }
               if (req.method === 'PATCH') {
                 const body = await readJsonBody(req);
                 if (!body?.id) return sendJson(res, 400, { ok: false, error: 'MISSING_ID' });
-                const photoMission = await updatePhotoMission(null, String(body.id), body);
+                const photoMission = await updatePhotoMission(null, String(body.id), body, wk);
                 return sendJson(res, 200, { ok: true, photoMission });
               }
               if (req.method === 'DELETE') {
                 const id = parsed.searchParams.get('id');
                 if (!id) return sendJson(res, 400, { ok: false, error: 'MISSING_ID' });
-                await deletePhotoMission(null, id);
+                await deletePhotoMission(null, id, wk);
                 return sendJson(res, 200, {
                   ok: true,
                   removed: id,
-                  photoMissions: await listPhotoMissionsAdmin(null),
+                  photoMissions: await listPhotoMissionsAdmin(null, wk),
                 });
               }
             } catch (err) {
@@ -816,11 +1046,11 @@ function adminApiPlugin(env) {
           if (path === '/api/admin/challenges/theme') {
             try {
               if (req.method === 'GET') {
-                return sendJson(res, 200, { ok: true, theme: await getDesafioTheme(null) });
+                return sendJson(res, 200, { ok: true, theme: await getDesafioTheme(null, wk) });
               }
               if (req.method === 'PATCH') {
                 const body = await readJsonBody(req);
-                const theme = await updateDesafioTheme(null, body || {});
+                const theme = await updateDesafioTheme(null, body || {}, wk);
                 return sendJson(res, 200, { ok: true, theme });
               }
             } catch (err) {
@@ -833,32 +1063,32 @@ function adminApiPlugin(env) {
               if (req.method === 'GET') {
                 return sendJson(res, 200, {
                   ok: true,
-                  stampCards: await listStampCardsAdmin(null),
+                  stampCards: await listStampCardsAdmin(null, wk),
                 });
               }
               if (req.method === 'POST') {
                 const body = await readJsonBody(req);
-                const stampCard = await createStampCard(null, body || {});
+                const stampCard = await createStampCard(null, body || {}, wk);
                 return sendJson(res, 201, {
                   ok: true,
                   stampCard,
-                  stampCards: await listStampCardsAdmin(null),
+                  stampCards: await listStampCardsAdmin(null, wk),
                 });
               }
               if (req.method === 'PATCH') {
                 const body = await readJsonBody(req);
                 if (!body?.id) return sendJson(res, 400, { ok: false, error: 'MISSING_ID' });
-                const stampCard = await updateStampCard(null, String(body.id), body);
+                const stampCard = await updateStampCard(null, String(body.id), body, wk);
                 return sendJson(res, 200, { ok: true, stampCard });
               }
               if (req.method === 'DELETE') {
                 const id = parsed.searchParams.get('id');
                 if (!id) return sendJson(res, 400, { ok: false, error: 'MISSING_ID' });
-                await deleteStampCard(null, id);
+                await deleteStampCard(null, id, wk);
                 return sendJson(res, 200, {
                   ok: true,
                   removed: id,
-                  stampCards: await listStampCardsAdmin(null),
+                  stampCards: await listStampCardsAdmin(null, wk),
                 });
               }
             } catch (err) {
@@ -867,7 +1097,7 @@ function adminApiPlugin(env) {
           }
 
           if (path === '/api/admin/raffles/draw' && req.method === 'GET') {
-            const { raffle, entries } = await listActiveRaffleSoldEntries(null);
+            const { raffle, entries } = await listActiveRaffleSoldEntries(null, wk);
             if (!raffle) {
               return sendJson(res, 404, {
                 ok: false,
@@ -900,31 +1130,35 @@ function adminApiPlugin(env) {
             };
             try {
               if (req.method === 'GET') {
-                return sendJson(res, 200, { ok: true, raffles: await listRafflesAdmin(null) });
+                const [raffles, sales] = await Promise.all([
+                  listRafflesAdmin(null, wk),
+                  listRaffleSalesAdmin(null, {}, wk),
+                ]);
+                return sendJson(res, 200, { ok: true, raffles, sales });
               }
               if (req.method === 'POST') {
                 const body = await readJsonBody(req);
-                const raffle = await createRaffle(null, body || {});
+                const raffle = await createRaffle(null, body || {}, wk);
                 return sendJson(res, 201, {
                   ok: true,
                   raffle,
-                  raffles: await listRafflesAdmin(null),
+                  raffles: await listRafflesAdmin(null, wk),
                 });
               }
               if (req.method === 'PATCH') {
                 const body = await readJsonBody(req);
                 if (!body?.id) return sendJson(res, 400, { ok: false, error: 'MISSING_ID' });
-                const raffle = await updateRaffle(null, String(body.id), body);
+                const raffle = await updateRaffle(null, String(body.id), body, wk);
                 return sendJson(res, 200, { ok: true, raffle });
               }
               if (req.method === 'DELETE') {
                 const id = parsed.searchParams.get('id');
                 if (!id) return sendJson(res, 400, { ok: false, error: 'MISSING_ID' });
-                await deleteRaffle(null, id);
+                await deleteRaffle(null, id, wk);
                 return sendJson(res, 200, {
                   ok: true,
                   removed: id,
-                  raffles: await listRafflesAdmin(null),
+                  raffles: await listRafflesAdmin(null, wk),
                 });
               }
             } catch (err) {
@@ -955,6 +1189,114 @@ function mercadopagoApiPlugin(env) {
       server.middlewares.use(async (req, res, next) => {
         try {
           const url = req.url?.split('?')[0];
+
+          if (url === '/api/site-page' && req.method === 'GET') {
+            const parsed = new URL(req.url || '/', 'http://localhost');
+            const weddingKey = String(
+              parsed.searchParams.get('w') || parsed.searchParams.get('wedding') || PUBLISHED_WEDDING_KEY
+            )
+              .trim()
+              .toLowerCase();
+            const sections = await listSiteSectionsPublic(null, weddingKey);
+            return sendJson(res, 200, { ok: true, weddingKey, sections });
+          }
+
+          if (url === '/api/wedding' && req.method === 'GET') {
+            const parsed = new URL(req.url || '/', 'http://localhost');
+            const weddingKey = String(
+              parsed.searchParams.get('w') || parsed.searchParams.get('wedding') || PUBLISHED_WEDDING_KEY
+            )
+              .trim()
+              .toLowerCase();
+            const { listSiteSectionsAdmin, siteHasFilledContent } = await import(
+              './functions/_lib/site-page-service.mjs'
+            );
+            const [tenant, sections] = await Promise.all([
+              getTenantById(null, weddingKey),
+              listSiteSectionsAdmin(null, weddingKey),
+            ]);
+            const coupleNames =
+              tenant?.coupleNames ||
+              (weddingKey === PUBLISHED_WEDDING_KEY
+                ? 'Dani & Carine'
+                : coupleNamesFallbackFromSlug(weddingKey));
+            const hasContent = siteHasFilledContent(sections);
+            const plan =
+              tenant?.plan || (weddingKey === PUBLISHED_WEDDING_KEY ? 'vip' : 'basic');
+            const rodape = sections.find((s) => s.sectionKey === 'rodape')?.content || {};
+            const fromNames = String(coupleNames || '')
+              .split('&')
+              .map((s) => s.trim())
+              .filter(Boolean);
+            return sendJson(res, 200, {
+              ok: true,
+              weddingKey,
+              coupleNames,
+              plan,
+              comingSoon: weddingKey !== PUBLISHED_WEDDING_KEY && !hasContent,
+              hasSiteContent: hasContent,
+              initialLeft: String(
+                rodape.initialLeft || fromNames[0]?.[0] || ''
+              )
+                .toUpperCase()
+                .slice(0, 1),
+              initialRight: String(
+                rodape.initialRight || fromNames[1]?.[0] || ''
+              )
+                .toUpperCase()
+                .slice(0, 1),
+              sitePath: tenant?.sitePath || `/${weddingKey}/`,
+              adminPath: tenant?.adminPath || `/${weddingKey}/admin`,
+            });
+          }
+
+          if (url === '/api/register' && req.method === 'POST') {
+            try {
+              const body = await readJsonBody(req);
+              const result = await registerWedding(null, body);
+              return sendJson(res, 200, {
+                ok: true,
+                tenantId: result.tenant.id,
+                coupleNames: result.tenant.coupleNames,
+                role: result.role,
+                adminPath: result.tenant.adminPath,
+              });
+            } catch (err) {
+              const map = {
+                NAME_REQUIRED: 400,
+                PARTNER_REQUIRED: 400,
+                ROLE_INVALID: 400,
+                EMAIL_INVALID: 400,
+                PASSWORD_WEAK: 400,
+                PASSWORD_MISMATCH: 400,
+                EMAIL_TAKEN: 409,
+                SLUG_EXHAUSTED: 409,
+              };
+              return sendJson(res, map[err.message] || 500, {
+                ok: false,
+                error: err.message,
+                message: err.details || err.message,
+              });
+            }
+          }
+
+          if (url === '/api/waitlist' && req.method === 'POST') {
+            const body = await readJsonBody(req);
+            const validated = validateWaitlistPayload(body);
+            if (!validated.ok) {
+              return sendJson(res, 400, {
+                ok: false,
+                error: validated.error,
+                message: validated.message,
+              });
+            }
+            const result = await addWaitlistSignup(null, validated);
+            return sendJson(res, 200, {
+              ok: true,
+              updated: result.updated,
+              entry: { email: result.entry.email, plan: result.entry.plan },
+            });
+          }
 
           if (url === '/api/create-pix' && req.method === 'POST') {
             const body = await readJsonBody(req);
@@ -1029,6 +1371,7 @@ export default defineConfig(({ mode }) => {
           lista: resolve(rootDir, 'lista/index.html'),
           casebemApp: resolve(rootDir, 'app/index.html'),
           casebemGames: resolve(rootDir, 'games/index.html'),
+          casebemDemoGame: resolve(rootDir, 'demo/game/index.html'),
         },
       },
     },

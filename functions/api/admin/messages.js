@@ -25,7 +25,7 @@ export async function onRequestPatch(context) {
     );
   }
 
-  const auth = requireAdmin(request, env);
+  const auth = await requireAdmin(request, env);
   if (!auth.ok) {
     return Response.json(
       { ok: false, error: auth.error, message: auth.message },
@@ -52,7 +52,7 @@ export async function onRequestPatch(context) {
   }
 
   try {
-    const updated = await setMessageHidden(env.DB, String(body.id), body.hidden);
+    const updated = await setMessageHidden(env.DB, String(body.id), body.hidden, auth.weddingKey);
     return Response.json({ ok: true, message: updated }, { status: 200, headers });
   } catch (err) {
     if (err.message === 'MESSAGE_NOT_FOUND') {

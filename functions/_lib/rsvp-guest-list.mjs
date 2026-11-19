@@ -2,8 +2,13 @@
  * Lista de convidados + grupos — D1 + seed/memory fallback (Cloudflare Free).
  */
 
-import { WEDDING_KEY, normalizeName } from './rsvp-validators.mjs';
+import { WEDDING_KEY as DEFAULT_WEDDING_KEY, normalizeName } from './rsvp-validators.mjs';
 import { GUEST_LIST_SEED } from '../../data/guest-list-seed.mjs';
+
+function resolveWeddingKey(weddingKey) {
+  const k = String(weddingKey || DEFAULT_WEDDING_KEY).trim();
+  return k || DEFAULT_WEDDING_KEY;
+}
 
 /**
  * Canonical key for matching invite names (case/accents-insensitive-ish).
@@ -22,40 +27,46 @@ export function parseGuestNamesInput(text) {
     .filter(Boolean);
 }
 
-/** In-memory store for local Vite / no-D1 */
-let memoryGuests = null;
-let memoryGroups = null;
-let memoryRsvpMode = 'closed';
+/** @type {Map<string, {guests:any[], groups:any[], rsvpMode:string}>} */
+let memoryByWedding = new Map();
 
-function ensureMemoryGroups() {
-  if (!memoryGroups) memoryGroups = [];
-  return memoryGroups;
-}
-
-function ensureMemoryGuests() {
-  if (!memoryGuests) {
+function storeFor(weddingKey) {
+  const key = resolveWeddingKey(weddingKey);
+  if (!memoryByWedding.has(key)) {
     const now = new Date().toISOString();
-    memoryGuests = GUEST_LIST_SEED.map((display) => {
-      const displayName = normalizeName(display);
-      return {
-        id: crypto.randomUUID(),
-        displayName,
-        nameKey: nameKey(displayName),
-        createdAt: now,
-        attending: null,
-        respondedAt: null,
-        groupId: null,
-        groupName: null,
-      };
-    });
+    const guests =
+      key === DEFAULT_WEDDING_KEY
+        ? GUEST_LIST_SEED.map((display) => {
+            const displayName = normalizeName(display);
+            return {
+              id: crypto.randomUUID(),
+              displayName,
+              nameKey: nameKey(displayName),
+              createdAt: now,
+              attending: null,
+              respondedAt: null,
+              groupId: null,
+              groupName: null,
+            };
+          })
+        : [];
+    memoryByWedding.set(key, { guests, groups: [], rsvpMode: 'closed' });
   }
-  return memoryGuests;
+  return memoryByWedding.get(key);
 }
 
-function syncMemoryGroupNames() {
-  const groups = ensureMemoryGroups();
+function ensureMemoryGroups(weddingKey) {
+  return storeFor(weddingKey).groups;
+}
+
+function ensureMemoryGuests(weddingKey) {
+  return storeFor(weddingKey).guests;
+}
+
+function syncMemoryGroupNames(weddingKey) {
+  const groups = ensureMemoryGroups(weddingKey);
   const byId = new Map(groups.map((g) => [g.id, g.name]));
-  for (const guest of ensureMemoryGuests()) {
+  for (const guest of ensureMemoryGuests(weddingKey)) {
     guest.groupName = guest.groupId ? byId.get(guest.groupId) || null : null;
   }
 }
@@ -91,40 +102,45 @@ function normalizeGroupName(name) {
 }
 
 export function resetMemoryGuestsForTests() {
-  memoryGuests = null;
-  memoryGroups = null;
-  memoryRsvpMode = 'closed';
+  memoryByWedding = new Map();
 }
 
-export async function seedGuestListIfEmpty(db) {
-  if (!db) return { seeded: false, count: ensureMemoryGuests().length };
+export async function seedGuestListIfEmpty(db, weddingKey = DEFAULT_WEDDING_KEY) {
+  const key = resolveWeddingKey(weddingKey);
+  if (!db) return { seeded: false, count: ensureMemoryGuests(key).length };
   const countRow = await db
     .prepare(`SELECT COUNT(*) AS c FROM rsvp_guest_list WHERE wedding_key = ?`)
-    .bind(WEDDING_KEY)
+    .bind(key)
     .first();
   const count = Number(countRow?.c || 0);
   if (count > 0) return { seeded: false, count };
-  return { seeded: true, ...(await addGuests(db, GUEST_LIST_SEED)) };
+  if (key !== DEFAULT_WEDDING_KEY) return { seeded: false, count: 0 };
+  return { seeded: true, ...(await addGuests(db, GUEST_LIST_SEED, {}, key)) };
 }
 
-export async function getRsvpMode(db) {
-  if (!db) return memoryRsvpMode === 'closed' ? 'closed' : 'open';
+export async function getRsvpMode(db, weddingKey = DEFAULT_WEDDING_KEY) {
+  const key = resolveWeddingKey(weddingKey);
+  if (!db) {
+    const mode = storeFor(key).rsvpMode;
+    return mode === 'closed' ? 'closed' : 'open';
+  }
   const row = await db
     .prepare(`SELECT rsvp_mode FROM wedding_settings WHERE wedding_key = ?`)
-    .bind(WEDDING_KEY)
+    .bind(key)
     .first();
   // Default: só da lista (closed) quando não há registro
   if (!row) return 'closed';
   return row.rsvp_mode === 'open' ? 'open' : 'closed';
 }
 
-export async function setRsvpMode(db, mode) {
+export async function setRsvpMode(db, mode, weddingKey = DEFAULT_WEDDING_KEY) {
+  const key = resolveWeddingKey(weddingKey);
   if (mode !== 'open' && mode !== 'closed') {
     throw new Error('INVALID_RSVP_MODE');
   }
   const now = new Date().toISOString();
   if (!db) {
-    memoryRsvpMode = mode;
+    storeFor(key).rsvpMode = mode;
     return { rsvpMode: mode, updatedAt: now };
   }
   await db
@@ -135,14 +151,15 @@ export async function setRsvpMode(db, mode) {
          rsvp_mode = excluded.rsvp_mode,
          updated_at = excluded.updated_at`
     )
-    .bind(WEDDING_KEY, mode, now)
+    .bind(key, mode, now)
     .run();
   return { rsvpMode: mode, updatedAt: now };
 }
 
-export async function listGroups(db) {
+export async function listGroups(db, weddingKey = DEFAULT_WEDDING_KEY) {
+  const key = resolveWeddingKey(weddingKey);
   if (!db) {
-    return [...ensureMemoryGroups()].sort((a, b) =>
+    return [...ensureMemoryGroups(key)].sort((a, b) =>
       a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' })
     );
   }
@@ -153,18 +170,19 @@ export async function listGroups(db) {
        WHERE wedding_key = ?
        ORDER BY name COLLATE NOCASE ASC`
     )
-    .bind(WEDDING_KEY)
+    .bind(key)
     .all();
   return (rows?.results || []).map(mapGroupRow);
 }
 
-export async function createGroup(db, name) {
+export async function createGroup(db, name, weddingKey = DEFAULT_WEDDING_KEY) {
+  const key = resolveWeddingKey(weddingKey);
   const display = normalizeGroupName(name);
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
 
   if (!db) {
-    const mem = ensureMemoryGroups();
+    const mem = ensureMemoryGroups(key);
     if (mem.some((g) => g.name.toLowerCase() === display.toLowerCase())) {
       throw new Error('GROUP_EXISTS');
     }
@@ -179,7 +197,7 @@ export async function createGroup(db, name) {
         `INSERT INTO guest_groups (id, wedding_key, name, created_at)
          VALUES (?, ?, ?, ?)`
       )
-      .bind(id, WEDDING_KEY, display, now)
+      .bind(id, key, display, now)
       .run();
   } catch (err) {
     if (err?.message?.includes('UNIQUE')) throw new Error('GROUP_EXISTS');
@@ -188,15 +206,16 @@ export async function createGroup(db, name) {
   return { id, name: display, createdAt: now };
 }
 
-export async function deleteGroup(db, groupId) {
+export async function deleteGroup(db, groupId, weddingKey = DEFAULT_WEDDING_KEY) {
+  const key = resolveWeddingKey(weddingKey);
   if (!groupId || typeof groupId !== 'string') throw new Error('INVALID_GROUP_ID');
 
   if (!db) {
-    const mem = ensureMemoryGroups();
+    const mem = ensureMemoryGroups(key);
     const idx = mem.findIndex((g) => g.id === groupId);
     if (idx < 0) throw new Error('GROUP_NOT_FOUND');
     mem.splice(idx, 1);
-    for (const guest of ensureMemoryGuests()) {
+    for (const guest of ensureMemoryGuests(key)) {
       if (guest.groupId === groupId) {
         guest.groupId = null;
         guest.groupName = null;
@@ -207,42 +226,44 @@ export async function deleteGroup(db, groupId) {
 
   await db
     .prepare(`UPDATE rsvp_guest_list SET group_id = NULL WHERE wedding_key = ? AND group_id = ?`)
-    .bind(WEDDING_KEY, groupId)
+    .bind(key, groupId)
     .run();
 
   const result = await db
     .prepare(`DELETE FROM guest_groups WHERE id = ? AND wedding_key = ?`)
-    .bind(groupId, WEDDING_KEY)
+    .bind(groupId, key)
     .run();
   const changes = Number(result?.meta?.changes ?? result?.changes ?? 0);
   if (changes === 0) throw new Error('GROUP_NOT_FOUND');
   return { id: groupId, removed: true };
 }
 
-async function assertGroupExists(db, groupId) {
+async function assertGroupExists(db, groupId, weddingKey) {
+  const key = resolveWeddingKey(weddingKey);
   if (groupId == null || groupId === '') return null;
   if (!db) {
-    const g = ensureMemoryGroups().find((x) => x.id === groupId);
+    const g = ensureMemoryGroups(key).find((x) => x.id === groupId);
     if (!g) throw new Error('GROUP_NOT_FOUND');
     return g;
   }
   const row = await db
     .prepare(`SELECT id, name FROM guest_groups WHERE id = ? AND wedding_key = ?`)
-    .bind(groupId, WEDDING_KEY)
+    .bind(groupId, key)
     .first();
   if (!row) throw new Error('GROUP_NOT_FOUND');
   return mapGroupRow(row);
 }
 
-export async function listGuestList(db) {
+export async function listGuestList(db, weddingKey = DEFAULT_WEDDING_KEY) {
+  const key = resolveWeddingKey(weddingKey);
   if (!db) {
-    syncMemoryGroupNames();
-    return [...ensureMemoryGuests()].sort((a, b) =>
+    syncMemoryGroupNames(key);
+    return [...ensureMemoryGuests(key)].sort((a, b) =>
       a.displayName.localeCompare(b.displayName, 'pt-BR', { sensitivity: 'base' })
     );
   }
 
-  await seedGuestListIfEmpty(db);
+  await seedGuestListIfEmpty(db, key);
 
   const rows = await db
     .prepare(
@@ -253,7 +274,7 @@ export async function listGuestList(db) {
        WHERE g.wedding_key = ?
        ORDER BY g.display_name COLLATE NOCASE ASC`
     )
-    .bind(WEDDING_KEY)
+    .bind(key)
     .all();
 
   return (rows?.results || []).map(mapGuestRow);
@@ -262,18 +283,19 @@ export async function listGuestList(db) {
 /**
  * Partial search by name (e.g. "Bruno" → "Bruno Butzke e Familia").
  */
-export async function searchGuests(db, query) {
+export async function searchGuests(db, query, weddingKey = DEFAULT_WEDDING_KEY) {
+  const key = resolveWeddingKey(weddingKey);
   const q = nameKey(query || '');
   if (q.length < 2) return [];
 
   if (!db) {
-    return ensureMemoryGuests()
+    return ensureMemoryGuests(key)
       .filter((g) => g.nameKey.includes(q))
       .sort((a, b) => a.displayName.localeCompare(b.displayName, 'pt-BR', { sensitivity: 'base' }))
       .slice(0, 20);
   }
 
-  await seedGuestListIfEmpty(db);
+  await seedGuestListIfEmpty(db, key);
 
   const rows = await db
     .prepare(
@@ -283,7 +305,7 @@ export async function searchGuests(db, query) {
        ORDER BY display_name COLLATE NOCASE ASC
        LIMIT 20`
     )
-    .bind(WEDDING_KEY, `%${q}%`)
+    .bind(key, `%${q}%`)
     .all();
 
   return (rows?.results || []).map(mapGuestRow);
@@ -292,15 +314,16 @@ export async function searchGuests(db, query) {
 /**
  * Atualiza status na lista após confirmação (sim/não) pelo nome.
  */
-export async function markGuestResponse(db, guestName, attending) {
-  const key = nameKey(guestName || '');
-  if (key.length < 2) return { updated: false };
+export async function markGuestResponse(db, guestName, attending, weddingKey = DEFAULT_WEDDING_KEY) {
+  const key = resolveWeddingKey(weddingKey);
+  const nk = nameKey(guestName || '');
+  if (nk.length < 2) return { updated: false };
   const now = new Date().toISOString();
   const attendingVal = attending ? 1 : 0;
 
   if (!db) {
-    const mem = ensureMemoryGuests();
-    const g = mem.find((x) => x.nameKey === key);
+    const mem = ensureMemoryGuests(key);
+    const g = mem.find((x) => x.nameKey === nk);
     if (!g) return { updated: false };
     g.attending = Boolean(attending);
     g.respondedAt = now;
@@ -313,7 +336,7 @@ export async function markGuestResponse(db, guestName, attending) {
        SET attending = ?, responded_at = ?
        WHERE wedding_key = ? AND name_key = ?`
     )
-    .bind(attendingVal, now, WEDDING_KEY, key)
+    .bind(attendingVal, now, key, nk)
     .run();
 
   const changes = Number(result?.meta?.changes ?? result?.changes ?? 0);
@@ -323,7 +346,8 @@ export async function markGuestResponse(db, guestName, attending) {
 /**
  * Admin: set attending by id. attending = true | false | null (pendente).
  */
-export async function setGuestAttending(db, guestId, attending) {
+export async function setGuestAttending(db, guestId, attending, weddingKey = DEFAULT_WEDDING_KEY) {
+  const key = resolveWeddingKey(weddingKey);
   if (!guestId || typeof guestId !== 'string') throw new Error('INVALID_GUEST_ID');
   if (!(attending === true || attending === false || attending === null)) {
     throw new Error('INVALID_ATTENDING');
@@ -332,7 +356,7 @@ export async function setGuestAttending(db, guestId, attending) {
   const attendingVal = attending === null ? null : attending ? 1 : 0;
 
   if (!db) {
-    const g = ensureMemoryGuests().find((x) => x.id === guestId);
+    const g = ensureMemoryGuests(key).find((x) => x.id === guestId);
     if (!g) throw new Error('GUEST_NOT_FOUND');
     g.attending = attending;
     g.respondedAt = now;
@@ -345,20 +369,21 @@ export async function setGuestAttending(db, guestId, attending) {
        SET attending = ?, responded_at = ?
        WHERE id = ? AND wedding_key = ?`
     )
-    .bind(attendingVal, now, guestId, WEDDING_KEY)
+    .bind(attendingVal, now, guestId, key)
     .run();
   const changes = Number(result?.meta?.changes ?? result?.changes ?? 0);
   if (changes === 0) throw new Error('GUEST_NOT_FOUND');
   return { updated: true };
 }
 
-export async function setGuestGroup(db, guestId, groupId) {
+export async function setGuestGroup(db, guestId, groupId, weddingKey = DEFAULT_WEDDING_KEY) {
+  const key = resolveWeddingKey(weddingKey);
   if (!guestId || typeof guestId !== 'string') throw new Error('INVALID_GUEST_ID');
-  const resolved = groupId ? await assertGroupExists(db, groupId) : null;
+  const resolved = groupId ? await assertGroupExists(db, groupId, key) : null;
   const nextId = resolved ? resolved.id : null;
 
   if (!db) {
-    const g = ensureMemoryGuests().find((x) => x.id === guestId);
+    const g = ensureMemoryGuests(key).find((x) => x.id === guestId);
     if (!g) throw new Error('GUEST_NOT_FOUND');
     g.groupId = nextId;
     g.groupName = resolved?.name || null;
@@ -371,7 +396,7 @@ export async function setGuestGroup(db, guestId, groupId) {
        SET group_id = ?
        WHERE id = ? AND wedding_key = ?`
     )
-    .bind(nextId, guestId, WEDDING_KEY)
+    .bind(nextId, guestId, key)
     .run();
   const changes = Number(result?.meta?.changes ?? result?.changes ?? 0);
   if (changes === 0) throw new Error('GUEST_NOT_FOUND');
@@ -382,7 +407,8 @@ export async function setGuestGroup(db, guestId, groupId) {
  * Upsert many names. Returns { added, skipped }.
  * @param {{ groupId?: string|null }} [opts]
  */
-export async function addGuests(db, names, opts = {}) {
+export async function addGuests(db, names, opts = {}, weddingKey = DEFAULT_WEDDING_KEY) {
+  const key = resolveWeddingKey(weddingKey);
   if (!Array.isArray(names) || names.length === 0) {
     throw new Error('EMPTY_GUEST_LIST');
   }
@@ -391,29 +417,29 @@ export async function addGuests(db, names, opts = {}) {
   }
 
   const groupId = opts.groupId || null;
-  const group = groupId ? await assertGroupExists(db, groupId) : null;
+  const group = groupId ? await assertGroupExists(db, groupId, key) : null;
 
   let added = 0;
   let skipped = 0;
   const now = new Date().toISOString();
 
   if (!db) {
-    const mem = ensureMemoryGuests();
+    const mem = ensureMemoryGuests(key);
     for (const raw of names) {
       const display = normalizeName(String(raw || ''));
       if (display.length < 2 || display.length > 100) {
         skipped++;
         continue;
       }
-      const key = nameKey(display);
-      if (mem.some((g) => g.nameKey === key)) {
+      const nk = nameKey(display);
+      if (mem.some((g) => g.nameKey === nk)) {
         skipped++;
         continue;
       }
       mem.push({
         id: crypto.randomUUID(),
         displayName: display,
-        nameKey: key,
+        nameKey: nk,
         createdAt: now,
         attending: null,
         respondedAt: null,
@@ -431,7 +457,7 @@ export async function addGuests(db, names, opts = {}) {
       skipped++;
       continue;
     }
-    const key = nameKey(display);
+    const nk = nameKey(display);
     const id = crypto.randomUUID();
     try {
       await db
@@ -439,7 +465,7 @@ export async function addGuests(db, names, opts = {}) {
           `INSERT INTO rsvp_guest_list (id, wedding_key, display_name, name_key, created_at, group_id)
            VALUES (?, ?, ?, ?, ?, ?)`
         )
-        .bind(id, WEDDING_KEY, display, key, now, group?.id || null)
+        .bind(id, key, display, nk, now, group?.id || null)
         .run();
       added++;
     } catch (err) {
@@ -454,13 +480,14 @@ export async function addGuests(db, names, opts = {}) {
   return { added, skipped };
 }
 
-export async function removeGuest(db, guestId) {
+export async function removeGuest(db, guestId, weddingKey = DEFAULT_WEDDING_KEY) {
+  const key = resolveWeddingKey(weddingKey);
   if (!guestId || typeof guestId !== 'string') {
     throw new Error('INVALID_GUEST_ID');
   }
 
   if (!db) {
-    const mem = ensureMemoryGuests();
+    const mem = ensureMemoryGuests(key);
     const idx = mem.findIndex((g) => g.id === guestId);
     if (idx < 0) throw new Error('GUEST_NOT_FOUND');
     mem.splice(idx, 1);
@@ -469,7 +496,7 @@ export async function removeGuest(db, guestId) {
 
   const result = await db
     .prepare(`DELETE FROM rsvp_guest_list WHERE id = ? AND wedding_key = ?`)
-    .bind(guestId, WEDDING_KEY)
+    .bind(guestId, key)
     .run();
   const changes = Number(result?.meta?.changes ?? result?.changes ?? 0);
   if (changes === 0) throw new Error('GUEST_NOT_FOUND');
@@ -479,16 +506,17 @@ export async function removeGuest(db, guestId) {
 /**
  * If mode is closed, guest name must exist on list.
  */
-export async function assertGuestAllowed(db, guestName) {
-  const mode = await getRsvpMode(db);
+export async function assertGuestAllowed(db, guestName, weddingKey = DEFAULT_WEDDING_KEY) {
+  const key = resolveWeddingKey(weddingKey);
+  const mode = await getRsvpMode(db, key);
   if (mode !== 'closed') {
     return { allowed: true, mode };
   }
 
-  const key = nameKey(guestName);
+  const nk = nameKey(guestName);
 
   if (!db) {
-    const hit = ensureMemoryGuests().find((g) => g.nameKey === key);
+    const hit = ensureMemoryGuests(key).find((g) => g.nameKey === nk);
     if (!hit) {
       return {
         allowed: false,
@@ -507,7 +535,7 @@ export async function assertGuestAllowed(db, guestName) {
        WHERE wedding_key = ? AND name_key = ?
        LIMIT 1`
     )
-    .bind(WEDDING_KEY, key)
+    .bind(key, nk)
     .first();
 
   if (!row) {

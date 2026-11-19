@@ -9,32 +9,45 @@ import { rsvpsToCsv, markIntentPaidByProviderRef, setMessageHidden } from '../fu
 import { processMercadoPagoWebhook } from '../functions/_lib/mp-webhook.mjs';
 import { sendAdminNotification } from '../functions/_lib/notify-email.mjs';
 
-test('requireAdmin: 503 se ADMIN_PANEL_SECRET curto/ausente', () => {
+test('requireAdmin: 503 se ADMIN_PANEL_SECRET curto/ausente', async () => {
   const req = new Request('https://casebem.com/api/admin/summary', {
     headers: { Authorization: 'Bearer abc' },
   });
-  const r = requireAdmin(req, {});
+  const r = await requireAdmin(req, {});
   assert.equal(r.ok, false);
   assert.equal(r.status, 503);
 });
 
-test('requireAdmin: 401 com token errado', () => {
+test('requireAdmin: 401 com token errado', async () => {
   const secret = 'a'.repeat(20);
   const req = new Request('https://casebem.com/api/admin/summary', {
     headers: { Authorization: 'Bearer wrong-token-xxxxxx' },
   });
-  const r = requireAdmin(req, { ADMIN_PANEL_SECRET: secret });
+  const r = await requireAdmin(req, { ADMIN_PANEL_SECRET: secret });
   assert.equal(r.ok, false);
   assert.equal(r.status, 401);
 });
 
-test('requireAdmin: ok com Bearer correto', () => {
+test('requireAdmin: ok com Bearer legado (secret puro)', async () => {
   const secret = 'super-secret-admin-1';
   const req = new Request('https://casebem.com/api/admin/summary', {
     headers: { Authorization: `Bearer ${secret}` },
   });
-  const r = requireAdmin(req, { ADMIN_PANEL_SECRET: secret });
+  const r = await requireAdmin(req, { ADMIN_PANEL_SECRET: secret });
   assert.equal(r.ok, true);
+  assert.equal(r.weddingKey, 'dani-carine');
+});
+
+test('requireAdmin: ok com token tenant scoped', async () => {
+  const secret = 'super-secret-admin-2';
+  const { mintTenantToken } = await import('../functions/_lib/admin-auth.mjs');
+  const token = await mintTenantToken(secret, 'meu-casal');
+  const req = new Request('https://casebem.com/api/admin/summary', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const r = await requireAdmin(req, { ADMIN_PANEL_SECRET: secret });
+  assert.equal(r.ok, true);
+  assert.equal(r.weddingKey, 'meu-casal');
 });
 
 test('rsvpsToCsv: gera header e escapa vírgulas', () => {

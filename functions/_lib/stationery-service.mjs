@@ -9,8 +9,15 @@ import {
   whatsappShareUrl,
 } from '../../data/stationery-templates.mjs';
 import { slugifyId } from './catalog-service.mjs';
+import { WEDDING_KEY as DEFAULT_WEDDING_KEY } from './messages-validators.mjs';
 
-let memoryStationery = null;
+function resolveWeddingKey(weddingKey) {
+  const k = String(weddingKey || DEFAULT_WEDDING_KEY).trim();
+  return k || DEFAULT_WEDDING_KEY;
+}
+
+/** @type {Map<string, object[]>} */
+let memoryStationeryByWedding = new Map();
 
 function rowToTemplate(row) {
   return {
@@ -24,28 +31,46 @@ function rowToTemplate(row) {
   };
 }
 
-function ensureMemoryStationery() {
-  if (!memoryStationery) {
-    memoryStationery = STATIONERY_TEMPLATES.map((t, i) => ({
-      id: t.id,
-      title: t.title,
-      body: t.body,
-      kind: t.kind || 'whatsapp',
-      active: true,
-      sortOrder: i,
-      updatedAt: null,
-    }));
+function ensureMemoryStationery(weddingKey = DEFAULT_WEDDING_KEY) {
+  const key = resolveWeddingKey(weddingKey);
+  if (!memoryStationeryByWedding.has(key)) {
+    const list =
+      key === DEFAULT_WEDDING_KEY
+        ? STATIONERY_TEMPLATES.map((t, i) => ({
+            id: t.id,
+            title: t.title,
+            body: t.body,
+            kind: t.kind || 'whatsapp',
+            active: true,
+            sortOrder: i,
+            updatedAt: null,
+          }))
+        : [];
+    memoryStationeryByWedding.set(key, list);
   }
-  return memoryStationery;
+  return memoryStationeryByWedding.get(key);
 }
 
 export function resetMemoryStationeryForTests() {
-  memoryStationery = null;
+  memoryStationeryByWedding = new Map();
 }
 
-export async function seedStationeryIfEmpty(db) {
-  if (!db) return { seeded: false, count: ensureMemoryStationery().length };
-  const countRow = await db.prepare(`SELECT COUNT(*) AS c FROM stationery_templates`).first();
+export async function seedStationeryIfEmpty(db, weddingKey = DEFAULT_WEDDING_KEY) {
+  const key = resolveWeddingKey(weddingKey);
+  if (!db) {
+    return { seeded: false, count: ensureMemoryStationery(key).length };
+  }
+  if (key !== DEFAULT_WEDDING_KEY) {
+    const countRow = await db
+      .prepare(`SELECT COUNT(*) AS c FROM stationery_templates WHERE wedding_key = ?`)
+      .bind(key)
+      .first();
+    return { seeded: false, count: Number(countRow?.c || 0) };
+  }
+  const countRow = await db
+    .prepare(`SELECT COUNT(*) AS c FROM stationery_templates WHERE wedding_key = ?`)
+    .bind(key)
+    .first();
   const count = Number(countRow?.c || 0);
   if (count > 0) return { seeded: false, count };
 
@@ -55,10 +80,10 @@ export async function seedStationeryIfEmpty(db) {
     await db
       .prepare(
         `INSERT INTO stationery_templates (
-          id, title, body, kind, active, sort_order, updated_at
-        ) VALUES (?, ?, ?, ?, 1, ?, ?)`
+          id, wedding_key, title, body, kind, active, sort_order, updated_at
+        ) VALUES (?, ?, ?, ?, ?, 1, ?, ?)`
       )
-      .bind(t.id, t.title, t.body, t.kind || 'whatsapp', i++, now)
+      .bind(t.id, key, t.title, t.body, t.kind || 'whatsapp', i++, now)
       .run();
   }
   return { seeded: true, count: STATIONERY_TEMPLATES.length };
@@ -73,42 +98,49 @@ function staticActiveList() {
   }));
 }
 
-export async function getActiveStationery(db) {
+export async function getActiveStationery(db, weddingKey = DEFAULT_WEDDING_KEY) {
+  const key = resolveWeddingKey(weddingKey);
   if (!db) {
-    return ensureMemoryStationery()
+    return ensureMemoryStationery(key)
       .filter((t) => t.active)
       .map((t) => ({ ...t }));
   }
   try {
-    await seedStationeryIfEmpty(db);
+    await seedStationeryIfEmpty(db, key);
     const rows = await db
       .prepare(
         `SELECT id, title, body, kind, active, sort_order, updated_at
          FROM stationery_templates
-         WHERE active = 1
+         WHERE wedding_key = ? AND active = 1
          ORDER BY sort_order ASC, id ASC`
       )
+      .bind(key)
       .all();
     const list = (rows?.results || []).map(rowToTemplate);
-    return list.length === 0 ? staticActiveList() : list;
+    if (list.length === 0 && key === DEFAULT_WEDDING_KEY) return staticActiveList();
+    return list;
   } catch {
-    return staticActiveList();
+    if (key === DEFAULT_WEDDING_KEY) return staticActiveList();
+    return [];
   }
 }
 
-export async function listStationeryAdmin(db) {
+export async function listStationeryAdmin(db, weddingKey = DEFAULT_WEDDING_KEY) {
+  const key = resolveWeddingKey(weddingKey);
   if (!db) {
-    return [...ensureMemoryStationery()].sort(
+    return [...ensureMemoryStationery(key)].sort(
       (a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id)
     );
   }
-  await seedStationeryIfEmpty(db);
+  await seedStationeryIfEmpty(db, key);
   const rows = await db
     .prepare(
       `SELECT id, title, body, kind, active, sort_order, updated_at
        FROM stationery_templates
+       WHERE wedding_key = ?
        ORDER BY sort_order ASC, id ASC`
     )
+    .bind(key)
     .all();
   return (rows?.results || []).map(rowToTemplate);
 }
@@ -202,7 +234,8 @@ export function validateStationeryCreate(body) {
   };
 }
 
-export async function createStationeryTemplate(db, body) {
+export async function createStationeryTemplate(db, body, weddingKey = DEFAULT_WEDDING_KEY) {
+  const key = resolveWeddingKey(weddingKey);
   const validation = validateStationeryCreate(body);
   if (!validation.valid) {
     const err = new Error('VALIDATION');
@@ -213,7 +246,7 @@ export async function createStationeryTemplate(db, body) {
   const now = new Date().toISOString();
 
   if (!db) {
-    const mem = ensureMemoryStationery();
+    const mem = ensureMemoryStationery(key);
     if (mem.some((t) => t.id === d.id)) throw new Error('TEMPLATE_EXISTS');
     const template = {
       id: d.id,
@@ -232,10 +265,10 @@ export async function createStationeryTemplate(db, body) {
     await db
       .prepare(
         `INSERT INTO stationery_templates (
-          id, title, body, kind, active, sort_order, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)`
+          id, wedding_key, title, body, kind, active, sort_order, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
       )
-      .bind(d.id, d.title, d.body, d.kind, d.active ? 1 : 0, d.sortOrder, now)
+      .bind(d.id, key, d.title, d.body, d.kind, d.active ? 1 : 0, d.sortOrder, now)
       .run();
   } catch (err) {
     if (err?.message?.includes('UNIQUE') || err?.message?.includes('PRIMARY')) {
@@ -255,8 +288,9 @@ export async function createStationeryTemplate(db, body) {
   });
 }
 
-export async function updateStationeryTemplate(db, templateId, patch) {
+export async function updateStationeryTemplate(db, templateId, patch, weddingKey = DEFAULT_WEDDING_KEY) {
   if (!templateId || typeof templateId !== 'string') throw new Error('INVALID_ID');
+  const key = resolveWeddingKey(weddingKey);
 
   const validation = validateStationeryPatch(patch);
   if (!validation.valid) {
@@ -269,7 +303,7 @@ export async function updateStationeryTemplate(db, templateId, patch) {
   const now = new Date().toISOString();
 
   if (!db) {
-    const mem = ensureMemoryStationery();
+    const mem = ensureMemoryStationery(key);
     const t = mem.find((x) => x.id === templateId);
     if (!t) throw new Error('TEMPLATE_NOT_FOUND');
     if (d.title !== undefined) t.title = d.title;
@@ -282,17 +316,17 @@ export async function updateStationeryTemplate(db, templateId, patch) {
   }
 
   const existing = await db
-    .prepare(`SELECT id FROM stationery_templates WHERE id = ?`)
-    .bind(templateId)
+    .prepare(`SELECT id FROM stationery_templates WHERE id = ? AND wedding_key = ?`)
+    .bind(templateId, key)
     .first();
   if (!existing) throw new Error('TEMPLATE_NOT_FOUND');
 
   const row = await db
     .prepare(
       `SELECT id, title, body, kind, active, sort_order
-       FROM stationery_templates WHERE id = ?`
+       FROM stationery_templates WHERE id = ? AND wedding_key = ?`
     )
-    .bind(templateId)
+    .bind(templateId, key)
     .first();
 
   const next = {
@@ -307,19 +341,20 @@ export async function updateStationeryTemplate(db, templateId, patch) {
     .prepare(
       `UPDATE stationery_templates
        SET title = ?, body = ?, kind = ?, active = ?, sort_order = ?, updated_at = ?
-       WHERE id = ?`
+       WHERE id = ? AND wedding_key = ?`
     )
-    .bind(next.title, next.body, next.kind, next.active, next.sort_order, now, templateId)
+    .bind(next.title, next.body, next.kind, next.active, next.sort_order, now, templateId, key)
     .run();
 
   return rowToTemplate({ ...next, id: templateId, updated_at: now });
 }
 
-export async function deleteStationeryTemplate(db, templateId) {
+export async function deleteStationeryTemplate(db, templateId, weddingKey = DEFAULT_WEDDING_KEY) {
   if (!templateId || typeof templateId !== 'string') throw new Error('INVALID_ID');
+  const key = resolveWeddingKey(weddingKey);
 
   if (!db) {
-    const mem = ensureMemoryStationery();
+    const mem = ensureMemoryStationery(key);
     const idx = mem.findIndex((t) => t.id === templateId);
     if (idx < 0) throw new Error('TEMPLATE_NOT_FOUND');
     mem.splice(idx, 1);
@@ -327,8 +362,8 @@ export async function deleteStationeryTemplate(db, templateId) {
   }
 
   const result = await db
-    .prepare(`DELETE FROM stationery_templates WHERE id = ?`)
-    .bind(templateId)
+    .prepare(`DELETE FROM stationery_templates WHERE id = ? AND wedding_key = ?`)
+    .bind(templateId, key)
     .run();
   const changes = Number(result?.meta?.changes ?? result?.changes ?? 0);
   if (changes === 0) throw new Error('TEMPLATE_NOT_FOUND');

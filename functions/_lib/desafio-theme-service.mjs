@@ -2,10 +2,16 @@
  * Visual theme — app dos desafios + cartão fidelidade
  */
 
-import { WEDDING_KEY } from './challenges-validators.mjs';
+import { WEDDING_KEY as DEFAULT_WEDDING_KEY } from './challenges-validators.mjs';
+
+function resolveWeddingKey(weddingKey) {
+  const k = String(weddingKey || DEFAULT_WEDDING_KEY).trim();
+  return k || DEFAULT_WEDDING_KEY;
+}
+
 
 const DEFAULT_THEME = {
-  weddingKey: WEDDING_KEY,
+  weddingKey: DEFAULT_WEDDING_KEY,
   appBgFrom: '#f8f0ef',
   appBgMid: '#f4f6f0',
   appBgTo: '#f8f3ec',
@@ -39,7 +45,7 @@ export function getDefaultDesafioTheme() {
 function rowToTheme(row) {
   if (!row) return { ...DEFAULT_THEME };
   return {
-    weddingKey: row.wedding_key ?? row.weddingKey ?? WEDDING_KEY,
+    weddingKey: row.wedding_key ?? row.weddingKey ?? DEFAULT_WEDDING_KEY,
     appBgFrom: row.app_bg_from ?? row.appBgFrom ?? DEFAULT_THEME.appBgFrom,
     appBgMid: row.app_bg_mid ?? row.appBgMid ?? DEFAULT_THEME.appBgMid,
     appBgTo: row.app_bg_to ?? row.appBgTo ?? DEFAULT_THEME.appBgTo,
@@ -124,7 +130,8 @@ export function validateDesafioThemePatch(body) {
   return { valid: errors.length === 0, errors, data: out };
 }
 
-export async function getDesafioTheme(db) {
+export async function getDesafioTheme(db, weddingKey = DEFAULT_WEDDING_KEY) {
+  const weddingKeyResolved = resolveWeddingKey(weddingKey);
   if (!db) {
     if (!memoryTheme) memoryTheme = { ...DEFAULT_THEME };
     return { ...memoryTheme };
@@ -133,13 +140,13 @@ export async function getDesafioTheme(db) {
   try {
     const row = await db
       .prepare(`SELECT * FROM desafio_theme WHERE wedding_key = ?`)
-      .bind(WEDDING_KEY)
+      .bind(weddingKeyResolved)
       .first();
     if (!row) {
       const now = new Date().toISOString();
       await db
         .prepare(`INSERT INTO desafio_theme (wedding_key, updated_at) VALUES (?, ?)`)
-        .bind(WEDDING_KEY, now)
+        .bind(weddingKeyResolved, now)
         .run();
       return { ...DEFAULT_THEME, updatedAt: now };
     }
@@ -149,7 +156,8 @@ export async function getDesafioTheme(db) {
   }
 }
 
-export async function updateDesafioTheme(db, patch) {
+export async function updateDesafioTheme(db, patch, weddingKey = DEFAULT_WEDDING_KEY) {
+  const weddingKeyResolved = resolveWeddingKey(weddingKey);
   const validation = validateDesafioThemePatch(patch || {});
   if (!validation.valid) {
     const err = new Error('VALIDATION');
@@ -195,7 +203,7 @@ export async function updateDesafioTheme(db, patch) {
         updated_at = excluded.updated_at`
     )
     .bind(
-      WEDDING_KEY,
+      weddingKeyResolved,
       next.appBgFrom,
       next.appBgMid,
       next.appBgTo,

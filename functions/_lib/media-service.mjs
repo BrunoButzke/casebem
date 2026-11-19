@@ -115,16 +115,29 @@ export async function listMediaAdmin(db, weddingKey = DEFAULT_WEDDING_KEY) {
       (a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id)
     );
   }
-  const rows = await db
-    .prepare(
-      `SELECT id, title, youtube_url, active, sort_order, updated_at
-       FROM media_playlist
-       WHERE wedding_key = ?
-       ORDER BY sort_order ASC, id ASC`
-    )
-    .bind(key)
-    .all();
-  return (rows?.results || []).map(rowToItem);
+  try {
+    const rows = await db
+      .prepare(
+        `SELECT id, title, youtube_url, active, sort_order, updated_at
+         FROM media_playlist
+         WHERE wedding_key = ?
+         ORDER BY sort_order ASC, id ASC`
+      )
+      .bind(key)
+      .all();
+    return (rows?.results || []).map(rowToItem);
+  } catch (err) {
+    const { isMissingWeddingKeyColumn } = await import('./d1-compat.mjs');
+    if (!isMissingWeddingKeyColumn(err) || key !== DEFAULT_WEDDING_KEY) throw err;
+    const rows = await db
+      .prepare(
+        `SELECT id, title, youtube_url, active, sort_order, updated_at
+         FROM media_playlist
+         ORDER BY sort_order ASC, id ASC`
+      )
+      .all();
+    return (rows?.results || []).map(rowToItem);
+  }
 }
 
 export function validateMediaCreate(body) {

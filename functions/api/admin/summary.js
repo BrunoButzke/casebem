@@ -47,8 +47,14 @@ export async function onRequestGet(context) {
     const wk = auth.weddingKey;
     const [messages, gifts, finance, rsvpMode, guestList, groups, tenant] = await Promise.all([
       listMessagesAdmin(env.DB, { weddingKey: wk }),
-      listGiftsAdmin(env.DB, { weddingKey: wk }),
-      listFinanceAdmin(env.DB, { weddingKey: wk }),
+      listGiftsAdmin(env.DB, { weddingKey: wk }).catch((err) => {
+        console.error('listGiftsAdmin', err?.message || err);
+        return [];
+      }),
+      listFinanceAdmin(env.DB, { weddingKey: wk }).catch((err) => {
+        console.error('listFinanceAdmin', err?.message || err);
+        return [];
+      }),
       getRsvpMode(env.DB, wk),
       listGuestList(env.DB, wk),
       listGroups(env.DB, wk),

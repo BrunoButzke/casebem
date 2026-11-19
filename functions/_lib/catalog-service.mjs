@@ -180,17 +180,30 @@ export async function listCatalogAdmin(db, weddingKey = DEFAULT_WEDDING_KEY) {
       (a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id)
     );
   }
-  await seedCatalogIfEmpty(db, key);
-  const rows = await db
-    .prepare(
-      `SELECT id, name, description, price_in_cents, image_url, image_data, mode, active, sort_order, updated_at
-       FROM gifts_catalog
-       WHERE wedding_key = ?
-       ORDER BY sort_order ASC, id ASC`
-    )
-    .bind(key)
-    .all();
-  return (rows?.results || []).map(rowToGift);
+  try {
+    await seedCatalogIfEmpty(db, key);
+    const rows = await db
+      .prepare(
+        `SELECT id, name, description, price_in_cents, image_url, image_data, mode, active, sort_order, updated_at
+         FROM gifts_catalog
+         WHERE wedding_key = ?
+         ORDER BY sort_order ASC, id ASC`
+      )
+      .bind(key)
+      .all();
+    return (rows?.results || []).map(rowToGift);
+  } catch (err) {
+    const { isMissingWeddingKeyColumn } = await import('./d1-compat.mjs');
+    if (!isMissingWeddingKeyColumn(err) || key !== DEFAULT_WEDDING_KEY) throw err;
+    const rows = await db
+      .prepare(
+        `SELECT id, name, description, price_in_cents, image_url, image_data, mode, active, sort_order, updated_at
+         FROM gifts_catalog
+         ORDER BY sort_order ASC, id ASC`
+      )
+      .all();
+    return (rows?.results || []).map(rowToGift);
+  }
 }
 
 export function validateGiftPatch(body) {

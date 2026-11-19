@@ -3,11 +3,14 @@
  */
 
 import { WEDDING_KEY as DEFAULT_WEDDING_KEY } from './messages-validators.mjs';
+import { isMissingWeddingKeyColumn } from './d1-compat.mjs';
 
 function resolveWeddingKey(weddingKey) {
   const k = String(weddingKey || DEFAULT_WEDDING_KEY).trim();
   return k || DEFAULT_WEDDING_KEY;
 }
+
+export { isMissingWeddingKeyColumn };
 
 export async function listRsvps(db, { limit = 200, weddingKey = DEFAULT_WEDDING_KEY } = {}) {
   const key = resolveWeddingKey(weddingKey);
@@ -134,23 +137,8 @@ export function isRaffleCheckoutItems(items) {
   return items.every((item) => String(item?.giftId || '').startsWith('raffle-'));
 }
 
-export async function listGiftsAdmin(db, { limit = 200, weddingKey = DEFAULT_WEDDING_KEY } = {}) {
-  const key = resolveWeddingKey(weddingKey);
-  const safeLimit = Math.min(Math.max(Number(limit) || 200, 1), 500);
-  const rows = await db
-    .prepare(
-      `SELECT intent_key, gifter_name, amount_cents, payment_method, status,
-              provider_reference, canonical_items, created_at, updated_at, paid_at
-       FROM checkout_intents
-       WHERE COALESCE(wedding_key, ?) = ?
-         AND canonical_items NOT LIKE '%"giftId":"raffle-%'
-       ORDER BY created_at DESC
-       LIMIT ?`
-    )
-    .bind(DEFAULT_WEDDING_KEY, key, safeLimit)
-    .all();
-
-  return (rows?.results || [])
+function mapGiftIntentRows(rows) {
+  return (rows || [])
     .map((g) => {
       const items = parseCanonicalItems(g.canonical_items);
       const paid = Boolean(g.paid_at);
@@ -169,6 +157,41 @@ export async function listGiftsAdmin(db, { limit = 200, weddingKey = DEFAULT_WED
       };
     })
     .filter((g) => !isRaffleCheckoutItems(g.items));
+}
+
+export async function listGiftsAdmin(db, { limit = 200, weddingKey = DEFAULT_WEDDING_KEY } = {}) {
+  const key = resolveWeddingKey(weddingKey);
+  const safeLimit = Math.min(Math.max(Number(limit) || 200, 1), 500);
+  try {
+    const rows = await db
+      .prepare(
+        `SELECT intent_key, gifter_name, amount_cents, payment_method, status,
+                provider_reference, canonical_items, created_at, updated_at, paid_at
+         FROM checkout_intents
+         WHERE COALESCE(wedding_key, ?) = ?
+           AND canonical_items NOT LIKE '%"giftId":"raffle-%'
+         ORDER BY created_at DESC
+         LIMIT ?`
+      )
+      .bind(DEFAULT_WEDDING_KEY, key, safeLimit)
+      .all();
+    return mapGiftIntentRows(rows?.results);
+  } catch (err) {
+    // Prod sem migration 0031: só o casal parceiro lê o legado global.
+    if (!isMissingWeddingKeyColumn(err) || key !== DEFAULT_WEDDING_KEY) throw err;
+    const rows = await db
+      .prepare(
+        `SELECT intent_key, gifter_name, amount_cents, payment_method, status,
+                provider_reference, canonical_items, created_at, updated_at, paid_at
+         FROM checkout_intents
+         WHERE canonical_items NOT LIKE '%"giftId":"raffle-%'
+         ORDER BY created_at DESC
+         LIMIT ?`
+      )
+      .bind(safeLimit)
+      .all();
+    return mapGiftIntentRows(rows?.results);
+  }
 }
 
 function giftItemsLabel(items) {

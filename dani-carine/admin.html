@@ -28,8 +28,8 @@
         <h1>Bem-vindos</h1>
         <p class="admin-sub" id="login-couple-sub">Acesso à gestão do casamento</p>
         <div class="admin-field">
-          <label for="admin-user">Usuário ou e-mail</label>
-          <input id="admin-user" type="text" autocomplete="username" placeholder="login ou e-mail" />
+          <label for="admin-user">E-mail</label>
+          <input id="admin-user" type="email" autocomplete="username" placeholder="voce@email.com" />
         </div>
         <div class="admin-field">
           <label for="admin-pass">Senha</label>
@@ -1085,8 +1085,15 @@
           showLogin(data.message || 'Não autorizado');
           return;
         }
+        const msg = data.message || data.error || 'Falha ao carregar';
+        const loginVisible = !$('login-box')?.hidden;
+        if (loginVisible) {
+          showLogin(msg);
+          return;
+        }
+        showPanel();
         $('panel-err').hidden = false;
-        $('panel-err').textContent = data.message || data.error || 'Falha ao carregar';
+        $('panel-err').textContent = msg;
         return;
       }
 

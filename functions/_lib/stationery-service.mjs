@@ -132,17 +132,30 @@ export async function listStationeryAdmin(db, weddingKey = DEFAULT_WEDDING_KEY) 
       (a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id)
     );
   }
-  await seedStationeryIfEmpty(db, key);
-  const rows = await db
-    .prepare(
-      `SELECT id, title, body, kind, active, sort_order, updated_at
-       FROM stationery_templates
-       WHERE wedding_key = ?
-       ORDER BY sort_order ASC, id ASC`
-    )
-    .bind(key)
-    .all();
-  return (rows?.results || []).map(rowToTemplate);
+  try {
+    await seedStationeryIfEmpty(db, key);
+    const rows = await db
+      .prepare(
+        `SELECT id, title, body, kind, active, sort_order, updated_at
+         FROM stationery_templates
+         WHERE wedding_key = ?
+         ORDER BY sort_order ASC, id ASC`
+      )
+      .bind(key)
+      .all();
+    return (rows?.results || []).map(rowToTemplate);
+  } catch (err) {
+    const { isMissingWeddingKeyColumn } = await import('./d1-compat.mjs');
+    if (!isMissingWeddingKeyColumn(err) || key !== DEFAULT_WEDDING_KEY) throw err;
+    const rows = await db
+      .prepare(
+        `SELECT id, title, body, kind, active, sort_order, updated_at
+         FROM stationery_templates
+         ORDER BY sort_order ASC, id ASC`
+      )
+      .all();
+    return (rows?.results || []).map(rowToTemplate);
+  }
 }
 
 /**

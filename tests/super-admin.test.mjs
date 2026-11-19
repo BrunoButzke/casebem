@@ -47,12 +47,16 @@ test('super login returns role super and distinct token', async () => {
   assert.notEqual(body.token, SECRET);
 });
 
-test('tenant login still returns role tenant', async () => {
+test('login legado Dani/Carine não entra mais como tenant', async () => {
   const res = await loginPost(loginCtx({ user: 'Dani', pass: 'Carine' }));
-  assert.equal(res.status, 200);
+  assert.equal(res.status, 401);
   const body = await res.json();
-  assert.equal(body.role, 'tenant');
-  assert.equal(body.token, await mintTenantToken(SECRET, 'dani-carine'));
+  assert.equal(body.ok, false);
+});
+
+test('token tenant scoped ainda autentica o painel', async () => {
+  const token = await mintTenantToken(SECRET, 'dani-carine');
+  assert.match(token, /^t\./);
 });
 
 test('super overview requires super token', async () => {

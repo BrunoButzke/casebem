@@ -1,11 +1,10 @@
 /**
  * POST /api/admin/login
  * 1. Super admin (e-mail plataforma)
- * 2. Membro Noiva/Noivo (admin_members)
- * 3. Fallback legado Dani/Carine
+ * 2. Membro Noiva/Noivo cadastrado em Acessos (admin_members)
  */
 
-import { loginGamesAdmin, mintTenantToken } from '../../_lib/admin-auth.mjs';
+import { mintTenantToken } from '../../_lib/admin-auth.mjs';
 import { isSuperAdminCredentials, loginSuperAdmin } from '../../_lib/super-admin.mjs';
 import { authenticateAdminMember } from '../../_lib/admin-members-service.mjs';
 import { pathsForTenantId } from '../../_lib/tenant-service.mjs';
@@ -75,17 +74,13 @@ export async function onRequestPost(context) {
     console.error('authenticateAdminMember failed', err?.message || err);
   }
 
-  const result = await loginGamesAdmin(env, body?.user, body?.pass);
-  if (!result.ok) {
-    return json(headers, { ok: false, error: result.error, message: result.message }, result.status);
-  }
-  const legacy = pathsForTenantId(result.weddingKey || 'dani-carine');
-  return json(headers, {
-    ok: true,
-    token: result.token,
-    role: result.role || 'tenant',
-    weddingKey: result.weddingKey || 'dani-carine',
-    adminPath: legacy.adminPath,
-    sitePath: legacy.sitePath,
-  });
+  return json(
+    headers,
+    {
+      ok: false,
+      error: 'UNAUTHORIZED',
+      message: 'E-mail ou senha não conferem. Use o acesso cadastrado em Acessos.',
+    },
+    401
+  );
 }

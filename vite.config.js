@@ -82,7 +82,7 @@ import {
   finalizeRaffleSalesByIntent,
   listActiveRaffleSoldEntries,
 } from './functions/_lib/raffle-service.mjs';
-import { loginGamesAdmin, requireAdmin, mintTenantToken } from './functions/_lib/admin-auth.mjs';
+import { requireAdmin, mintTenantToken } from './functions/_lib/admin-auth.mjs';
 import {
   isSuperAdminCredentials,
   loginSuperAdmin,
@@ -560,21 +560,10 @@ function adminApiPlugin(env) {
                 sitePath: `/${memberAuth.weddingKey}/`,
               });
             }
-            const result = await loginGamesAdmin(env, body?.user, body?.pass);
-            if (!result.ok) {
-              return sendJson(res, result.status, {
-                ok: false,
-                error: result.error,
-                message: result.message,
-              });
-            }
-            return sendJson(res, 200, {
-              ok: true,
-              token: result.token,
-              role: result.role || 'tenant',
-              weddingKey: 'dani-carine',
-              adminPath: '/dani-carine/admin',
-              sitePath: '/dani-carine/',
+            return sendJson(res, 401, {
+              ok: false,
+              error: 'UNAUTHORIZED',
+              message: 'E-mail ou senha não conferem. Use o acesso cadastrado em Acessos.',
             });
           }
 

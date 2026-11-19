@@ -5,7 +5,7 @@
  */
 
 import { mintTenantToken } from '../../_lib/admin-auth.mjs';
-import { isSuperAdminCredentials, loginSuperAdmin } from '../../_lib/super-admin.mjs';
+import { loginSuperAdmin } from '../../_lib/super-admin.mjs';
 import { authenticateAdminMember } from '../../_lib/admin-members-service.mjs';
 import { pathsForTenantId } from '../../_lib/tenant-service.mjs';
 import { getCorsHeaders, validateOrigin } from '../../_lib/http-helpers.mjs';
@@ -35,12 +35,26 @@ export async function onRequestPost(context) {
     return json(headers, { ok: false, error: 'INVALID_JSON' }, 400);
   }
 
-  if (isSuperAdminCredentials(body?.user, body?.pass)) {
-    const result = loginSuperAdmin(env, body?.user, body?.pass);
-    if (!result.ok) {
-      return json(headers, { ok: false, error: result.error, message: result.message }, result.status);
+  try {
+    const superResult = await loginSuperAdmin(env, body?.user, body?.pass, env.DB || null);
+    if (superResult.ok) {
+      return json(headers, {
+        ok: true,
+        token: superResult.token,
+        role: superResult.role,
+        email: superResult.email,
+      });
     }
-    return json(headers, { ok: true, token: result.token, role: result.role });
+    // Credenciais batem mas ambiente incompleto — não cair no fluxo de membro
+    if (superResult.status === 503) {
+      return json(
+        headers,
+        { ok: false, error: superResult.error, message: superResult.message },
+        superResult.status
+      );
+    }
+  } catch (err) {
+    console.error('loginSuperAdmin failed', err?.message || err);
   }
 
   try {

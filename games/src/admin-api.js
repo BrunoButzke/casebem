@@ -53,6 +53,26 @@ export async function listRaffleDrawEntries() {
   };
 }
 
+export async function getDrawBroadcastAdmin() {
+  const res = await fetch('/api/admin/raffles/draw/broadcast', { headers: adminHeaders() });
+  const data = await res.json().catch(() => ({}));
+  throwIfAuthFailed(res, data);
+  if (!res.ok || !data.ok) throw new Error(data.message || 'Não deu para carregar o modo sorteio');
+  return data.broadcast || { phase: 'gallery' };
+}
+
+export async function putDrawBroadcast(body) {
+  const res = await fetch('/api/admin/raffles/draw/broadcast', {
+    method: 'PUT',
+    headers: adminHeaders(),
+    body: JSON.stringify(body || {}),
+  });
+  const data = await res.json().catch(() => ({}));
+  throwIfAuthFailed(res, data);
+  if (!res.ok || !data.ok) throw new Error(data.message || data.error || 'Não deu para atualizar o modo sorteio');
+  return data.broadcast || { phase: 'gallery' };
+}
+
 export async function setQuestionCorrectIndex(id, correctIndex) {
   const res = await fetch('/api/admin/challenges/questions', {
     method: 'PATCH',

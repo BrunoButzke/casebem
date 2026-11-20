@@ -6,7 +6,8 @@
   'use strict';
 
   var STORY_MS = 7000;
-  var POLL_MS = 5000;
+  var POLL_MS = 2000;
+  var DEFAULT_DURATION_MS = 8000;
 
   var playlist = [];
   var currentId = '';
@@ -14,9 +15,13 @@
   var cinema = false;
   var storyTimer = null;
   var ignoreEscUntil = 0;
+  var broadcast = { phase: 'gallery' };
+  var reelTimer = null;
+  var confettiKey = '';
 
   var app = document.getElementById('app');
   var barsEl = document.getElementById('bars');
+  var stageEl = document.getElementById('stage');
   var slideEl = document.getElementById('slide');
   var emptyEl = document.getElementById('empty');
   var imgEl = document.getElementById('slide-img');
@@ -25,6 +30,180 @@
   var btnCinema = document.getElementById('btn-cinema');
   var btnPrev = document.getElementById('btn-prev');
   var btnNext = document.getElementById('btn-next');
+  var drawSoonEl = document.getElementById('draw-soon');
+  var drawReelEl = document.getElementById('draw-reel');
+  var drawLabelEl = document.getElementById('draw-label');
+  var drawNumberEl = document.getElementById('draw-number');
+  var drawNameEl = document.getElementById('draw-name');
+  var drawSubEl = document.getElementById('draw-sub');
+  var drawConfettiEl = document.getElementById('draw-confetti');
+
+  function pad2(n) {
+    var s = String(n);
+    return s.length < 2 ? '0' + s : s;
+  }
+
+  function drawActive() {
+    var p = broadcast && broadcast.phase;
+    return p === 'soon' || p === 'spinning' || p === 'winner';
+  }
+
+  function syncAppClass() {
+    var cls = 'telao';
+    if (cinema) cls += ' is-cinema';
+    if (drawActive()) cls += ' is-draw';
+    app.className = cls;
+  }
+
+  function clearReelTimer() {
+    if (reelTimer) {
+      clearTimeout(reelTimer);
+      reelTimer = null;
+    }
+  }
+
+  function easeOutCubic(t) {
+    if (t < 0) t = 0;
+    if (t > 1) t = 1;
+    return 1 - Math.pow(1 - t, 3);
+  }
+
+  function tickIntervalMs(progress) {
+    return Math.round(45 + easeOutCubic(progress) * 220);
+  }
+
+  function reelDisplayAt(nowMs) {
+    var pool = (broadcast && broadcast.pool) || [];
+    var winnerNumber = Math.floor(Number(broadcast && broadcast.winnerNumber));
+    var durationMs = Math.max(1000, Number(broadcast && broadcast.durationMs) || DEFAULT_DURATION_MS);
+    var started = Date.parse((broadcast && broadcast.startedAt) || '');
+    if (!(winnerNumber >= 1)) {
+      return { displayNumber: '—', done: false, progress: 0 };
+    }
+    if (!isFinite(started)) {
+      return { displayNumber: pad2(winnerNumber), done: true, progress: 1 };
+    }
+    var elapsed = Math.max(0, nowMs - started);
+    var progress = Math.min(1, elapsed / durationMs);
+    if (progress >= 1 || !pool.length) {
+      return { displayNumber: pad2(winnerNumber), done: true, progress: 1 };
+    }
+    var interval = tickIntervalMs(progress);
+    var slot = Math.floor(elapsed / interval);
+    var idx = Math.abs((slot * 2654435761) ^ (winnerNumber * 97)) % pool.length;
+    var sample = pool[idx];
+    var num = sample && sample.number ? Number(sample.number) : winnerNumber;
+    return { displayNumber: pad2(num), done: false, progress: progress };
+  }
+
+  function burstConfetti(key) {
+    var i;
+    var html;
+    var colors;
+    var angle;
+    var dist;
+    var dx;
+    var dy;
+    if (!drawConfettiEl) return;
+    if (key && confettiKey === key) return;
+    if (key) confettiKey = key;
+    colors = ['#ffffff', '#ffe4ec', '#ffb7c5', '#f472b6', '#ec4899', '#db2777'];
+    html = '';
+    for (i = 0; i < 40; i++) {
+      angle = ((Math.PI * 2 * i) / 40) + (i % 3) * 0.12;
+      dist = 100 + (i % 6) * 36;
+      dx = Math.cos(angle) * dist;
+      dy = Math.sin(angle) * dist - 50;
+      html +=
+        '<span class="telao-draw__confetti-piece" style="background:' +
+        colors[i % colors.length] +
+        ';--dx:' +
+        dx +
+        'px;--dy:' +
+        dy +
+        'px;animation-delay:' +
+        (i % 10) * 0.02 +
+        's"></span>';
+    }
+    drawConfettiEl.innerHTML = html;
+  }
+
+  function renderDraw() {
+    var phase = (broadcast && broadcast.phase) || 'gallery';
+    var snap;
+    syncAppClass();
+    if (barsEl) barsEl.style.display = drawActive() ? 'none' : '';
+    if (stageEl) stageEl.style.display = drawActive() ? 'none' : '';
+    if (drawSoonEl) drawSoonEl.style.display = phase === 'soon' ? '' : 'none';
+    if (drawReelEl) drawReelEl.style.display = phase === 'spinning' || phase === 'winner' ? '' : 'none';
+
+    if (phase === 'soon') {
+      clearReelTimer();
+      clearStoryTimer();
+      if (drawConfettiEl) drawConfettiEl.innerHTML = '';
+      return;
+    }
+
+    if (phase === 'winner') {
+      clearReelTimer();
+      clearStoryTimer();
+      if (drawReelEl) {
+        drawReelEl.className = 'telao-draw telao-draw--reel is-winner';
+      }
+      if (drawLabelEl) drawLabelEl.textContent = 'Ganhador';
+      if (drawNumberEl) {
+        drawNumberEl.textContent = pad2(broadcast.winnerNumber || 0);
+      }
+      if (drawNameEl) {
+        drawNameEl.style.display = '';
+        drawNameEl.textContent = broadcast.winnerName || 'Sem comprador';
+      }
+      if (drawSubEl) {
+        drawSubEl.style.display = '';
+        drawSubEl.textContent = 'Número ' + (broadcast.winnerNumber || '');
+      }
+      burstConfetti(String(broadcast.startedAt || broadcast.winnerNumber || ''));
+      return;
+    }
+
+    if (phase === 'spinning') {
+      clearStoryTimer();
+      if (drawReelEl) drawReelEl.className = 'telao-draw telao-draw--reel is-spinning';
+      if (drawLabelEl) drawLabelEl.textContent = 'Sorteando';
+      if (drawNameEl) drawNameEl.style.display = 'none';
+      if (drawSubEl) drawSubEl.style.display = 'none';
+      if (drawConfettiEl) drawConfettiEl.innerHTML = '';
+
+      function tickReel() {
+        snap = reelDisplayAt(Date.now());
+        if (drawNumberEl) drawNumberEl.textContent = snap.displayNumber;
+        if (snap.done) {
+          clearReelTimer();
+          if (drawReelEl) drawReelEl.className = 'telao-draw telao-draw--reel is-winner';
+          if (drawLabelEl) drawLabelEl.textContent = 'Ganhador';
+          if (drawNameEl) {
+            drawNameEl.style.display = '';
+            drawNameEl.textContent = broadcast.winnerName || 'Sem comprador';
+          }
+          if (drawSubEl) {
+            drawSubEl.style.display = '';
+            drawSubEl.textContent = 'Número ' + (broadcast.winnerNumber || '');
+          }
+          burstConfetti(String(broadcast.startedAt || broadcast.winnerNumber || ''));
+          return;
+        }
+        reelTimer = setTimeout(tickReel, tickIntervalMs(snap.progress));
+      }
+      clearReelTimer();
+      tickReel();
+      return;
+    }
+
+    clearReelTimer();
+    if (drawConfettiEl) drawConfettiEl.innerHTML = '';
+    confettiKey = '';
+    scheduleNext();
+  }
 
   function imageUrl(id) {
     return '/api/desafio/gallery/' + encodeURIComponent(id) + '/image';
@@ -86,6 +265,7 @@
 
   function scheduleNext() {
     clearStoryTimer();
+    if (drawActive()) return;
     if (!currentId) return;
     storyTimer = setTimeout(function () {
       setCurrent(nextId(currentId));
@@ -202,9 +382,9 @@
     }
   }
 
-  function fetchGallery(cb) {
+  function fetchJson(url, cb) {
     var xhr = new XMLHttpRequest();
-    xhr.open('GET', '/api/desafio/gallery', true);
+    xhr.open('GET', url, true);
     xhr.onreadystatechange = function () {
       if (xhr.readyState !== 4) return;
       if (xhr.status < 200 || xhr.status >= 300) {
@@ -216,7 +396,7 @@
         cb(new Error('bad payload'), null);
         return;
       }
-      cb(null, data.photos || []);
+      cb(null, data);
     };
     xhr.onerror = function () {
       cb(new Error('network'), null);
@@ -225,8 +405,23 @@
   }
 
   function poll() {
-    fetchGallery(function (err, photos) {
-      if (!err && photos) applyLive(photos);
+    fetchJson('/api/desafio/gallery', function (err, data) {
+      if (!err && data && data.photos) applyLive(data.photos);
+    });
+    fetchJson('/api/desafio/raffle/draw-broadcast', function (err, data) {
+      var next;
+      if (err || !data) return;
+      next = data.broadcast || { phase: 'gallery' };
+      if (
+        next.phase === broadcast.phase &&
+        next.startedAt === broadcast.startedAt &&
+        next.winnerNumber === broadcast.winnerNumber &&
+        next.updatedAt === broadcast.updatedAt
+      ) {
+        return;
+      }
+      broadcast = next;
+      renderDraw();
     });
   }
 
@@ -255,13 +450,8 @@
 
   function setCinema(on) {
     cinema = !!on;
-    if (cinema) {
-      app.className = 'telao is-cinema';
-      btnCinema.textContent = 'Sair da tela';
-    } else {
-      app.className = 'telao';
-      btnCinema.textContent = 'Tela cheia';
-    }
+    syncAppClass();
+    btnCinema.textContent = cinema ? 'Sair da tela' : 'Tela cheia';
   }
 
   function toggleCinema() {
@@ -282,9 +472,11 @@
     toggleCinema();
   };
   btnPrev.onclick = function () {
+    if (drawActive()) return;
     setCurrent(prevId(currentId));
   };
   btnNext.onclick = function () {
+    if (drawActive()) return;
     setCurrent(nextId(currentId));
   };
 
@@ -316,6 +508,10 @@
       if (cinema || fullscreenEl() || Date.now() < ignoreEscUntil) {
         toggleCinema();
       }
+      return;
+    }
+    if (drawActive()) {
+      if (key === 'f' || key === 'F' || key === 70) toggleCinema();
       return;
     }
     if (key === 'ArrowRight' || key === 39) setCurrent(nextId(currentId));

@@ -36,7 +36,9 @@
   var drawNumberEl = document.getElementById('draw-number');
   var drawNameEl = document.getElementById('draw-name');
   var drawSubEl = document.getElementById('draw-sub');
+  var drawHintEl = document.getElementById('draw-hint');
   var drawConfettiEl = document.getElementById('draw-confetti');
+  var lastReelNumber = '';
 
   function pad2(n) {
     var s = String(n);
@@ -69,7 +71,23 @@
   }
 
   function tickIntervalMs(progress) {
-    return Math.round(45 + easeOutCubic(progress) * 220);
+    return Math.round(18 + easeOutCubic(progress) * 142);
+  }
+
+  function setReelNumber(text, spinning) {
+    if (!drawNumberEl) return;
+    drawNumberEl.textContent = text;
+    if (!spinning) {
+      drawNumberEl.className = 'telao-draw__number';
+      lastReelNumber = text;
+      return;
+    }
+    if (text === lastReelNumber) return;
+    lastReelNumber = text;
+    drawNumberEl.className = 'telao-draw__number';
+    // force reflow to restart CSS roll on each tick
+    void drawNumberEl.offsetWidth;
+    drawNumberEl.className = 'telao-draw__number is-tick';
   }
 
   function reelDisplayAt(nowMs) {
@@ -151,9 +169,8 @@
         drawReelEl.className = 'telao-draw telao-draw--reel is-winner';
       }
       if (drawLabelEl) drawLabelEl.textContent = 'Ganhador';
-      if (drawNumberEl) {
-        drawNumberEl.textContent = pad2(broadcast.winnerNumber || 0);
-      }
+      setReelNumber(pad2(broadcast.winnerNumber || 0), false);
+      if (drawHintEl) drawHintEl.style.display = 'none';
       if (drawNameEl) {
         drawNameEl.style.display = '';
         drawNameEl.textContent = broadcast.winnerName || 'Sem comprador';
@@ -170,17 +187,20 @@
       clearStoryTimer();
       if (drawReelEl) drawReelEl.className = 'telao-draw telao-draw--reel is-spinning';
       if (drawLabelEl) drawLabelEl.textContent = 'Sorteando';
+      if (drawHintEl) drawHintEl.style.display = '';
       if (drawNameEl) drawNameEl.style.display = 'none';
       if (drawSubEl) drawSubEl.style.display = 'none';
       if (drawConfettiEl) drawConfettiEl.innerHTML = '';
 
       function tickReel() {
         snap = reelDisplayAt(Date.now());
-        if (drawNumberEl) drawNumberEl.textContent = snap.displayNumber;
+        setReelNumber(snap.displayNumber, true);
         if (snap.done) {
           clearReelTimer();
           if (drawReelEl) drawReelEl.className = 'telao-draw telao-draw--reel is-winner';
           if (drawLabelEl) drawLabelEl.textContent = 'Ganhador';
+          setReelNumber(snap.displayNumber, false);
+          if (drawHintEl) drawHintEl.style.display = 'none';
           if (drawNameEl) {
             drawNameEl.style.display = '';
             drawNameEl.textContent = broadcast.winnerName || 'Sem comprador';

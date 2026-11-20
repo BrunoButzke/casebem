@@ -299,7 +299,7 @@ body {
   -webkit-box-direction: normal;
   -ms-flex-direction: column;
   flex-direction: column;
-  padding: 4rem 1.5rem 2rem;
+  padding: 5rem 1.5rem 2.5rem;
   text-align: center;
   color: #fff;
   background: #2a1018;
@@ -307,13 +307,25 @@ body {
   background: linear-gradient(160deg, #2a1018 0%, #4a1828 45%, #1a0c12 100%);
 }
 
+.telao-draw__eyebrow {
+  margin: 0 0 0.35rem;
+  font-size: 18px;
+  font-size: 2.2vw;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #f9a8d4;
+}
+
 .telao-draw__soon {
   margin: 0;
+  max-width: 16ch;
   font-family: Georgia, 'Times New Roman', serif;
-  font-size: 48px;
-  font-size: 8vw;
+  font-size: 64px;
+  font-size: 11vw;
   font-weight: 600;
-  line-height: 1.15;
+  line-height: 1.05;
+  text-shadow: 0 18px 60px rgba(0, 0, 0, 0.45);
   -webkit-animation: telao-soon-float 3.2s ease-in-out infinite;
   animation: telao-soon-float 3.2s ease-in-out infinite;
 }
@@ -343,60 +355,120 @@ body {
 }
 
 .telao-draw__label {
-  margin: 0 0 0.5rem;
-  font-size: 14px;
+  margin: 0 0 0.35rem;
+  font-size: 18px;
+  font-size: 2.6vw;
   font-weight: 700;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
   color: #f9a8d4;
 }
 
+.telao-draw__reel-window {
+  position: relative;
+  width: 90%;
+  max-width: 360px;
+  height: 0.95em;
+  margin: 0.2rem auto 0;
+  font-size: 120px;
+  font-size: 26vw;
+  overflow: hidden;
+}
+
 .telao-draw__number {
   margin: 0;
-  font-size: 96px;
-  font-size: 18vw;
+  font-size: 1em;
   font-weight: 700;
-  line-height: 1;
+  line-height: 0.95;
   color: #fff;
+  text-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
 }
 
-.telao-draw--reel.is-spinning .telao-draw__number {
-  -webkit-animation: telao-draw-shake 0.14s linear infinite;
-  animation: telao-draw-shake 0.14s linear infinite;
+.telao-draw--reel.is-spinning .telao-draw__number.is-tick {
+  -webkit-animation: telao-reel-roll 0.11s ease-out both;
+  animation: telao-reel-roll 0.11s ease-out both;
 }
 
-@-webkit-keyframes telao-draw-shake {
+.telao-draw--reel.is-winner .telao-draw__number {
+  -webkit-animation: telao-reel-land 0.55s ease-out both;
+  animation: telao-reel-land 0.55s ease-out both;
+}
+
+@-webkit-keyframes telao-reel-roll {
   from {
-    -webkit-transform: translateY(-2px);
-    transform: translateY(-2px);
+    -webkit-transform: translateY(-55%) scale(0.94);
+    transform: translateY(-55%) scale(0.94);
+    opacity: 0.35;
   }
   to {
-    -webkit-transform: translateY(2px);
-    transform: translateY(2px);
+    -webkit-transform: translateY(0) scale(1);
+    transform: translateY(0) scale(1);
+    opacity: 1;
   }
 }
 
-@keyframes telao-draw-shake {
+@keyframes telao-reel-roll {
   from {
-    -webkit-transform: translateY(-2px);
-    transform: translateY(-2px);
+    -webkit-transform: translateY(-55%) scale(0.94);
+    transform: translateY(-55%) scale(0.94);
+    opacity: 0.35;
   }
   to {
-    -webkit-transform: translateY(2px);
-    transform: translateY(2px);
+    -webkit-transform: translateY(0) scale(1);
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+@-webkit-keyframes telao-reel-land {
+  0% {
+    -webkit-transform: scale(0.82);
+    transform: scale(0.82);
+  }
+  60% {
+    -webkit-transform: scale(1.08);
+    transform: scale(1.08);
+  }
+  100% {
+    -webkit-transform: scale(1);
+    transform: scale(1);
+  }
+}
+
+@keyframes telao-reel-land {
+  0% {
+    -webkit-transform: scale(0.82);
+    transform: scale(0.82);
+  }
+  60% {
+    -webkit-transform: scale(1.08);
+    transform: scale(1.08);
+  }
+  100% {
+    -webkit-transform: scale(1);
+    transform: scale(1);
   }
 }
 
 .telao-draw__name {
-  margin: 1.2rem 0 0;
-  font-size: 28px;
-  font-size: 4.5vw;
+  margin: 1rem 0 0;
+  font-size: 36px;
+  font-size: 6vw;
   font-weight: 700;
+  line-height: 1.1;
 }
 
 .telao-draw__sub {
-  margin: 0.35rem 0 0;
+  margin: 0.25rem 0 0;
+  font-size: 20px;
+  font-size: 2.8vw;
+  color: #f9a8d4;
+}
+
+.telao-draw__hint {
+  margin: 0.45rem 0 0;
   font-size: 16px;
+  font-size: 2vw;
   color: #f9a8d4;
 }
 

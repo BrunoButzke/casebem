@@ -36,7 +36,8 @@ function leaveFullscreen() {
   return fn ? fn.call(document) : Promise.resolve();
 }
 
-export default function Telao() {
+/** @param {{ standalone?: boolean }} props — clone indexável em /telao (sem voltar à galeria) */
+export default function Telao({ standalone = false } = {}) {
   const navigate = useNavigate();
   const rootRef = useRef(null);
   const cinemaRef = useRef(false);
@@ -155,6 +156,7 @@ export default function Telao() {
   function leaveTelao() {
     if (fullscreenEl()) void leaveFullscreen().catch(() => {});
     setCinemaMode(false);
+    if (standalone) return;
     // Sem convidado (TV/projetor) permanece no telão público; com sessão volta à galeria.
     if (getGuestName()) navigate('/galeria');
   }
@@ -193,7 +195,7 @@ export default function Telao() {
           <button type="button" onClick={toggleCinema}>
             {cinema ? 'Sair da tela' : 'Tela cheia'}
           </button>
-          {getGuestName() ? (
+          {!standalone && getGuestName() ? (
             <button type="button" onClick={leaveTelao}>
               Sair
             </button>

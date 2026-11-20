@@ -9,3 +9,8 @@
 # Demo ilustrativa do app (mock isolado do /games)
 /demo/game    /demo/game/index.html   200
 /demo/game/*  /demo/game/index.html   200
+
+# Telão indexável (clone público para TVs antigas / Google)
+/telao    /telao/index.html   200
+/telao/   /telao/index.html   200
+/telao/*  /telao/index.html   200

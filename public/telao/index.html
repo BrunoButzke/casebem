@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#1a1214" />
     <meta name="robots" content="index,follow" />
+    <meta http-equiv="Cache-Control" content="no-cache" />
     <title>Telão Dani &amp; Carine — Galeria ao vivo | CaseBem</title>
     <meta
       name="description"
@@ -19,7 +20,7 @@
     <meta property="og:url" content="https://casebem.com/telao/" />
     <meta property="og:type" content="website" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="stylesheet" href="/telao/telao.css" />
+    <link rel="stylesheet" href="/telao/telao.css?v=20261120c" />
   </head>
   <body>
     <div id="app" class="telao">
@@ -31,15 +32,23 @@
           <button type="button" id="btn-cinema">Tela cheia</button>
         </div>
       </header>
-      <div id="draw-soon" class="telao-draw telao-draw--soon" style="display: none" role="status">
-        <p class="telao-draw__soon">Sorteio em breve</p>
+      <div id="draw-soon" class="telao-draw telao-draw--soon" role="status">
+        <div class="telao-draw__inner">
+          <p class="telao-draw__eyebrow">Dani &amp; Carine</p>
+          <p class="telao-draw__soon">Sorteio em breve</p>
+        </div>
       </div>
-      <div id="draw-reel" class="telao-draw telao-draw--reel" style="display: none" role="status">
+      <div id="draw-reel" class="telao-draw telao-draw--reel" role="status">
         <div id="draw-confetti" class="telao-draw__confetti" aria-hidden="true"></div>
-        <p id="draw-label" class="telao-draw__label">Sorteando</p>
-        <p id="draw-number" class="telao-draw__number">—</p>
-        <p id="draw-name" class="telao-draw__name" style="display: none"></p>
-        <p id="draw-sub" class="telao-draw__sub" style="display: none"></p>
+        <div class="telao-draw__inner">
+          <p id="draw-label" class="telao-draw__label">Sorteando</p>
+          <div class="telao-draw__reel-window">
+            <p id="draw-number" class="telao-draw__number">—</p>
+          </div>
+          <p id="draw-hint" class="telao-draw__hint">A roleta está girando…</p>
+          <p id="draw-name" class="telao-draw__name is-hidden">—</p>
+          <p id="draw-sub" class="telao-draw__sub is-hidden">—</p>
+        </div>
       </div>
       <div class="telao-stage" id="stage">
         <figure id="slide" class="telao-slide" style="display: none">
@@ -59,6 +68,6 @@
         Ative JavaScript para ver o telão ao vivo de Dani e Carine.
       </p>
     </noscript>
-    <script src="/telao/telao.js"></script>
+    <script src="/telao/telao.js?v=20261120c"></script>
   </body>
 </html>

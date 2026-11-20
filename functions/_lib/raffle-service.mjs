@@ -920,22 +920,49 @@ export async function createRaffleCheckout(db, env, body, { origin = null } = {}
     return { ok: false, status: 409, error: 'INTENT_CONFLICT', message: 'Pedido já usado com outro conteúdo' };
   }
 
-  if (intentResult.status === 'pending' && intentResult.intent?.qrCode) {
-    return {
-      ok: true,
-      method: 'pix',
-      status: 'pending',
-      payment: {
-        id: intentResult.intent.providerReference,
-        qrCode: intentResult.intent.qrCode,
-        qrCodeBase64: intentResult.intent.qrCodeBase64 || '',
-      },
-      amountCents,
-      numbers,
-    };
+  // Idempotência: getOrCreateIntent devolve 'existing' (não 'pending') — igual gifts.
+  // Sem isso, retry apaga os holds e o Pix antigo pode realocar outros números no finalize.
+  if (intentResult.status === 'existing') {
+    const intent = intentResult.intent || {};
+    const held = parseRaffleItems(
+      typeof intent.items === 'string' ? intent.items : JSON.stringify(intent.items || [])
+    ).numbers;
+    const reservedNumbers = held.length ? held : numbers;
+
+    if (intent.status === 'pending' && intent.qrCode) {
+      return {
+        ok: true,
+        method: 'pix',
+        status: 'pending',
+        payment: {
+          id: intent.providerReference,
+          qrCode: intent.qrCode,
+          qrCodeBase64: intent.qrCodeBase64 || '',
+        },
+        amountCents: Number(intent.amountCents) || amountCents,
+        numbers: reservedNumbers,
+        intentKey,
+        fromCache: true,
+      };
+    }
+
+    if (intent.status === 'paid') {
+      const fin = await finalizeRaffleSalesByIntent(db, intentKey, weddingKeyResolved);
+      return {
+        ok: true,
+        method: 'pix',
+        status: 'paid',
+        payment: { id: intent.providerReference },
+        amountCents: Number(intent.amountCents) || amountCents,
+        numbers: fin.numbers?.length ? fin.numbers : reservedNumbers,
+        intentKey,
+        fromCache: true,
+      };
+    }
   }
 
   const now = new Date().toISOString();
+  let reservedNumbers = numbers;
   try {
     for (const n of numbers) {
       await db
@@ -947,8 +974,23 @@ export async function createRaffleCheckout(db, env, body, { origin = null } = {}
         .run();
     }
   } catch (err) {
-    await db.prepare(`DELETE FROM desafio_raffle_sales WHERE intent_key = ? AND status = 'pending'`).bind(intentKey).run();
-    if (String(err?.message || '').includes('UNIQUE') || String(err?.message || '').includes('PRIMARY')) {
+    const isUnique =
+      String(err?.message || '').includes('UNIQUE') || String(err?.message || '').includes('PRIMARY');
+    if (!isUnique) throw err;
+
+    // Retry do mesmo intent: holds já existem — NÃO apagar (senão o Pix antigo realoca outros nºs).
+    const heldRows = await db
+      .prepare(
+        `SELECT number FROM desafio_raffle_sales
+         WHERE intent_key = ? AND status = 'pending'
+         ORDER BY number`
+      )
+      .bind(intentKey)
+      .all();
+    const heldNumbers = (heldRows?.results || []).map((r) => Number(r.number));
+    if (heldNumbers.length) {
+      reservedNumbers = heldNumbers;
+    } else {
       return {
         ok: false,
         status: 409,
@@ -956,7 +998,6 @@ export async function createRaffleCheckout(db, env, body, { origin = null } = {}
         message: 'Opa, alguém pegou esse número. Escolha outro(s).',
       };
     }
-    throw err;
   }
 
   const notificationUrl = (() => {
@@ -1026,7 +1067,7 @@ export async function createRaffleCheckout(db, env, body, { origin = null } = {}
       ticketUrl: payment.ticketUrl || '',
     },
     amountCents,
-    numbers,
+    numbers: reservedNumbers,
     intentKey,
   };
 }

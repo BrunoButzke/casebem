@@ -28,6 +28,7 @@ export default function Sorteio() {
   const [pix, setPix] = useState(null);
   const [paid, setPaid] = useState(false);
   const [paidNumbers, setPaidNumbers] = useState([]);
+  const [reservedNumbers, setReservedNumbers] = useState([]);
   const [page, setPage] = useState(0);
   const intentRef = useRef(newIntentKey());
   const pollRef = useRef(null);
@@ -151,6 +152,7 @@ export default function Sorteio() {
     setCheckoutError('');
     setPaid(false);
     setPaidNumbers([]);
+    setReservedNumbers([...selected].sort((a, b) => a - b));
     setPix(null);
     setPending(true);
     try {
@@ -161,6 +163,9 @@ export default function Sorteio() {
         payerEmail: email.trim(),
         intentKey: intentRef.current,
       });
+      if (Array.isArray(data.numbers) && data.numbers.length) {
+        setReservedNumbers(data.numbers.map(Number).filter((n) => Number.isInteger(n)));
+      }
       setPix(data.payment);
       if (data.payment?.id) startPolling(data.payment.id);
       await reload();
@@ -336,6 +341,18 @@ export default function Sorteio() {
                     }
                     alt="QR Code Pix"
                   />
+                ) : null}
+                {reservedNumbers.length ? (
+                  <>
+                    <p className="play-sub">Números reservados:</p>
+                    <div className="sorteio-grid">
+                      {reservedNumbers.map((n) => (
+                        <span key={n} className="sorteio-num is-mine">
+                          {n}
+                        </span>
+                      ))}
+                    </div>
+                  </>
                 ) : null}
                 <p className="play-sub">Escaneie o QR ou copie o código Pix:</p>
                 <textarea className="sorteio-pix-code" readOnly rows={3} value={pix.qrCode || ''} />

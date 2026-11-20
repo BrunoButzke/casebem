@@ -39,3 +39,13 @@ test('finalizeRaffleSalesByIntent is safe with empty memory', async () => {
   const out = await finalizeRaffleSalesByIntent(null, '');
   assert.equal(out.updated, 0);
 });
+
+test('createRaffleCheckout early-return usa status existing (não pending)', async () => {
+  // Guarda de regressão: o check errado `intentResult.status === 'pending'`
+  // apagava holds no retry e realocava números no pagamento.
+  const src = await import('node:fs').then((fs) =>
+    fs.readFileSync(new URL('../functions/_lib/raffle-service.mjs', import.meta.url), 'utf8')
+  );
+  assert.match(src, /intentResult\.status === 'existing'/);
+  assert.doesNotMatch(src, /intentResult\.status === 'pending' && intentResult\.intent/);
+});

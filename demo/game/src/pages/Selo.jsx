@@ -88,7 +88,7 @@ function LoyaltyCard({ card, guestName, scores }) {
           <ConfettiBurst active={burst} />
           <p className="loyalty-card__complete-label">Missão completa</p>
           <p className="loyalty-card__name">{guestName}</p>
-          {copy.bannerStrong ? <p className="loyalty-card__complete-reward">{copy.bannerStrong}</p> : null}
+          <p className="loyalty-card__complete-reward">Você liberou o drink secreto, avise o garçom!</p>
         </>
       ) : (
         <>
@@ -118,13 +118,17 @@ function LoyaltyCard({ card, guestName, scores }) {
 export default function Selo() {
   const { catalog, guestName, scores } = useDemo();
   const cards = catalog.stampCards;
+  const allComplete =
+    cards.length > 0 && cards.every((card) => loyaltyCopy(card, scores).complete);
 
   return (
     <div className="play-page">
       <h1 className="play-script">Selo</h1>
-      <p className="play-sub">
-        {scores.stamps} selos · {scores.points} pts · complete o cartão e ganhe o brinde
-      </p>
+      {!allComplete ? (
+        <p className="play-sub">
+          {scores.stamps} selos · {scores.points} pts · complete o cartão e ganhe o brinde
+        </p>
+      ) : null}
       {cards.map((card) => (
         <LoyaltyCard key={card.id} card={card} guestName={guestName} scores={scores} />
       ))}

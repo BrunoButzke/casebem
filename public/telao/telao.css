@@ -277,9 +277,14 @@ body {
 
 .telao.is-draw .telao-top {
   z-index: 5;
+  top: 0.85rem;
 }
 
-/* Hidden by default — TVs antigas: block + absolute (sem flex). */
+.telao.is-draw .telao-top p {
+  font-size: 1.25rem;
+}
+
+/* Hidden by default — TVs antigas: table/table-cell (sem flex). */
 .telao-draw {
   position: absolute;
   left: 0;
@@ -299,16 +304,15 @@ body {
 }
 
 .telao-draw.is-on {
-  display: block !important;
+  display: table !important;
+  table-layout: fixed;
 }
 
 .telao-draw__inner {
-  position: absolute;
-  left: 5%;
-  right: 5%;
-  top: 50%;
-  width: 90%;
-  margin-top: -8rem;
+  display: table-cell;
+  vertical-align: middle;
+  width: 100%;
+  padding: 4.5rem 1.25rem 2rem;
   text-align: center;
 }
 
@@ -372,19 +376,25 @@ body {
 .telao-draw__reel-window {
   position: relative;
   width: 90%;
-  max-width: 420px;
-  height: 1em;
-  margin: 0.25rem auto 0;
-  font-size: 120px;
-  font-size: 26vw;
+  max-width: 480px;
+  margin: 0.35rem auto 0.15rem;
+  font-size: 96px;
+  font-size: 18vw;
+  line-height: 1;
+  overflow: visible;
+}
+
+.telao-draw--reel.is-spinning .telao-draw__reel-window {
+  height: 1.05em;
   overflow: hidden;
 }
 
 .telao-draw__number {
   margin: 0;
+  padding: 0.05em 0;
   font-size: 1em;
   font-weight: 700;
-  line-height: 0.95;
+  line-height: 1;
   color: #fff;
   text-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
 }
@@ -456,17 +466,17 @@ body {
 }
 
 .telao-draw__name {
-  margin: 1rem 0 0;
-  font-size: 36px;
-  font-size: 6vw;
+  margin: 0.85rem 0 0;
+  font-size: 32px;
+  font-size: 5vw;
   font-weight: 700;
-  line-height: 1.1;
+  line-height: 1.15;
 }
 
 .telao-draw__sub {
-  margin: 0.25rem 0 0;
-  font-size: 20px;
-  font-size: 2.8vw;
+  margin: 0.35rem 0 0;
+  font-size: 18px;
+  font-size: 2.4vw;
   color: #f9a8d4;
 }
 

@@ -1226,15 +1226,21 @@ body {
 .telao-draw__reel-window {
   position: relative;
   width: min(92vw, 22rem);
-  height: 0.95em;
   margin: 0.35rem auto 0;
-  font-size: clamp(7rem, 28vw, 14rem);
-  overflow: hidden;
+  font-size: clamp(6rem, 22vw, 12rem);
+  line-height: 1;
+  overflow: visible;
   isolation: isolate;
 }
 
-.telao-draw__reel-window::before,
-.telao-draw__reel-window::after {
+/* Máscaras só durante o giro — no ganhador ficavam como “faixas” no fundo */
+.telao-draw--reel.is-spinning .telao-draw__reel-window {
+  height: 1.05em;
+  overflow: hidden;
+}
+
+.telao-draw--reel.is-spinning .telao-draw__reel-window::before,
+.telao-draw--reel.is-spinning .telao-draw__reel-window::after {
   content: '';
   position: absolute;
   left: 0;
@@ -1244,24 +1250,26 @@ body {
   pointer-events: none;
 }
 
-.telao-draw__reel-window::before {
+.telao-draw--reel.is-spinning .telao-draw__reel-window::before {
   top: 0;
   background: linear-gradient(to bottom, color-mix(in oklch, #1a0c12 88%, transparent), transparent);
 }
 
-.telao-draw__reel-window::after {
+.telao-draw--reel.is-spinning .telao-draw__reel-window::after {
   bottom: 0;
   background: linear-gradient(to top, color-mix(in oklch, #1a0c12 88%, transparent), transparent);
 }
 
 .telao-draw__number {
   margin: 0;
+  padding: 0.04em 0;
   font-size: 1em;
   font-weight: 700;
-  line-height: 0.95;
+  line-height: 1;
   font-variant-numeric: tabular-nums;
   color: #fff;
   text-shadow: 0 16px 48px color-mix(in oklch, #000 45%, transparent);
+  background: transparent;
 }
 
 .telao-draw--reel.is-spinning .telao-draw__number {

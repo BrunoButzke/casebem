@@ -23,13 +23,17 @@ export function loyaltyCardProgress(card, scores = {}) {
 export function loyaltyCardCopy(card, scores = {}) {
   const progress = loyaltyCardProgress(card, scores);
   const reward = String(card?.rewardText || '').trim();
+  const complete = progress.filled >= progress.slots;
   return {
     ...progress,
     stamps: progress.filled,
+    complete,
     title: card?.name || '',
     bannerStrong: reward,
     bannerHint: String(card?.barHint || '').trim(),
-    footer: String(card?.footerTemplate || '').replace('{n}', String(progress.remaining)),
+    footer: complete
+      ? ''
+      : String(card?.footerTemplate || '').replace('{n}', String(progress.remaining)),
   };
 }
 

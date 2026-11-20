@@ -20,10 +20,25 @@ import { getGuestName } from './guest.js';
 const SPLASH_MS = 2600;
 const SPLASH_KEY = 'casebem_desafio_splash_done';
 
+function isPublicTelaoPath(pathname) {
+  return String(pathname || '') === '/galeria/telao';
+}
+
+/** Telão público — sem login de convidado (TV / projetor). */
+function TelaoPublic() {
+  return (
+    <div className="play is-telao">
+      <main className="play-main">
+        <Telao />
+      </main>
+    </div>
+  );
+}
+
 function useEntrySplash() {
   const { pathname } = useLocation();
   const [showSplash, setShowSplash] = useState(() => {
-    if (isGamesAdminPath(pathname)) return false;
+    if (isGamesAdminPath(pathname) || isPublicTelaoPath(pathname)) return false;
     if (getGuestName()) return false;
     try {
       return sessionStorage.getItem(SPLASH_KEY) !== '1';
@@ -45,7 +60,7 @@ function useEntrySplash() {
     return () => window.clearTimeout(t);
   }, [showSplash]);
 
-  if (isGamesAdminPath(pathname)) return false;
+  if (isGamesAdminPath(pathname) || isPublicTelaoPath(pathname)) return false;
   return showSplash;
 }
 
@@ -62,6 +77,7 @@ export default function App() {
         <Route path="galeria" element={<AdminGaleria />} />
         <Route path="sorteio" element={<AdminSorteio />} />
       </Route>
+      <Route path="/galeria/telao" element={<TelaoPublic />} />
       <Route element={<PlayShell />}>
         <Route path="/quiz" element={<Quiz />} />
         <Route path="/desafios" element={<Desafios />} />
@@ -69,7 +85,6 @@ export default function App() {
         <Route path="/ranking" element={<Ranking />} />
         <Route path="/galeria" element={<Galeria />} />
         <Route path="/sorteio" element={<Sorteio />} />
-        <Route path="/galeria/telao" element={<Telao />} />
       </Route>
       <Route path="/home" element={<Navigate to="/quiz" replace />} />
       <Route path="/missoes" element={<Navigate to="/quiz" replace />} />

@@ -83,6 +83,10 @@ import {
   finalizeRaffleSalesByIntent,
   listActiveRaffleSoldEntries,
 } from './functions/_lib/raffle-service.mjs';
+import {
+  getDrawBroadcast,
+  upsertDrawBroadcast,
+} from './functions/_lib/draw-broadcast-service.mjs';
 import { requireAdmin, mintTenantToken } from './functions/_lib/admin-auth.mjs';
 import {
   loginSuperAdmin,
@@ -301,6 +305,11 @@ function guestListApiPlugin() {
               return sendJson(res, 200, { ok: true, paid: true, finalized: fin.updated || 0 });
             }
             return sendJson(res, 400, { ok: false, error: 'MISSING_INTENT_KEY' });
+          }
+
+          if (path === '/api/desafio/raffle/draw-broadcast' && req.method === 'GET') {
+            const broadcast = await getDrawBroadcast(null);
+            return sendJson(res, 200, { ok: true, broadcast });
           }
 
           if (path === '/api/desafio/ranking' && req.method === 'GET') {
@@ -1149,6 +1158,32 @@ function adminApiPlugin(env) {
               raffle: { id: raffle.id, name: raffle.name, totalNumbers: raffle.totalNumbers },
               entries,
             });
+          }
+
+          if (path === '/api/admin/raffles/draw/broadcast') {
+            try {
+              if (req.method === 'GET') {
+                const broadcast = await getDrawBroadcast(null, wk);
+                return sendJson(res, 200, { ok: true, broadcast });
+              }
+              if (req.method === 'PUT') {
+                const body = await readJsonBody(req);
+                const broadcast = await upsertDrawBroadcast(null, body || {}, wk);
+                return sendJson(res, 200, { ok: true, broadcast });
+              }
+            } catch (err) {
+              const client =
+                err.message === 'INVALID_PHASE' ||
+                err.message === 'MISSING_WINNER' ||
+                err.message === 'MISSING_RAFFLE_ID' ||
+                err.message === 'MISSING_POOL' ||
+                err.message === 'VALIDATION';
+              return sendJson(res, client ? 400 : 500, {
+                ok: false,
+                error: err.message,
+                details: err.details,
+              });
+            }
           }
 
           if (path === '/api/admin/raffles') {

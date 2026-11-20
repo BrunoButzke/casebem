@@ -269,3 +269,182 @@ body {
 .telao:fullscreen .telao-slide img {
   border-radius: 0;
 }
+
+.telao.is-draw .telao-bars,
+.telao.is-draw .telao-stage {
+  display: none !important;
+}
+
+.telao.is-draw .telao-top {
+  z-index: 4;
+}
+
+.telao-draw {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 3;
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-align: center;
+  -ms-flex-align: center;
+  align-items: center;
+  -webkit-box-pack: center;
+  -ms-flex-pack: center;
+  justify-content: center;
+  -webkit-box-orient: vertical;
+  -webkit-box-direction: normal;
+  -ms-flex-direction: column;
+  flex-direction: column;
+  padding: 4rem 1.5rem 2rem;
+  text-align: center;
+  color: #fff;
+  background: #2a1018;
+  background: -webkit-linear-gradient(160deg, #2a1018 0%, #4a1828 45%, #1a0c12 100%);
+  background: linear-gradient(160deg, #2a1018 0%, #4a1828 45%, #1a0c12 100%);
+}
+
+.telao-draw__soon {
+  margin: 0;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 48px;
+  font-size: 8vw;
+  font-weight: 600;
+  line-height: 1.15;
+  -webkit-animation: telao-soon-float 3.2s ease-in-out infinite;
+  animation: telao-soon-float 3.2s ease-in-out infinite;
+}
+
+@-webkit-keyframes telao-soon-float {
+  0%,
+  100% {
+    -webkit-transform: translateY(0) scale(1);
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    -webkit-transform: translateY(-12px) scale(1.06);
+    transform: translateY(-12px) scale(1.06);
+  }
+}
+
+@keyframes telao-soon-float {
+  0%,
+  100% {
+    -webkit-transform: translateY(0) scale(1);
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    -webkit-transform: translateY(-12px) scale(1.06);
+    transform: translateY(-12px) scale(1.06);
+  }
+}
+
+.telao-draw__label {
+  margin: 0 0 0.5rem;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #f9a8d4;
+}
+
+.telao-draw__number {
+  margin: 0;
+  font-size: 96px;
+  font-size: 18vw;
+  font-weight: 700;
+  line-height: 1;
+  color: #fff;
+}
+
+.telao-draw--reel.is-spinning .telao-draw__number {
+  -webkit-animation: telao-draw-shake 0.14s linear infinite;
+  animation: telao-draw-shake 0.14s linear infinite;
+}
+
+@-webkit-keyframes telao-draw-shake {
+  from {
+    -webkit-transform: translateY(-2px);
+    transform: translateY(-2px);
+  }
+  to {
+    -webkit-transform: translateY(2px);
+    transform: translateY(2px);
+  }
+}
+
+@keyframes telao-draw-shake {
+  from {
+    -webkit-transform: translateY(-2px);
+    transform: translateY(-2px);
+  }
+  to {
+    -webkit-transform: translateY(2px);
+    transform: translateY(2px);
+  }
+}
+
+.telao-draw__name {
+  margin: 1.2rem 0 0;
+  font-size: 28px;
+  font-size: 4.5vw;
+  font-weight: 700;
+}
+
+.telao-draw__sub {
+  margin: 0.35rem 0 0;
+  font-size: 16px;
+  color: #f9a8d4;
+}
+
+.telao-draw__confetti {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.telao-draw__confetti-piece {
+  position: absolute;
+  left: 50%;
+  top: 45%;
+  width: 8px;
+  height: 14px;
+  margin-left: -4px;
+  background: #f472b6;
+  border-radius: 2px;
+  -webkit-animation: telao-confetti 1.35s ease-out forwards;
+  animation: telao-confetti 1.35s ease-out forwards;
+}
+
+@-webkit-keyframes telao-confetti {
+  0% {
+    opacity: 1;
+    -webkit-transform: translate(0, 0) scale(0.6);
+    transform: translate(0, 0) scale(0.6);
+  }
+  100% {
+    opacity: 0;
+    -webkit-transform: translate(var(--dx, 40px), var(--dy, -80px)) rotate(220deg);
+    transform: translate(var(--dx, 40px), var(--dy, -80px)) rotate(220deg);
+  }
+}
+
+@keyframes telao-confetti {
+  0% {
+    opacity: 1;
+    -webkit-transform: translate(0, 0) scale(0.6);
+    transform: translate(0, 0) scale(0.6);
+  }
+  100% {
+    opacity: 0;
+    -webkit-transform: translate(var(--dx, 40px), var(--dy, -80px)) rotate(220deg);
+    transform: translate(var(--dx, 40px), var(--dy, -80px)) rotate(220deg);
+  }
+}

@@ -1028,6 +1028,7 @@ body {
 }
 
 .admin-draw__reel {
+  position: relative;
   width: min(100%, 18rem);
   margin: 0.5rem auto 1rem;
   padding: 1.4rem 1rem;
@@ -1035,10 +1036,49 @@ body {
   background: color-mix(in oklch, #fff 86%, var(--rose));
   border: 1px solid color-mix(in oklch, var(--rose) 28%, #fff);
   box-shadow: 0 12px 28px color-mix(in oklch, var(--ink) 10%, transparent);
+  overflow: hidden;
 }
 
 .admin-draw__reel.is-spinning .admin-draw__number {
   animation: admin-draw-shake 0.12s linear infinite;
+}
+
+.admin-draw__confetti,
+.telao-draw__confetti {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.admin-draw__confetti-piece,
+.telao-draw__confetti-piece {
+  position: absolute;
+  left: 50%;
+  top: 45%;
+  width: 8px;
+  height: 14px;
+  border-radius: 2px;
+  transform: translate(-50%, -50%);
+  animation: admin-draw-confetti 1.35s cubic-bezier(0.16, 0.84, 0.32, 1) forwards;
+}
+
+.admin-draw__confetti-piece.is-round,
+.telao-draw__confetti-piece.is-round {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+}
+
+@keyframes admin-draw-confetti {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(0.6) rotate(0deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1) rotate(var(--rot));
+  }
 }
 
 .admin-draw__reel.is-done {
@@ -1116,6 +1156,87 @@ body {
     opacity: 1;
     transform: translateY(0) scale(1);
   }
+}
+
+.telao.is-draw .telao-top {
+  z-index: 4;
+}
+
+.telao-draw {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  padding: 4rem 1.5rem 2rem;
+  background:
+    radial-gradient(ellipse at 50% 30%, color-mix(in oklch, var(--rose, #ec4899) 35%, transparent), transparent 55%),
+    linear-gradient(160deg, #2a1018 0%, #4a1828 45%, #1a0c12 100%);
+  color: #fff;
+  text-align: center;
+}
+
+.telao-draw--soon .telao-draw__soon {
+  margin: 0;
+  font-family: var(--font-display, Georgia, 'Times New Roman', serif);
+  font-size: clamp(2.4rem, 8vw, 5.5rem);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1.15;
+  animation: telao-soon-float 3.2s ease-in-out infinite;
+}
+
+@keyframes telao-soon-float {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-12px) scale(1.06);
+  }
+}
+
+.telao-draw--reel {
+  position: absolute;
+}
+
+.telao-draw__label {
+  margin: 0 0 0.5rem;
+  font-size: clamp(0.85rem, 2vw, 1.1rem);
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: color-mix(in oklch, #fff 70%, #f9a8d4);
+}
+
+.telao-draw__number {
+  margin: 0;
+  font-size: clamp(5rem, 22vw, 11rem);
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+  text-shadow: 0 12px 40px color-mix(in oklch, #000 40%, transparent);
+}
+
+.telao-draw--reel:not(.is-winner) .telao-draw__number {
+  animation: admin-draw-shake 0.14s linear infinite;
+}
+
+.telao-draw__name {
+  margin: 1.2rem 0 0;
+  font-size: clamp(1.6rem, 5vw, 3rem);
+  font-weight: 700;
+}
+
+.telao-draw__sub {
+  margin: 0.35rem 0 0;
+  font-size: clamp(1rem, 2.5vw, 1.35rem);
+  color: color-mix(in oklch, #fff 75%, #f9a8d4);
+}
+
+.telao-draw__confetti {
+  inset: -10%;
 }
 
 .gallery-card__delete {

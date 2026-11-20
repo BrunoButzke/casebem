@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { galleryImageUrl, listGallery, prefetchGalleryImage } from '../gallery-api.js';
+import { getGuestName } from '../guest.js';
 import { mergePlaylist, nextId } from '../telao-queue.js';
 
 const STORY_MS = 7000;
@@ -151,6 +152,13 @@ export default function Telao() {
     };
   }, []);
 
+  function leaveTelao() {
+    if (fullscreenEl()) void leaveFullscreen().catch(() => {});
+    setCinemaMode(false);
+    // Sem convidado (TV/projetor) permanece no telão público; com sessão volta à galeria.
+    if (getGuestName()) navigate('/galeria');
+  }
+
   useEffect(() => {
     function onKey(e) {
       if (e.key === 'Escape') {
@@ -158,7 +166,7 @@ export default function Telao() {
           toggleCinema();
           return;
         }
-        navigate('/galeria');
+        leaveTelao();
       }
       if (e.key === 'ArrowRight') setCurrent(nextId(playlistRef.current, currentIdRef.current));
       if (e.key === 'ArrowLeft') setCurrent(prevId(playlistRef.current, currentIdRef.current));
@@ -185,16 +193,11 @@ export default function Telao() {
           <button type="button" onClick={toggleCinema}>
             {cinema ? 'Sair da tela' : 'Tela cheia'}
           </button>
-          <button
-            type="button"
-            onClick={() => {
-              if (fullscreenEl()) void leaveFullscreen();
-              setCinemaMode(false);
-              navigate('/galeria');
-            }}
-          >
-            Sair
-          </button>
+          {getGuestName() ? (
+            <button type="button" onClick={leaveTelao}>
+              Sair
+            </button>
+          ) : null}
         </div>
       </header>
       <div className="telao-stage">

@@ -22,6 +22,20 @@ test('loyalty card copy matches admin preview layout', () => {
   assert.equal(copy.footer, 'Faltam 4 pontos para o próximo drink 🍸');
   assert.equal(copy.slots, 5);
   assert.equal(copy.stamps, 1);
+  assert.equal(copy.complete, false);
+});
+
+test('loyalty card completo quando selos enchem os slots', () => {
+  const card = {
+    name: 'Drink',
+    stampsRequired: 3,
+    rewardText: 'Brinde',
+    footerTemplate: 'Faltam {n}',
+  };
+  assert.equal(loyaltyCardCopy(card, { stamps: 2 }).complete, false);
+  const done = loyaltyCardCopy(card, { stamps: 3 });
+  assert.equal(done.complete, true);
+  assert.equal(done.footer, '');
 });
 
 test('points card fills one bolinha per pointsPerSlot and {n} is points to finish', () => {
@@ -39,7 +53,8 @@ test('points card fills one bolinha per pointsPerSlot and {n} is points to finis
   assert.equal(copy.footer, 'Faltam 30 pontos para o próximo drink 🍸');
   assert.equal(loyaltyCardCopy(card, { points: 25 }).stamps, 2);
   assert.equal(loyaltyCardCopy(card, { points: 40 }).stamps, 4);
-  assert.equal(loyaltyCardCopy(card, { points: 40 }).footer, 'Faltam 0 pontos para o próximo drink 🍸');
+  assert.equal(loyaltyCardCopy(card, { points: 40 }).complete, true);
+  assert.equal(loyaltyCardCopy(card, { points: 40 }).footer, '');
 });
 
 test('loyalty card copy uses remaining stamps in footer, not bar hint as footer', () => {

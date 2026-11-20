@@ -1,0 +1,212 @@
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  background: #1a1214;
+  color: #f7ece8;
+  font-family: Georgia, 'Times New Roman', serif;
+  overflow: hidden;
+}
+
+.telao {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 100vh;
+  background: #1a1214;
+  display: -webkit-box;
+  display: -webkit-flex;
+  display: flex;
+  -webkit-box-orient: vertical;
+  -webkit-flex-direction: column;
+  flex-direction: column;
+}
+
+.telao-bars {
+  position: absolute;
+  top: 0.55rem;
+  left: 0.75rem;
+  right: 0.75rem;
+  z-index: 3;
+  display: -webkit-box;
+  display: -webkit-flex;
+  display: flex;
+  gap: 0.3rem;
+}
+
+.telao-bar {
+  -webkit-box-flex: 1;
+  -webkit-flex: 1;
+  flex: 1;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.22);
+  overflow: hidden;
+}
+
+.telao-bar i {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: #fff;
+}
+
+.telao-bar.is-done i {
+  width: 100%;
+}
+
+.telao-bar.is-active i {
+  -webkit-animation: telao-bar linear forwards;
+  animation: telao-bar linear forwards;
+}
+
+@-webkit-keyframes telao-bar {
+  from {
+    width: 0;
+  }
+  to {
+    width: 100%;
+  }
+}
+
+@keyframes telao-bar {
+  from {
+    width: 0;
+  }
+  to {
+    width: 100%;
+  }
+}
+
+.telao-top {
+  position: relative;
+  z-index: 2;
+  display: -webkit-box;
+  display: -webkit-flex;
+  display: flex;
+  -webkit-box-pack: justify;
+  -webkit-justify-content: space-between;
+  justify-content: space-between;
+  -webkit-box-align: center;
+  -webkit-align-items: center;
+  align-items: center;
+  padding: 1.35rem 1rem 0.5rem;
+  pointer-events: none;
+}
+
+.telao-top p {
+  margin: 0;
+  font-size: 1.05rem;
+  letter-spacing: 0.04em;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.55);
+}
+
+.telao-top__actions {
+  pointer-events: auto;
+}
+
+.telao-top__actions button {
+  appearance: none;
+  -webkit-appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(0, 0, 0, 0.35);
+  color: #fff;
+  border-radius: 999px;
+  padding: 0.45rem 0.9rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.telao-stage {
+  position: relative;
+  -webkit-box-flex: 1;
+  -webkit-flex: 1;
+  flex: 1;
+  min-height: 0;
+}
+
+.telao-slide {
+  margin: 0;
+  position: absolute;
+  inset: 0;
+  display: -webkit-box;
+  display: -webkit-flex;
+  display: flex;
+  -webkit-box-orient: vertical;
+  -webkit-flex-direction: column;
+  flex-direction: column;
+  -webkit-box-align: center;
+  -webkit-align-items: center;
+  align-items: center;
+  -webkit-box-pack: center;
+  -webkit-justify-content: center;
+  justify-content: center;
+}
+
+.telao-slide img {
+  max-width: 92%;
+  max-height: 72vh;
+  object-fit: contain;
+  border-radius: 0.5rem;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+}
+
+.telao-slide figcaption {
+  margin-top: 0.85rem;
+  text-align: center;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
+}
+
+.telao-slide figcaption strong {
+  display: block;
+  font-size: 1.15rem;
+}
+
+.telao-slide figcaption span {
+  display: block;
+  margin-top: 0.2rem;
+  opacity: 0.85;
+  font-size: 0.95rem;
+}
+
+.telao-empty {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  -webkit-transform: translate(-50%, -50%);
+  transform: translate(-50%, -50%);
+  margin: 0;
+  opacity: 0.8;
+  font-size: 1.1rem;
+  text-align: center;
+  width: 80%;
+}
+
+.telao-hit {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 28%;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  z-index: 1;
+}
+
+.telao-hit--left {
+  left: 0;
+}
+
+.telao-hit--right {
+  right: 0;
+}
+
+.telao.is-cinema .telao-top p {
+  opacity: 0;
+}
+
+.telao.is-cinema .telao-slide img {
+  max-height: 86vh;
+}

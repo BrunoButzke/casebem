@@ -62,13 +62,10 @@ test('nested /demo/game routes rewrite to the demo SPA directory', () => {
   assert.deepEqual(resolvePagesRoute('casebem.com', '/demo/game/'), { action: 'next' });
 });
 
-test('telão indexável em /telao não vira tenant e reescreve nested paths', () => {
+test('telão indexável em /telao é estático e não vira tenant', () => {
   assert.deepEqual(resolvePagesRoute('casebem.com', '/telao'), { action: 'next' });
   assert.deepEqual(resolvePagesRoute('casebem.com', '/telao/'), { action: 'next' });
-  assert.deepEqual(resolvePagesRoute('casebem.com', '/telao/qualquer'), {
-    action: 'rewrite',
-    assetPath: '/telao/',
-  });
+  assert.deepEqual(resolvePagesRoute('casebem.com', '/telao/index.html'), { action: 'next' });
 });
 
 test('existing /games on casebem.com is served as a static file', () => {

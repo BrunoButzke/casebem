@@ -113,6 +113,15 @@
     barsEl.innerHTML = html;
   }
 
+  function markOrientation(img) {
+    if (!img) return;
+    var w = img.naturalWidth || 0;
+    var h = img.naturalHeight || 0;
+    var ready = w > 0 && h > 0;
+    var portrait = ready && h > w;
+    img.className = portrait ? 'is-portrait' : ready ? 'is-landscape' : '';
+  }
+
   function showPhoto(photo) {
     if (!photo) {
       slideEl.style.display = 'none';
@@ -121,10 +130,14 @@
     }
     emptyEl.style.display = 'none';
     slideEl.style.display = 'block';
+    imgEl.onload = function () {
+      markOrientation(imgEl);
+    };
     imgEl.src = photo.preview || imageUrl(photo.id);
     imgEl.alt = photo.title || '';
     titleEl.textContent = photo.title || '';
     guestEl.textContent = photo.guestName || '';
+    if (imgEl.complete) markOrientation(imgEl);
   }
 
   function setCurrent(id) {
@@ -149,6 +162,13 @@
     scheduleNext();
   }
 
+  function refreshCaption() {
+    var photo = meta[currentId];
+    if (!photo) return;
+    titleEl.textContent = photo.title || '';
+    guestEl.textContent = photo.guestName || '';
+  }
+
   function applyLive(photos) {
     var ids = [];
     var i;
@@ -165,11 +185,13 @@
       setCurrent('');
       return;
     }
+    // Não chamar setCurrent no poll se a foto atual segue válida —
+    // senão o timer de 7s é resetado a cada 5s e a história nunca avança.
     if (!currentId || playlist.indexOf(currentId) < 0) {
       setCurrent(playlist[0]);
-    } else {
-      setCurrent(currentId);
+      return;
     }
+    refreshCaption();
   }
 
   function parseJson(text) {

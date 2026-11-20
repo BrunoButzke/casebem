@@ -5,9 +5,14 @@ import { getGuestName } from '../guest.js';
 import { mergePlaylist, nextId } from '../telao-queue.js';
 import { fetchDrawBroadcast } from '../draw-broadcast-api.js';
 import { reelDisplayAt, tickIntervalMs } from '../draw-reel.mjs';
+import { fetchRanking } from '../ranking-api.js';
+import { sortRankingRows } from '../ranking-board.mjs';
 
 const STORY_MS = 7000;
 const POLL_MS = 2000;
+const RANK_EVERY_MS = 5 * 60 * 1000;
+const RANK_SHOW_MS = 12 * 1000;
+const RANK_TOP = 8;
 const CONFETTI_COLORS = ['#ffffff', '#ffe4ec', '#ffb7c5', '#f472b6', '#ec4899', '#db2777', '#fdf2f8'];
 
 function prevId(playlist, currentId) {
@@ -90,14 +95,20 @@ export default function Telao({ standalone = false } = {}) {
   const [broadcast, setBroadcast] = useState({ phase: 'gallery' });
   const [reelNumber, setReelNumber] = useState('—');
   const [confetti, setConfetti] = useState(false);
+  const [rankBreak, setRankBreak] = useState(false);
+  const [rankRows, setRankRows] = useState([]);
   const playlistRef = useRef([]);
   const currentIdRef = useRef('');
   const metaRef = useRef({});
   const confettiKeyRef = useRef('');
   const reelTimerRef = useRef(null);
+  const rankHideRef = useRef(null);
+  const drawActiveRef = useRef(false);
 
   const phase = broadcast?.phase || 'gallery';
   const drawActive = phase === 'soon' || phase === 'spinning' || phase === 'winner';
+  drawActiveRef.current = drawActive;
+  const galleryPaused = drawActive || rankBreak;
 
   function setCinemaMode(on) {
     cinemaRef.current = on;
@@ -165,12 +176,51 @@ export default function Telao({ standalone = false } = {}) {
   }, [currentId]);
 
   useEffect(() => {
-    if (drawActive || !currentId) return undefined;
+    if (galleryPaused || !currentId) return undefined;
     const t = window.setTimeout(() => {
       setCurrent(nextId(playlistRef.current, currentIdRef.current));
     }, STORY_MS);
     return () => window.clearTimeout(t);
-  }, [currentId, tick, drawActive]);
+  }, [currentId, tick, galleryPaused]);
+
+  useEffect(() => {
+    if (drawActive) {
+      if (rankHideRef.current) {
+        window.clearTimeout(rankHideRef.current);
+        rankHideRef.current = null;
+      }
+      setRankBreak(false);
+    }
+  }, [drawActive]);
+
+  useEffect(() => {
+    async function showRankBreak() {
+      if (drawActiveRef.current) return;
+      try {
+        const rows = sortRankingRows(await fetchRanking()).slice(0, RANK_TOP);
+        setRankRows(rows);
+      } catch {
+        setRankRows([]);
+      }
+      if (drawActiveRef.current) return;
+      setRankBreak(true);
+      if (rankHideRef.current) window.clearTimeout(rankHideRef.current);
+      rankHideRef.current = window.setTimeout(() => {
+        setRankBreak(false);
+        rankHideRef.current = null;
+        setTick((n) => n + 1);
+      }, RANK_SHOW_MS);
+    }
+
+    const interval = window.setInterval(() => {
+      void showRankBreak();
+    }, RANK_EVERY_MS);
+
+    return () => {
+      window.clearInterval(interval);
+      if (rankHideRef.current) window.clearTimeout(rankHideRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (reelTimerRef.current) {
@@ -267,20 +317,23 @@ export default function Telao({ standalone = false } = {}) {
         }
         leaveTelao();
       }
-      if (drawActive) return;
+      if (drawActive || rankBreak) return;
       if (e.key === 'ArrowRight') setCurrent(nextId(playlistRef.current, currentIdRef.current));
       if (e.key === 'ArrowLeft') setCurrent(prevId(playlistRef.current, currentIdRef.current));
       if (e.key === 'f' || e.key === 'F') toggleCinema();
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [navigate, drawActive]);
+  }, [navigate, drawActive, rankBreak]);
 
   const currentIndex = Math.max(0, playlist.indexOf(currentId));
 
   return (
-    <div ref={rootRef} className={`telao${cinema ? ' is-cinema' : ''}${drawActive ? ' is-draw' : ''}`}>
-      {!drawActive ? (
+    <div
+      ref={rootRef}
+      className={`telao${cinema ? ' is-cinema' : ''}${drawActive ? ' is-draw' : ''}${rankBreak && !drawActive ? ' is-rank' : ''}`}
+    >
+      {!galleryPaused ? (
         <div className="telao-bars" aria-hidden="true">
           {playlist.map((id, i) => (
             <span key={id} className={`telao-bar${i < currentIndex ? ' is-done' : i === currentIndex ? ' is-active' : ''}`}>
@@ -332,7 +385,30 @@ export default function Telao({ standalone = false } = {}) {
         </div>
       ) : null}
 
-      {!drawActive ? (
+      {rankBreak && !drawActive ? (
+        <div className="telao-rank" role="status">
+          <p className="telao-rank__eyebrow">Placar ao vivo</p>
+          <h2 className="telao-rank__title">Ranking</h2>
+          {rankRows.length ? (
+            <ol className="telao-rank__list">
+              {rankRows.map((row, i) => (
+                <li key={`${row.guestName}-${i}`} className="telao-rank__row">
+                  <span className="telao-rank__pos">{i + 1}</span>
+                  <span className="telao-rank__name">{row.guestName}</span>
+                  <span className="telao-rank__pts">
+                    {row.points} pts
+                    {row.stamps ? ` · ${row.stamps} selos` : ''}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p className="telao-rank__empty">Ainda sem pontuação — joguem nos desafios!</p>
+          )}
+        </div>
+      ) : null}
+
+      {!galleryPaused ? (
         <div className="telao-stage">
           {photo?.preview ? (
             <figure className="telao-slide">
@@ -350,7 +426,19 @@ export default function Telao({ standalone = false } = {}) {
               </figcaption>
             </figure>
           ) : (
-            <p className="telao-empty">Aguardando fotos da festa…</p>
+            <div className="telao-empty telao-empty--qr">
+              <img
+                className="telao-empty__qr"
+                src="/telao/qr-games.png"
+                alt="QR code para abrir o games"
+                width={280}
+                height={280}
+              />
+              <p className="telao-empty__title">Entre no desafio</p>
+              <p className="telao-empty__sub">
+                Escaneie e abra <strong>casebem.com/games</strong> para jogar e enviar fotos
+              </p>
+            </div>
           )}
           <button type="button" className="telao-hit telao-hit--left" aria-label="Anterior" onClick={() => setCurrent(prevId(playlist, currentId))} />
           <button type="button" className="telao-hit telao-hit--right" aria-label="Próxima" onClick={() => setCurrent(nextId(playlist, currentId))} />

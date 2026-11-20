@@ -305,15 +305,20 @@ export default function Telao({ standalone = false } = {}) {
 
       {phase === 'soon' ? (
         <div className="telao-draw telao-draw--soon" role="status">
+          <p className="telao-draw__eyebrow">Dani &amp; Carine</p>
           <p className="telao-draw__soon">Sorteio em breve</p>
         </div>
       ) : null}
 
       {phase === 'spinning' || phase === 'winner' ? (
-        <div className={`telao-draw telao-draw--reel${phase === 'winner' ? ' is-winner' : ''}`} role="status">
+        <div className={`telao-draw telao-draw--reel${phase === 'winner' ? ' is-winner' : ' is-spinning'}`} role="status">
           <DrawConfetti active={confetti && phase === 'winner'} />
           <p className="telao-draw__label">{phase === 'winner' ? 'Ganhador' : 'Sorteando'}</p>
-          <p className="telao-draw__number">{reelNumber}</p>
+          <div className="telao-draw__reel-window" aria-hidden={phase !== 'winner'}>
+            <p key={`${phase}-${reelNumber}`} className="telao-draw__number">
+              {reelNumber}
+            </p>
+          </div>
           {phase === 'winner' ? (
             <>
               <p className="telao-draw__name">
@@ -321,7 +326,9 @@ export default function Telao({ standalone = false } = {}) {
               </p>
               <p className="telao-draw__sub">Número {broadcast.winnerNumber}</p>
             </>
-          ) : null}
+          ) : (
+            <p className="telao-draw__hint">A roleta está girando…</p>
+          )}
         </div>
       ) : null}
 

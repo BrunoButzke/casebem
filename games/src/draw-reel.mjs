@@ -15,12 +15,13 @@ export function easeOutCubic(t) {
 }
 
 /**
- * Intervalo entre ticks (ms) — começa rápido e desacelera.
+ * Intervalo entre ticks (ms) — roleta rápida no início, desacelera no fim.
  * @param {number} progress 0..1
  */
 export function tickIntervalMs(progress) {
   const p = Math.min(1, Math.max(0, Number(progress) || 0));
-  return Math.round(45 + easeOutCubic(p) * 220);
+  // ~18ms no começo → ~160ms no final (mais “roleta” que piscada lenta)
+  return Math.round(18 + easeOutCubic(p) * 142);
 }
 
 /**

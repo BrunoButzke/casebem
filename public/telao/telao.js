@@ -6,7 +6,7 @@
   'use strict';
 
   var STORY_MS = 7000;
-  var POLL_MS = 2000;
+  var POLL_MS = 1500;
   var DEFAULT_DURATION_MS = 8000;
 
   var playlist = [];
@@ -36,7 +36,9 @@
   var drawNumberEl = document.getElementById('draw-number');
   var drawNameEl = document.getElementById('draw-name');
   var drawSubEl = document.getElementById('draw-sub');
+  var drawHintEl = document.getElementById('draw-hint');
   var drawConfettiEl = document.getElementById('draw-confetti');
+  var lastReelNumber = '';
 
   function pad2(n) {
     var s = String(n);
@@ -52,7 +54,29 @@
     var cls = 'telao';
     if (cinema) cls += ' is-cinema';
     if (drawActive()) cls += ' is-draw';
-    app.className = cls;
+    if (app) app.className = cls;
+  }
+
+  function setOn(el, on) {
+    var cls;
+    if (!el) return;
+    cls = String(el.className || '');
+    if (on) {
+      if ((' ' + cls + ' ').indexOf(' is-on ') < 0) el.className = cls + ' is-on';
+    } else {
+      el.className = cls.replace(/\bis-on\b/g, '').replace(/\s+/g, ' ').replace(/^\s+|\s+$/g, '');
+    }
+  }
+
+  function setHidden(el, hidden) {
+    var cls;
+    if (!el) return;
+    cls = String(el.className || '');
+    if (hidden) {
+      if ((' ' + cls + ' ').indexOf(' is-hidden ') < 0) el.className = cls + ' is-hidden';
+    } else {
+      el.className = cls.replace(/\bis-hidden\b/g, '').replace(/\s+/g, ' ').replace(/^\s+|\s+$/g, '');
+    }
   }
 
   function clearReelTimer() {
@@ -69,7 +93,24 @@
   }
 
   function tickIntervalMs(progress) {
-    return Math.round(45 + easeOutCubic(progress) * 220);
+    return Math.round(18 + easeOutCubic(progress) * 142);
+  }
+
+  function setReelNumber(text, spinning) {
+    if (!drawNumberEl) return;
+    drawNumberEl.textContent = text;
+    if (!spinning) {
+      drawNumberEl.className = 'telao-draw__number';
+      lastReelNumber = text;
+      return;
+    }
+    if (text === lastReelNumber) return;
+    lastReelNumber = text;
+    drawNumberEl.className = 'telao-draw__number';
+    try {
+      drawNumberEl.offsetWidth;
+    } catch (e) {}
+    drawNumberEl.className = 'telao-draw__number is-tick';
   }
 
   function reelDisplayAt(nowMs) {
@@ -77,22 +118,29 @@
     var winnerNumber = Math.floor(Number(broadcast && broadcast.winnerNumber));
     var durationMs = Math.max(1000, Number(broadcast && broadcast.durationMs) || DEFAULT_DURATION_MS);
     var started = Date.parse((broadcast && broadcast.startedAt) || '');
+    var elapsed;
+    var progress;
+    var interval;
+    var slot;
+    var idx;
+    var sample;
+    var num;
     if (!(winnerNumber >= 1)) {
       return { displayNumber: '—', done: false, progress: 0 };
     }
     if (!isFinite(started)) {
       return { displayNumber: pad2(winnerNumber), done: true, progress: 1 };
     }
-    var elapsed = Math.max(0, nowMs - started);
-    var progress = Math.min(1, elapsed / durationMs);
+    elapsed = Math.max(0, nowMs - started);
+    progress = Math.min(1, elapsed / durationMs);
     if (progress >= 1 || !pool.length) {
       return { displayNumber: pad2(winnerNumber), done: true, progress: 1 };
     }
-    var interval = tickIntervalMs(progress);
-    var slot = Math.floor(elapsed / interval);
-    var idx = Math.abs((slot * 2654435761) ^ (winnerNumber * 97)) % pool.length;
-    var sample = pool[idx];
-    var num = sample && sample.number ? Number(sample.number) : winnerNumber;
+    interval = tickIntervalMs(progress);
+    slot = Math.floor(elapsed / interval);
+    idx = Math.abs(slot * 17 + winnerNumber * 13) % pool.length;
+    sample = pool[idx];
+    num = sample && sample.number ? Number(sample.number) : winnerNumber;
     return { displayNumber: pad2(num), done: false, progress: progress };
   }
 
@@ -100,29 +148,29 @@
     var i;
     var html;
     var colors;
-    var angle;
-    var dist;
-    var dx;
-    var dy;
+    var left;
+    var top;
+    var delay;
     if (!drawConfettiEl) return;
     if (key && confettiKey === key) return;
     if (key) confettiKey = key;
     colors = ['#ffffff', '#ffe4ec', '#ffb7c5', '#f472b6', '#ec4899', '#db2777'];
     html = '';
-    for (i = 0; i < 40; i++) {
-      angle = ((Math.PI * 2 * i) / 40) + (i % 3) * 0.12;
-      dist = 100 + (i % 6) * 36;
-      dx = Math.cos(angle) * dist;
-      dy = Math.sin(angle) * dist - 50;
+    for (i = 0; i < 36; i++) {
+      left = 20 + ((i * 17) % 60);
+      top = 30 + ((i * 11) % 40);
+      delay = ((i % 10) * 0.02).toFixed(2);
       html +=
-        '<span class="telao-draw__confetti-piece" style="background:' +
+        '<span class="telao-draw__confetti-piece" style="left:' +
+        left +
+        '%;top:' +
+        top +
+        '%;background:' +
         colors[i % colors.length] +
-        ';--dx:' +
-        dx +
-        'px;--dy:' +
-        dy +
-        'px;animation-delay:' +
-        (i % 10) * 0.02 +
+        ';-webkit-animation-delay:' +
+        delay +
+        's;animation-delay:' +
+        delay +
         's"></span>';
     }
     drawConfettiEl.innerHTML = html;
@@ -131,78 +179,80 @@
   function renderDraw() {
     var phase = (broadcast && broadcast.phase) || 'gallery';
     var snap;
-    syncAppClass();
-    if (barsEl) barsEl.style.display = drawActive() ? 'none' : '';
-    if (stageEl) stageEl.style.display = drawActive() ? 'none' : '';
-    if (drawSoonEl) drawSoonEl.style.display = phase === 'soon' ? '' : 'none';
-    if (drawReelEl) drawReelEl.style.display = phase === 'spinning' || phase === 'winner' ? '' : 'none';
+    try {
+      syncAppClass();
+      setOn(drawSoonEl, phase === 'soon');
+      setOn(drawReelEl, phase === 'spinning' || phase === 'winner');
 
-    if (phase === 'soon') {
-      clearReelTimer();
-      clearStoryTimer();
-      if (drawConfettiEl) drawConfettiEl.innerHTML = '';
-      return;
-    }
+      if (phase === 'soon') {
+        clearReelTimer();
+        clearStoryTimer();
+        if (drawConfettiEl) drawConfettiEl.innerHTML = '';
+        return;
+      }
 
-    if (phase === 'winner') {
-      clearReelTimer();
-      clearStoryTimer();
-      if (drawReelEl) {
-        drawReelEl.className = 'telao-draw telao-draw--reel is-winner';
-      }
-      if (drawLabelEl) drawLabelEl.textContent = 'Ganhador';
-      if (drawNumberEl) {
-        drawNumberEl.textContent = pad2(broadcast.winnerNumber || 0);
-      }
-      if (drawNameEl) {
-        drawNameEl.style.display = '';
-        drawNameEl.textContent = broadcast.winnerName || 'Sem comprador';
-      }
-      if (drawSubEl) {
-        drawSubEl.style.display = '';
-        drawSubEl.textContent = 'Número ' + (broadcast.winnerNumber || '');
-      }
-      burstConfetti(String(broadcast.startedAt || broadcast.winnerNumber || ''));
-      return;
-    }
-
-    if (phase === 'spinning') {
-      clearStoryTimer();
-      if (drawReelEl) drawReelEl.className = 'telao-draw telao-draw--reel is-spinning';
-      if (drawLabelEl) drawLabelEl.textContent = 'Sorteando';
-      if (drawNameEl) drawNameEl.style.display = 'none';
-      if (drawSubEl) drawSubEl.style.display = 'none';
-      if (drawConfettiEl) drawConfettiEl.innerHTML = '';
-
-      function tickReel() {
-        snap = reelDisplayAt(Date.now());
-        if (drawNumberEl) drawNumberEl.textContent = snap.displayNumber;
-        if (snap.done) {
-          clearReelTimer();
-          if (drawReelEl) drawReelEl.className = 'telao-draw telao-draw--reel is-winner';
-          if (drawLabelEl) drawLabelEl.textContent = 'Ganhador';
-          if (drawNameEl) {
-            drawNameEl.style.display = '';
-            drawNameEl.textContent = broadcast.winnerName || 'Sem comprador';
-          }
-          if (drawSubEl) {
-            drawSubEl.style.display = '';
-            drawSubEl.textContent = 'Número ' + (broadcast.winnerNumber || '');
-          }
-          burstConfetti(String(broadcast.startedAt || broadcast.winnerNumber || ''));
-          return;
+      if (phase === 'winner') {
+        clearReelTimer();
+        clearStoryTimer();
+        if (drawReelEl) drawReelEl.className = 'telao-draw telao-draw--reel is-winner is-on';
+        if (drawLabelEl) drawLabelEl.textContent = 'Ganhador';
+        setReelNumber(pad2(broadcast.winnerNumber || 0), false);
+        setHidden(drawHintEl, true);
+        if (drawNameEl) {
+          setHidden(drawNameEl, false);
+          drawNameEl.textContent = broadcast.winnerName || 'Sem comprador';
         }
-        reelTimer = setTimeout(tickReel, tickIntervalMs(snap.progress));
+        if (drawSubEl) {
+          setHidden(drawSubEl, false);
+          drawSubEl.textContent = 'Número ' + (broadcast.winnerNumber || '');
+        }
+        burstConfetti(String(broadcast.startedAt || broadcast.winnerNumber || ''));
+        return;
       }
-      clearReelTimer();
-      tickReel();
-      return;
-    }
 
-    clearReelTimer();
-    if (drawConfettiEl) drawConfettiEl.innerHTML = '';
-    confettiKey = '';
-    scheduleNext();
+      if (phase === 'spinning') {
+        clearStoryTimer();
+        if (drawReelEl) drawReelEl.className = 'telao-draw telao-draw--reel is-spinning is-on';
+        if (drawLabelEl) drawLabelEl.textContent = 'Sorteando';
+        setHidden(drawHintEl, false);
+        setHidden(drawNameEl, true);
+        setHidden(drawSubEl, true);
+        if (drawConfettiEl) drawConfettiEl.innerHTML = '';
+
+        function tickReel() {
+          snap = reelDisplayAt(new Date().getTime());
+          setReelNumber(snap.displayNumber, true);
+          if (snap.done) {
+            clearReelTimer();
+            if (drawReelEl) drawReelEl.className = 'telao-draw telao-draw--reel is-winner is-on';
+            if (drawLabelEl) drawLabelEl.textContent = 'Ganhador';
+            setReelNumber(snap.displayNumber, false);
+            setHidden(drawHintEl, true);
+            if (drawNameEl) {
+              setHidden(drawNameEl, false);
+              drawNameEl.textContent = broadcast.winnerName || 'Sem comprador';
+            }
+            if (drawSubEl) {
+              setHidden(drawSubEl, false);
+              drawSubEl.textContent = 'Número ' + (broadcast.winnerNumber || '');
+            }
+            burstConfetti(String(broadcast.startedAt || broadcast.winnerNumber || ''));
+            return;
+          }
+          reelTimer = setTimeout(tickReel, tickIntervalMs(snap.progress));
+        }
+        clearReelTimer();
+        tickReel();
+        return;
+      }
+
+      clearReelTimer();
+      if (drawConfettiEl) drawConfettiEl.innerHTML = '';
+      confettiKey = '';
+      scheduleNext();
+    } catch (err) {
+      /* keep gallery alive if draw UI fails on old TV */
+    }
   }
 
   function imageUrl(id) {
@@ -404,24 +454,38 @@
     xhr.send(null);
   }
 
+  function applyBroadcast(next) {
+    var prevPhase = broadcast && broadcast.phase;
+    var prevStarted = broadcast && broadcast.startedAt;
+    var prevWinner = broadcast && broadcast.winnerNumber;
+    var prevUpdated = broadcast && broadcast.updatedAt;
+    if (!next || typeof next !== 'object') next = { phase: 'gallery' };
+    if (!next.phase) next.phase = 'gallery';
+    if (
+      next.phase === prevPhase &&
+      next.startedAt === prevStarted &&
+      next.winnerNumber === prevWinner &&
+      next.updatedAt === prevUpdated
+    ) {
+      return;
+    }
+    broadcast = next;
+    renderDraw();
+  }
+
   function poll() {
     fetchJson('/api/desafio/gallery', function (err, data) {
-      if (!err && data && data.photos) applyLive(data.photos);
+      if (!err && data && data.photos) {
+        try {
+          applyLive(data.photos);
+        } catch (e) {}
+      }
     });
     fetchJson('/api/desafio/raffle/draw-broadcast', function (err, data) {
-      var next;
       if (err || !data) return;
-      next = data.broadcast || { phase: 'gallery' };
-      if (
-        next.phase === broadcast.phase &&
-        next.startedAt === broadcast.startedAt &&
-        next.winnerNumber === broadcast.winnerNumber &&
-        next.updatedAt === broadcast.updatedAt
-      ) {
-        return;
-      }
-      broadcast = next;
-      renderDraw();
+      try {
+        applyBroadcast(data.broadcast || { phase: 'gallery' });
+      } catch (e) {}
     });
   }
 

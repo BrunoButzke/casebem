@@ -20,7 +20,7 @@
     <meta property="og:url" content="https://casebem.com/telao/" />
     <meta property="og:type" content="website" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="stylesheet" href="/telao/telao.css?v=20261120e" />
+    <link rel="stylesheet" href="/telao/telao.css?v=20261120f" />
   </head>
   <body>
     <div id="app" class="telao">
@@ -66,7 +66,17 @@
             <span id="slide-guest"></span>
           </figcaption>
         </figure>
-        <p id="empty" class="telao-empty">Aguardando fotos da festa…</p>
+        <div id="empty" class="telao-empty telao-empty--qr">
+          <img
+            class="telao-empty__qr"
+            src="/telao/qr-games.png"
+            alt="QR code para abrir o games"
+            width="280"
+            height="280"
+          />
+          <p class="telao-empty__title">Entre no desafio</p>
+          <p class="telao-empty__sub">Escaneie e abra <strong>casebem.com/games</strong> para jogar e enviar fotos</p>
+        </div>
         <button type="button" class="telao-hit telao-hit--left" id="btn-prev" aria-label="Anterior"></button>
         <button type="button" class="telao-hit telao-hit--right" id="btn-next" aria-label="Próxima"></button>
       </div>
@@ -76,6 +86,6 @@
         Ative JavaScript para ver o telão ao vivo de Dani e Carine.
       </p>
     </noscript>
-    <script src="/telao/telao.js?v=20261120e"></script>
+    <script src="/telao/telao.js?v=20261120f"></script>
   </body>
 </html>

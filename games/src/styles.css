@@ -1921,6 +1921,47 @@ body {
   font-size: 2.2rem;
 }
 
+.telao-empty--qr {
+  align-content: center;
+  justify-items: center;
+  gap: 0.85rem;
+  padding: 4.5rem 1.5rem 2rem;
+  text-align: center;
+}
+
+.telao-empty__qr {
+  width: min(42vw, 280px);
+  height: auto;
+  border-radius: 1rem;
+  background: #fff;
+  padding: 0.65rem;
+  box-shadow: 0 18px 48px color-mix(in oklch, #000 40%, transparent);
+}
+
+.telao-empty__title {
+  margin: 0;
+  font-family: var(--font-display, Georgia, 'Times New Roman', serif);
+  font-size: clamp(1.8rem, 5vw, 3rem);
+  font-weight: 600;
+  color: #fff;
+  font-style: normal;
+}
+
+.telao-empty__sub {
+  margin: 0;
+  max-width: 22rem;
+  font-family: var(--font-body, Georgia, serif);
+  font-size: clamp(1rem, 2.4vw, 1.35rem);
+  font-style: normal;
+  line-height: 1.35;
+  color: color-mix(in oklch, #fff 78%, #f9a8d4);
+}
+
+.telao-empty__sub strong {
+  color: #fff;
+  font-weight: 700;
+}
+
 .telao-hit {
   appearance: none;
   position: absolute;

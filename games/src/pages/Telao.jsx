@@ -426,7 +426,19 @@ export default function Telao({ standalone = false } = {}) {
               </figcaption>
             </figure>
           ) : (
-            <p className="telao-empty">Aguardando fotos da festa…</p>
+            <div className="telao-empty telao-empty--qr">
+              <img
+                className="telao-empty__qr"
+                src="/telao/qr-games.png"
+                alt="QR code para abrir o games"
+                width={280}
+                height={280}
+              />
+              <p className="telao-empty__title">Entre no desafio</p>
+              <p className="telao-empty__sub">
+                Escaneie e abra <strong>casebem.com/games</strong> para jogar e enviar fotos
+              </p>
+            </div>
           )}
           <button type="button" className="telao-hit telao-hit--left" aria-label="Anterior" onClick={() => setCurrent(prevId(playlist, currentId))} />
           <button type="button" className="telao-hit telao-hit--right" aria-label="Próxima" onClick={() => setCurrent(nextId(playlist, currentId))} />

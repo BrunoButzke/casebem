@@ -8,6 +8,9 @@
   var STORY_MS = 7000;
   var POLL_MS = 1500;
   var DEFAULT_DURATION_MS = 8000;
+  var RANK_EVERY_MS = 5 * 60 * 1000;
+  var RANK_SHOW_MS = 12 * 1000;
+  var RANK_TOP = 8;
 
   var playlist = [];
   var currentId = '';
@@ -18,6 +21,8 @@
   var broadcast = { phase: 'gallery' };
   var reelTimer = null;
   var confettiKey = '';
+  var rankBreak = false;
+  var rankHideTimer = null;
 
   var app = document.getElementById('app');
   var barsEl = document.getElementById('bars');
@@ -38,6 +43,9 @@
   var drawSubEl = document.getElementById('draw-sub');
   var drawHintEl = document.getElementById('draw-hint');
   var drawConfettiEl = document.getElementById('draw-confetti');
+  var rankBreakEl = document.getElementById('rank-break');
+  var rankListEl = document.getElementById('rank-list');
+  var rankEmptyEl = document.getElementById('rank-empty');
   var lastReelNumber = '';
 
   function pad2(n) {
@@ -50,11 +58,81 @@
     return p === 'soon' || p === 'spinning' || p === 'winner';
   }
 
+  function galleryPaused() {
+    return drawActive() || rankBreak;
+  }
+
   function syncAppClass() {
     var cls = 'telao';
     if (cinema) cls += ' is-cinema';
     if (drawActive()) cls += ' is-draw';
+    if (rankBreak && !drawActive()) cls += ' is-rank';
     if (app) app.className = cls;
+  }
+
+  function hideRankBreak() {
+    rankBreak = false;
+    if (rankHideTimer) {
+      clearTimeout(rankHideTimer);
+      rankHideTimer = null;
+    }
+    setOn(rankBreakEl, false);
+    syncAppClass();
+    scheduleNext();
+  }
+
+  function renderRankRows(rows) {
+    var html = '';
+    var i;
+    var row;
+    var max = Math.min(RANK_TOP, rows.length);
+    if (!rankListEl) return;
+    for (i = 0; i < max; i++) {
+      row = rows[i];
+      html +=
+        '<li class="telao-rank__row"><span class="telao-rank__pos">' +
+        (i + 1) +
+        '</span><span class="telao-rank__name">' +
+        String(row.guestName || '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;') +
+        '</span><span class="telao-rank__pts">' +
+        (Number(row.points) || 0) +
+        ' pts' +
+        (row.stamps ? ' · ' + (Number(row.stamps) || 0) + ' selos' : '') +
+        '</span></li>';
+    }
+    rankListEl.innerHTML = html;
+    setHidden(rankEmptyEl, rows.length > 0);
+    setHidden(rankListEl, rows.length === 0);
+  }
+
+  function showRankBreak() {
+    if (drawActive()) return;
+    fetchJson('/api/desafio/ranking', function (err, data) {
+      var rows;
+      var i;
+      var a;
+      var b;
+      if (drawActive()) return;
+      rows = !err && data && data.rows ? data.rows.slice() : [];
+      rows.sort(function (x, y) {
+        a = (Number(y.points) || 0) - (Number(x.points) || 0);
+        if (a) return a;
+        b = (Number(y.stamps) || 0) - (Number(x.stamps) || 0);
+        if (b) return b;
+        return String(x.guestName || '').localeCompare(String(y.guestName || ''), 'pt');
+      });
+      renderRankRows(rows);
+      rankBreak = true;
+      setOn(rankBreakEl, true);
+      syncAppClass();
+      clearStoryTimer();
+      if (rankHideTimer) clearTimeout(rankHideTimer);
+      rankHideTimer = setTimeout(function () {
+        hideRankBreak();
+      }, RANK_SHOW_MS);
+    });
   }
 
   function setOn(el, on) {
@@ -315,7 +393,7 @@
 
   function scheduleNext() {
     clearStoryTimer();
-    if (drawActive()) return;
+    if (galleryPaused()) return;
     if (!currentId) return;
     storyTimer = setTimeout(function () {
       setCurrent(nextId(currentId));
@@ -470,6 +548,7 @@
       return;
     }
     broadcast = next;
+    if (drawActive() && rankBreak) hideRankBreak();
     renderDraw();
   }
 
@@ -536,11 +615,11 @@
     toggleCinema();
   };
   btnPrev.onclick = function () {
-    if (drawActive()) return;
+    if (galleryPaused()) return;
     setCurrent(prevId(currentId));
   };
   btnNext.onclick = function () {
-    if (drawActive()) return;
+    if (galleryPaused()) return;
     setCurrent(nextId(currentId));
   };
 
@@ -574,7 +653,7 @@
       }
       return;
     }
-    if (drawActive()) {
+    if (galleryPaused()) {
       if (key === 'f' || key === 'F' || key === 70) toggleCinema();
       return;
     }
@@ -585,4 +664,7 @@
 
   poll();
   setInterval(poll, POLL_MS);
+  setInterval(function () {
+    showRankBreak();
+  }, RANK_EVERY_MS);
 })();

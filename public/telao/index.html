@@ -20,7 +20,7 @@
     <meta property="og:url" content="https://casebem.com/telao/" />
     <meta property="og:type" content="website" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="stylesheet" href="/telao/telao.css?v=20261120d" />
+    <link rel="stylesheet" href="/telao/telao.css?v=20261120e" />
   </head>
   <body>
     <div id="app" class="telao">
@@ -32,6 +32,14 @@
           <button type="button" id="btn-cinema">Tela cheia</button>
         </div>
       </header>
+      <div id="rank-break" class="telao-rank" role="status">
+        <div class="telao-rank__inner">
+          <p class="telao-rank__eyebrow">Placar ao vivo</p>
+          <h2 class="telao-rank__title">Ranking</h2>
+          <ol id="rank-list" class="telao-rank__list"></ol>
+          <p id="rank-empty" class="telao-rank__empty is-hidden">Ainda sem pontuação — joguem nos desafios!</p>
+        </div>
+      </div>
       <div id="draw-soon" class="telao-draw telao-draw--soon" role="status">
         <div class="telao-draw__inner">
           <p class="telao-draw__eyebrow">Dani &amp; Carine</p>
@@ -68,6 +76,6 @@
         Ative JavaScript para ver o telão ao vivo de Dani e Carine.
       </p>
     </noscript>
-    <script src="/telao/telao.js?v=20261120d"></script>
+    <script src="/telao/telao.js?v=20261120e"></script>
   </body>
 </html>

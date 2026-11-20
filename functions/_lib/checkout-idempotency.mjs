@@ -181,8 +181,17 @@ export async function getOrCreateIntent(db, params, secret) {
  * @param {object} payment - {id, qrCode, qrCodeBase64}
  * @param {string} status - 'pending' ou 'failed'
  */
+/** Normaliza id do MP como texto (evita REAL no D1 virar "123.0"). */
+export function normalizeProviderReference(id) {
+  if (id == null || id === '') return null;
+  let s = String(id).trim();
+  if (/^\d+\.0$/.test(s)) s = s.slice(0, -2);
+  return s || null;
+}
+
 export async function updateIntentWithPayment(db, intentKey, payment, status) {
   const now = new Date().toISOString();
+  const providerRef = normalizeProviderReference(payment?.id);
 
   // Limpar lease_until quando status final (pending/failed)
   await db.prepare(
@@ -191,7 +200,7 @@ export async function updateIntentWithPayment(db, intentKey, payment, status) {
          lease_until = NULL, updated_at = ?
      WHERE intent_key = ?`
   ).bind(
-    payment.id || null,
+    providerRef,
     status,
     payment.qrCode || null,
     payment.qrCodeBase64 || null,

@@ -70,9 +70,22 @@ export async function onRequestPost(context) {
     mark = await markIntentPaidByExternalRef(env.DB, payment.externalReference, payment.id, now);
   }
 
-  const raffleIntent =
+  let raffleIntent =
     mark.intentKey ||
     (String(payment.externalReference || '').match(/^casebem:raffle:([0-9a-f-]{36})$/i) || [])[1];
+
+  // Fallback: localizar hold pelo payment_id da sale (mesmo se intent_pay ficou "123.0")
+  if (!raffleIntent) {
+    const hold = await env.DB.prepare(
+      `SELECT intent_key AS intentKey
+       FROM desafio_raffle_sales
+       WHERE payment_id = ? OR payment_id = ?
+       LIMIT 1`
+    )
+      .bind(String(payment.id), `${payment.id}.0`)
+      .first();
+    raffleIntent = hold?.intentKey || null;
+  }
 
   let finalized = 0;
   let numbers = [];

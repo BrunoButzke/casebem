@@ -1050,11 +1050,13 @@ export async function createRaffleCheckout(db, env, body, { origin = null } = {}
     };
   }
 
+  const { normalizeProviderReference } = await import('./checkout-idempotency.mjs');
+  const paymentId = normalizeProviderReference(payment.id);
   await db
     .prepare(`UPDATE desafio_raffle_sales SET payment_id = ? WHERE intent_key = ? AND status = 'pending'`)
-    .bind(String(payment.id), intentKey)
+    .bind(paymentId, intentKey)
     .run();
-  await updateIntentWithPayment(db, intentKey, payment, 'pending');
+  await updateIntentWithPayment(db, intentKey, { ...payment, id: paymentId }, 'pending');
 
   return {
     ok: true,

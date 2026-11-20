@@ -73,10 +73,28 @@ export async function processMercadoPagoWebhook({ db, env, payload }) {
   }
 
   let raffleFinalized = 0;
-  const raffleIntent =
+  let raffleIntent =
     mark.intentKey ||
     (String(payment.externalReference || '').match(/^casebem:raffle:([0-9a-f-]{36})$/i) || [])[1];
-  if (raffleIntent && (mark.kind === 'raffle' || String(payment.externalReference || '').includes(':raffle:'))) {
+
+  if (!raffleIntent) {
+    const hold = await db
+      .prepare(
+        `SELECT intent_key AS intentKey
+         FROM desafio_raffle_sales
+         WHERE payment_id = ? OR payment_id = ?
+         LIMIT 1`
+      )
+      .bind(String(payment.id), `${payment.id}.0`)
+      .first();
+    raffleIntent = hold?.intentKey || null;
+  }
+
+  const looksRaffle =
+    mark.kind === 'raffle' ||
+    String(payment.externalReference || '').includes(':raffle:') ||
+    Boolean(raffleIntent);
+  if (raffleIntent && looksRaffle) {
     const fin = await finalizeRaffleSalesByIntent(db, raffleIntent);
     raffleFinalized = fin.updated || 0;
   }

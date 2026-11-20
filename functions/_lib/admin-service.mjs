@@ -304,19 +304,42 @@ export async function recordGiftCheckoutIntent(db, params) {
  */
 export async function markIntentPaidByProviderRef(db, providerReference, paidAtIso) {
   if (!providerReference) return { updated: false };
+  const { normalizeProviderReference } = await import('./checkout-idempotency.mjs');
+  const ref = normalizeProviderReference(providerReference);
+  if (!ref) return { updated: false };
+  const refDotZero = `${ref}.0`;
+
+  // paid_at marca pago — status CHECK só permite creating|pending|failed (ver 0005)
   const result = await db
     .prepare(
       `UPDATE checkout_intents
        SET paid_at = COALESCE(paid_at, ?),
-           status = 'paid',
+           provider_reference = ?,
            updated_at = ?
-       WHERE provider_reference = ?`
+       WHERE provider_reference = ?
+          OR provider_reference = ?
+          OR CAST(provider_reference AS TEXT) = ?
+          OR CAST(provider_reference AS TEXT) = ?`
     )
-    .bind(paidAtIso, paidAtIso, String(providerReference))
+    .bind(paidAtIso, ref, paidAtIso, ref, refDotZero, ref, refDotZero)
     .run();
 
   const changes = Number(result?.meta?.changes ?? result?.changes ?? 0);
-  return { updated: changes > 0 };
+  if (!changes) return { updated: false };
+
+  const row = await db
+    .prepare(
+      `SELECT intent_key AS intentKey, canonical_items AS canonicalItems
+       FROM checkout_intents
+       WHERE provider_reference = ?
+       LIMIT 1`
+    )
+    .bind(ref)
+    .first();
+
+  const items = String(row?.canonicalItems || '');
+  const kind = items.includes('"giftId":"raffle-') || items.includes('"giftId": "raffle-') ? 'raffle' : 'gift';
+  return { updated: true, intentKey: row?.intentKey || null, kind };
 }
 
 /**
@@ -332,16 +355,18 @@ export async function markIntentPaidByExternalRef(db, externalReference, payment
   const intentKey = match[1];
   const kind = /^casebem:raffle:/i.test(externalReference) ? 'raffle' : 'gift';
 
+  // paid_at marca pago — não usar status='paid' (CHECK constraint)
+  const { normalizeProviderReference } = await import('./checkout-idempotency.mjs');
+  const ref = normalizeProviderReference(paymentId);
   const result = await db
     .prepare(
       `UPDATE checkout_intents
        SET paid_at = COALESCE(paid_at, ?),
            provider_reference = COALESCE(?, provider_reference),
-           status = 'paid',
            updated_at = ?
        WHERE intent_key = ?`
     )
-    .bind(paidAtIso, paymentId ? String(paymentId) : null, paidAtIso, intentKey)
+    .bind(paidAtIso, ref, paidAtIso, intentKey)
     .run();
 
   const changes = Number(result?.meta?.changes ?? result?.changes ?? 0);

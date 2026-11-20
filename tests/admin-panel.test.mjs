@@ -76,7 +76,7 @@ test('sendAdminNotification: skip sem RESEND_API_KEY (zero custo)', async () => 
 
 test('markIntentPaidByProviderRef: usa meta.changes oficial D1', async () => {
   const db = {
-    prepare() {
+    prepare(sql) {
       return {
         bind() {
           return this;
@@ -84,11 +84,22 @@ test('markIntentPaidByProviderRef: usa meta.changes oficial D1', async () => {
         async run() {
           return { success: true, meta: { changes: 1 } };
         },
+        async first() {
+          if (String(sql).includes('SELECT')) {
+            return {
+              intentKey: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+              canonicalItems: '[{"giftId":"raffle-x-1"}]',
+            };
+          }
+          return null;
+        },
       };
     },
   };
   const r = await markIntentPaidByProviderRef(db, '12345', '2026-01-01T00:00:00.000Z');
   assert.equal(r.updated, true);
+  assert.equal(r.kind, 'raffle');
+  assert.equal(r.intentKey, 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee');
 });
 
 test('setMessageHidden: 0 changes → MESSAGE_NOT_FOUND', async () => {
@@ -111,13 +122,25 @@ test('processMercadoPagoWebhook: marca paid quando approved', async () => {
   let updatedSql = '';
   const db = {
     prepare(sql) {
-      updatedSql = sql;
+      if (/UPDATE checkout_intents/.test(sql)) updatedSql = sql;
       return {
         bind() {
           return this;
         },
         async run() {
           return { success: true, meta: { changes: 1 } };
+        },
+        async first() {
+          if (/SELECT intent_key/.test(sql) && /checkout_intents/.test(sql)) {
+            return {
+              intentKey: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+              canonicalItems: '[{"giftId":"danca"}]',
+            };
+          }
+          return null;
+        },
+        async all() {
+          return { results: [] };
         },
       };
     },
@@ -143,6 +166,7 @@ test('processMercadoPagoWebhook: marca paid quando approved', async () => {
     assert.equal(result.ok, true);
     assert.equal(result.paid, true);
     assert.match(updatedSql, /paid_at/);
+    assert.doesNotMatch(updatedSql, /status\s*=\s*'paid'/);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -160,9 +184,16 @@ test('processMercadoPagoWebhook: card/boleto marca paid via external_reference',
           return this;
         },
         async run() {
-          // 1ª tentativa (provider_reference) = 0; 2ª (external_ref) = 1
-          const changes = sqls.length === 1 ? 0 : 1;
-          return { success: true, meta: { changes } };
+          // provider_reference UPDATE = 0; external_ref UPDATE = 1
+          const isProviderUpdate =
+            /UPDATE checkout_intents/.test(sql) && /provider_reference = \?/.test(sql) && /OR provider_reference/.test(sql);
+          return { success: true, meta: { changes: isProviderUpdate ? 0 : 1 } };
+        },
+        async first() {
+          return null;
+        },
+        async all() {
+          return { results: [] };
         },
       };
     },

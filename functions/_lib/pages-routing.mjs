@@ -3,7 +3,6 @@ const SPA_INDEX = {
   '/games': '/games/',
   '/app': '/app/',
   '/demo/game': '/demo/game/',
-  '/telao': '/telao/',
 };
 
 /** Prefixo de path que NÃO é tenant (slug noiva-noivo). */

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#1a1214" />
+    <meta name="robots" content="index,follow" />
+    <title>Telão Dani &amp; Carine — Galeria ao vivo | CaseBem</title>
+    <meta
+      name="description"
+      content="Telão ao vivo do casamento de Dani e Carine: fotos da festa em tela cheia para TV e projetor."
+    />
+    <link rel="canonical" href="https://casebem.com/telao/" />
+    <meta property="og:title" content="Telão Dani &amp; Carine — Galeria ao vivo" />
+    <meta
+      property="og:description"
+      content="Fotos da festa em tela cheia. Abra no TV ou projetor."
+    />
+    <meta property="og:url" content="https://casebem.com/telao/" />
+    <meta property="og:type" content="website" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="stylesheet" href="/telao/telao.css" />
+  </head>
+  <body>
+    <div id="app" class="telao">
+      <div id="bars" class="telao-bars" aria-hidden="true"></div>
+      <header class="telao-top">
+        <p>Dani &amp; Carine</p>
+        <div class="telao-top__actions">
+          <button type="button" id="btn-cinema">Tela cheia</button>
+        </div>
+      </header>
+      <div class="telao-stage">
+        <figure id="slide" class="telao-slide" style="display: none">
+          <img id="slide-img" alt="" />
+          <figcaption>
+            <strong id="slide-title"></strong>
+            <span id="slide-guest"></span>
+          </figcaption>
+        </figure>
+        <p id="empty" class="telao-empty">Aguardando fotos da festa…</p>
+        <button type="button" class="telao-hit telao-hit--left" id="btn-prev" aria-label="Anterior"></button>
+        <button type="button" class="telao-hit telao-hit--right" id="btn-next" aria-label="Próxima"></button>
+      </div>
+    </div>
+    <noscript>
+      <p style="color: #fff; text-align: center; padding: 2rem">
+        Ative JavaScript para ver o telão ao vivo de Dani e Carine.
+      </p>
+    </noscript>
+    <script src="/telao/telao.js"></script>
+  </body>
+</html>

@@ -1411,7 +1411,6 @@ export default defineConfig(({ mode }) => {
           casebemApp: resolve(rootDir, 'app/index.html'),
           casebemGames: resolve(rootDir, 'games/index.html'),
           casebemDemoGame: resolve(rootDir, 'demo/game/index.html'),
-          casebemTelao: resolve(rootDir, 'telao/index.html'),
         },
       },
     },

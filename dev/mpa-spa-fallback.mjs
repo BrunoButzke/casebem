@@ -1,6 +1,6 @@
 import { resolveTenantAssetRewrite } from '../functions/_lib/pages-routing.mjs';
 
-const SPA_PREFIXES = ['/games', '/app', '/demo/game', '/telao'];
+const SPA_PREFIXES = ['/games', '/app', '/demo/game'];
 
 export function rewriteMpaSpaUrl(url) {
   const raw = String(url || '/');

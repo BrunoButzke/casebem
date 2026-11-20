@@ -3,6 +3,7 @@ const SPA_INDEX = {
   '/games': '/games/',
   '/app': '/app/',
   '/demo/game': '/demo/game/',
+  '/telao': '/telao/',
 };
 
 /** Prefixo de path que NÃO é tenant (slug noiva-noivo). */
@@ -11,6 +12,7 @@ const RESERVED_TENANT_SEGMENTS = new Set([
   'games',
   'app',
   'demo',
+  'telao',
   'landing-page-animada',
   'lista',
   'images',

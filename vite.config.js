@@ -71,6 +71,7 @@ import {
   themeToCssVars,
 } from './functions/_lib/desafio-theme-service.mjs';
 import { listRanking, upsertRanking } from './functions/_lib/ranking-service.mjs';
+import { getGuestProgress, upsertGuestProgress } from './functions/_lib/desafio-progress-service.mjs';
 import {
   listRafflesAdmin,
   listRaffleSalesAdmin,
@@ -313,6 +314,36 @@ function guestListApiPlugin() {
               return sendJson(res, 200, { ok: true, rows });
             } catch (err) {
               const map = { VALIDATION: 400 };
+              return sendJson(res, map[err.message] || 500, {
+                ok: false,
+                error: err.message,
+                details: err.details,
+              });
+            }
+          }
+
+          if (path === '/api/desafio/progress' && req.method === 'GET') {
+            try {
+              const guestName = parsed.searchParams.get('guestName') || '';
+              const progress = await getGuestProgress(null, guestName);
+              return sendJson(res, 200, { ok: true, progress });
+            } catch (err) {
+              const map = { VALIDATION: 400 };
+              return sendJson(res, map[err.message] || 500, {
+                ok: false,
+                error: err.message,
+                details: err.details,
+              });
+            }
+          }
+
+          if (path === '/api/desafio/progress' && req.method === 'PUT') {
+            const body = await readJsonBody(req);
+            try {
+              const progress = await upsertGuestProgress(null, body);
+              return sendJson(res, 200, { ok: true, progress });
+            } catch (err) {
+              const map = { VALIDATION: 400, PROGRESS_UNAVAILABLE: 503 };
               return sendJson(res, map[err.message] || 500, {
                 ok: false,
                 error: err.message,

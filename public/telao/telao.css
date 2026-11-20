@@ -230,25 +230,41 @@ body {
 }
 
 .telao-empty--qr {
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  margin: 0;
+  padding: 5rem 1.5rem 2rem;
   font-style: normal;
+  -webkit-transform: none;
+  transform: none;
+  background: #ec4899;
+  background: -webkit-linear-gradient(160deg, #f9a8d4 0%, #ec4899 48%, #db2777 100%);
+  background: linear-gradient(160deg, #f9a8d4 0%, #ec4899 48%, #db2777 100%);
+  -webkit-box-sizing: border-box;
+  box-sizing: border-box;
 }
 
 .telao-empty__qr {
   display: block;
-  width: 42%;
-  max-width: 280px;
+  width: 58%;
+  max-width: 420px;
   height: auto;
-  margin: 0 auto 0.85rem;
-  padding: 0.65rem;
+  margin: 0 auto 0.7rem;
+  padding: 0.75rem;
   border-radius: 16px;
   background: #fff;
 }
 
 .telao-empty__title {
-  margin: 0 0 0.4rem;
+  margin: 0 0 0.35rem;
   font-family: Georgia, 'Times New Roman', serif;
-  font-size: 36px;
-  font-size: 5vw;
+  font-size: 22px;
+  font-size: 3vw;
   font-weight: 600;
   font-style: normal;
   color: #fff;
@@ -258,11 +274,11 @@ body {
   margin: 0 auto;
   max-width: 22rem;
   font-family: Arial, Helvetica, sans-serif;
-  font-size: 16px;
-  font-size: 2.2vw;
+  font-size: 13px;
+  font-size: 1.55vw;
   font-style: normal;
   line-height: 1.35;
-  color: #f9a8d4;
+  color: rgba(255, 255, 255, 0.88);
 }
 
 .telao-empty__sub strong {

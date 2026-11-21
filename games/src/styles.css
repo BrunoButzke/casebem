@@ -1927,7 +1927,10 @@ body {
   gap: 0.7rem;
   padding: 4.5rem 1.5rem 2rem;
   text-align: center;
-  background: linear-gradient(160deg, #f9a8d4 0%, #ec4899 48%, #db2777 100%);
+  background:
+    radial-gradient(ellipse at 50% 28%, color-mix(in oklch, var(--rose, #ec4899) 42%, transparent), transparent 58%),
+    radial-gradient(ellipse at 80% 90%, color-mix(in oklch, #f9a8d4 18%, transparent), transparent 40%),
+    linear-gradient(160deg, #2a1018 0%, #4a1828 45%, #1a0c12 100%);
 }
 
 .telao-empty__qr {
@@ -1955,7 +1958,7 @@ body {
   font-size: clamp(0.85rem, 1.6vw, 1.1rem);
   font-style: normal;
   line-height: 1.35;
-  color: color-mix(in oklch, #fff 90%, transparent);
+  color: color-mix(in oklch, #fff 78%, #f9a8d4);
 }
 
 .telao-empty__sub strong {

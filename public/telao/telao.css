@@ -242,9 +242,9 @@ body {
   font-style: normal;
   -webkit-transform: none;
   transform: none;
-  background: #ec4899;
-  background: -webkit-linear-gradient(160deg, #f9a8d4 0%, #ec4899 48%, #db2777 100%);
-  background: linear-gradient(160deg, #f9a8d4 0%, #ec4899 48%, #db2777 100%);
+  background: #2a1018;
+  background: -webkit-linear-gradient(160deg, #2a1018 0%, #4a1828 45%, #1a0c12 100%);
+  background: linear-gradient(160deg, #2a1018 0%, #4a1828 45%, #1a0c12 100%);
   -webkit-box-sizing: border-box;
   box-sizing: border-box;
 }
@@ -278,7 +278,7 @@ body {
   font-size: 1.55vw;
   font-style: normal;
   line-height: 1.35;
-  color: rgba(255, 255, 255, 0.88);
+  color: #f9a8d4;
 }
 
 .telao-empty__sub strong {
